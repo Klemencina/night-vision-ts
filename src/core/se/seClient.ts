@@ -102,16 +102,6 @@ class SeClient {
             uuid: x.uuid,
             scripts: x.scripts
         }))
-        console.log(
-            '[SeClient] execScripts: sending panes:',
-            list.length,
-            'pane uuids:',
-            list.map(p => p.uuid)
-        )
-        console.log(
-            '[SeClient] execScripts: scripts per pane:',
-            list.map(p => p.scripts?.length || 0)
-        )
         if (this.ww) {
             await this.ww.exec('exec-all-scripts', list)
         }
@@ -123,31 +113,11 @@ class SeClient {
     }
 
     replaceOverlays(data: any[]): void {
-        console.log(
-            '[SeClient] replaceOverlays: data panes:',
-            data.length,
-            'hub panes:',
-            this.hub.panes().length
-        )
         for (var pane of this.hub.panes()) {
             pane.overlays = pane.overlays.filter((x: any) => !x.prod)
             let p = data.find(x => x.uuid === pane.uuid)
-            console.log(
-                '[SeClient] replaceOverlays: pane uuid:',
-                pane.uuid,
-                'found in data:',
-                !!p,
-                'overlays to add:',
-                p?.overlays?.length || 0
-            )
             if (p?.overlays) {
                 pane.overlays.push(...p.overlays)
-                console.log(
-                    '[SeClient] replaceOverlays: added',
-                    p.overlays.length,
-                    'overlays to pane',
-                    pane.id
-                )
             }
         }
         let range: any
@@ -160,7 +130,6 @@ class SeClient {
             let main = this.hub.mainOv.data
             range = [main[0][0], main[main.length - 1][0]]
         }
-        console.log('[SeClient] replaceOverlays: calling calcSubset with range:', range)
         if (range?.length) {
             this.hub.calcSubset(range)
         }
@@ -191,20 +160,6 @@ class SeClient {
     onOverlayData(data: any[]): void {
         let h1 = Utils.ovDispositionHash(this.hub.panes())
         let h2 = Utils.ovDispositionHash(data)
-        console.log(
-            '[SeClient] onOverlayData: received panes:',
-            data.length,
-            'hashes match:',
-            h1 === h2
-        )
-        console.log(
-            '[SeClient] onOverlayData: received overlays per pane:',
-            data.map(p => p.overlays?.length || 0)
-        )
-        console.log(
-            '[SeClient] onOverlayData: current hub overlays per pane:',
-            this.hub.panes().map(p => p.overlays?.length || 0)
-        )
 
         if (h1 === h2) {
             this.updateOverlays(data)

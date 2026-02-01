@@ -430,7 +430,6 @@ export default {
         window.__counter__++
         if (window.__cpsId__) return
         window.__cpsId__ = setTimeout(() => {
-            console.log(window.__counter__, 'upd/sec')
             window.__counter__ = 0
             window.__cpsId__ = null
         }, 1000)

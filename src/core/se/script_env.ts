@@ -112,7 +112,6 @@ export default class ScriptEnv {
     }
 
     make_box(): Function {
-        console.log('[ScriptEnv] make_box: start for', this.src.type)
         let code = this.src.code
         let proto = Object.getPrototypeOf(this.std)
         let std = ``
@@ -120,7 +119,6 @@ export default class ScriptEnv {
             if (k === 'constructor') continue
             std += `const std_${k} = self.std.${k}.bind(self.std)\n`
         }
-        console.log('[ScriptEnv] make_box: after std bindings for', this.src.type)
 
         let tss = ``
         for (var k in this.shared) {
@@ -163,7 +161,6 @@ export default class ScriptEnv {
                 }
             `
             )
-            console.log('[ScriptEnv] make_box: done for', this.src.type)
             return fn
         } catch (e) {
             console.error('[ScriptEnv] build failed for', this.src.type, e)
@@ -190,7 +187,6 @@ export default class ScriptEnv {
     }
 
     prep(src: string): string {
-        console.log('[ScriptEnv] prep: start for', this.src.type)
         let h = this.src.type
         src = '\t\t  let _pref = \`\${_id}<-' + h + '<-\`\n' + src
 
@@ -230,7 +226,6 @@ export default class ScriptEnv {
         } while (m)
 
         let out = u.wrap_idxs(src, 'std_')
-        console.log('[ScriptEnv] prep: done for', this.src.type)
         return out
     }
 

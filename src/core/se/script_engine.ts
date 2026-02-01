@@ -87,34 +87,17 @@ class ScriptEngine {
         }
         // Let current run() finish; don't overwrite map/paneStruct or we get "reading 'step' of undefined"
         if (this.running) return
-        console.log(
-            '[ScriptEngine] exec_all: paneStruct panes:',
-            (self as any).paneStruct?.length || 0
-        )
-        console.log(
-            '[ScriptEngine] exec_all: scriptLib.iScripts keys:',
-            Object.keys((self as any).scriptLib?.iScripts || {})
-        )
 
         this.map = this.struct_to_map((self as any).paneStruct)
-        console.log('[ScriptEngine] exec_all: map keys (script uuids):', Object.keys(this.map))
 
         const initResult = this.init_state()
-        console.log('[ScriptEngine] exec_all: init_state returned', initResult)
         if (!initResult) return
         this.init_map()
-        console.log(
-            '[ScriptEngine] exec_all: init_map complete, map has',
-            Object.keys(this.map).length,
-            'scripts'
-        )
 
         if (Object.keys(this.map).length) {
-            console.log('[ScriptEngine] exec_all: calling run()')
             await this.run()
             this.drain_queues()
         } else {
-            console.log('[ScriptEngine] exec_all: no scripts, sending empty overlay-data')
             this.send('overlay-data', this.format_data())
         }
         this.send_state()
@@ -150,17 +133,9 @@ class ScriptEngine {
 
     add_script(s: any): void {
         let script = (self as any).scriptLib?.iScripts?.[s.type]
-        console.log(
-            '[ScriptEngine] add_script:',
-            s.type,
-            'found:',
-            !!script,
-            'scriptLib keys:',
-            Object.keys((self as any).scriptLib?.iScripts || {})
-        )
         if (!script) {
             delete this.map[s.uuid]
-            return console.log('Unknown script: ', s.type)
+            return
         }
 
         try {
@@ -169,10 +144,8 @@ class ScriptEngine {
                 update: script.code?.update || '',
                 post: script.code?.post || ''
             }
-            console.log('[ScriptEngine] add_script: after s.code for', s.type)
 
             symstd.parse(s)
-            console.log('[ScriptEngine] add_script: after symstd.parse for', s.type)
 
             for (var id in this.mods) {
                 if (this.mods[id].pre_env) {
@@ -200,7 +173,6 @@ class ScriptEngine {
                     this.tss
                 )
             )
-            console.log('[ScriptEngine] add_script: after ScriptEnv for', s.type)
 
             this.map[s.uuid] = s
 
@@ -211,7 +183,6 @@ class ScriptEngine {
             }
 
             s.env.build()
-            console.log('[ScriptEngine] add_script: after build for', s.type)
         } catch (err) {
             console.error('[ScriptEngine] add_script failed for', s.type, err)
             // Remove from map so run() skips this script; overlay-data still sent
@@ -281,19 +252,15 @@ class ScriptEngine {
             this.send_update(e.data.id)
             this.send_state()
         } catch (err) {
-            console.log(err)
+            // Swallow update errors to avoid console spam
         }
     }
 
     init_state(sel?: string[]): boolean {
-        console.log('[ScriptEngine] init_state: starting')
         sel = sel ?? Object.keys(this.map)
-        console.log('[ScriptEngine] init_state: sel count =', sel?.length)
         let task = sel.join(',')
-        console.log('[ScriptEngine] init_state: task =', task?.substring(0, 50))
 
         if (this.running) {
-            console.log('[ScriptEngine] init_state: already running, returning false')
             // Only restart when task changed (new scripts); same task = duplicate message, let current run() finish
             this._restart = task !== this.task
             return false
@@ -315,7 +282,6 @@ class ScriptEngine {
         this.running = false
         this.task = task
 
-        console.log('[ScriptEngine] init_state: complete, returning true')
         return true
     }
 
@@ -356,25 +322,12 @@ class ScriptEngine {
     }
 
     init_map(): void {
-        console.log(
-            '[ScriptEngine] init_map: starting with',
-            Object.keys(this.map).length,
-            'scripts'
-        )
         for (var id in this.map) {
-            console.log('[ScriptEngine] init_map: processing script', id)
             this.add_script(this.map[id])
-            console.log('[ScriptEngine] init_map: finished script', id)
         }
-        console.log('[ScriptEngine] init_map: complete')
     }
 
     async run(sel?: string[]): Promise<void> {
-        console.log(
-            '[ScriptEngine] run: starting with',
-            (sel || Object.keys(this.map)).length,
-            'scripts'
-        )
         this.send('engine-state', { running: true })
 
         var t1 = Utils.now()
@@ -387,7 +340,6 @@ class ScriptEngine {
         this.running = true
 
         try {
-            console.log('[ScriptEngine] run: calling env.init() for', sel.length, 'scripts')
             for (var id of sel) {
                 this.map[id].env.init()
             }
@@ -395,17 +347,10 @@ class ScriptEngine {
             let ohlcv = this.data.ohlcv.data
             let start = this.start(ohlcv)
             this.shared.event = 'step'
-            console.log(
-                '[ScriptEngine] run: processing',
-                ohlcv.length - start,
-                'candles starting from',
-                start
-            )
 
             for (var i = start; i < ohlcv.length; i++) {
                 if (i % 5000 === 0) await Utils.pause(0)
                 if (this.restarted()) {
-                    console.log('[ScriptEngine] run: restarted, returning early')
                     return
                 }
 
@@ -427,12 +372,11 @@ class ScriptEngine {
                 this.limit()
             }
 
-            console.log('[ScriptEngine] run: calling env.output.post() for', sel.length, 'scripts')
             for (var id of sel) {
                 this.map[id].env.output.post()
             }
         } catch (err) {
-            console.log('[ScriptEngine] run: ERROR', err)
+            console.error('[ScriptEngine] run failed:', err)
         }
 
         this.post_run_mods(sel)
@@ -440,7 +384,6 @@ class ScriptEngine {
         this.perf = Utils.now() - t1
         this.running = false
 
-        console.log('[ScriptEngine] run: complete, sending overlay-data')
         this.send('overlay-data', this.format_data())
     }
 
@@ -501,12 +444,6 @@ class ScriptEngine {
             uuid: x.uuid,
             overlays: this.override_overlays(x.overlays || [])
         }))
-        console.log(
-            '[ScriptEngine] format_data: returning panes:',
-            result.length,
-            'overlays per pane:',
-            result.map(p => p.overlays?.length || 0)
-        )
         return result
     }
 

@@ -47,20 +47,7 @@ class Scripts {
         this.srcLib.push(...Object.values(Tools).map(x => (x as any).default))
         this.srcLib.push(...Object.values(Indicators).map(x => (x as any).default))
         this.srcLib.push(...srcs)
-        console.log('[Scripts] init: loaded', this.srcLib.length, 'script sources')
-        console.log(
-            '[Scripts] init: overlays found:',
-            Object.keys(Overlays).length,
-            'indicators found:',
-            Object.keys(Indicators).length
-        )
         this.parse()
-        console.log(
-            '[Scripts] init: parsed prefabs:',
-            Object.keys(this.prefabs),
-            'iScripts:',
-            Object.keys(this.iScripts)
-        )
 
         await this.ww.exec('upload-scripts', {
             prefabs: Object.keys(this.prefabs).reduce((a: any, k) => {
