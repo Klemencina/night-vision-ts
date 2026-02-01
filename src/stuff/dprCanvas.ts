@@ -1,0 +1,49 @@
+
+// Setup canvas element with DPI adjustment
+
+import Utils from './utils'
+
+type SetupResult = [HTMLCanvasElement | null, CanvasRenderingContext2D | null]
+
+function setup(id: string, w: number, h: number): SetupResult {
+
+    let canvas = document.getElementById(id) as HTMLCanvasElement | null
+    if (!canvas) {
+        console.warn(`Canvas element #${id} not found, retrying...`)
+        return [null, null]
+    }
+    let dpr = window.devicePixelRatio || 1
+    canvas.style.width = `${w}px`
+    canvas.style.height = `${h}px`
+    if (dpr < 1) dpr = 1
+    var rect = canvas.getBoundingClientRect()
+    canvas.width = rect.width * dpr
+    canvas.height = rect.height * dpr
+    let ctx = canvas.getContext('2d', {})!
+    ctx.scale(dpr, dpr)
+    // Fallback fix for Brave browser
+    // https://github.com/brave/brave-browser/issues/1738
+    const ctxWithBackup = ctx as CanvasRenderingContext2D & { measureTextOrg?: typeof ctx.measureText }
+    if (!ctxWithBackup.measureTextOrg) {
+        ctxWithBackup.measureTextOrg = ctx.measureText
+    }
+    let nvjsId = id.split('-').shift() || ''
+    ctx.measureText = text =>
+        Utils.measureText(ctx, text, nvjsId) as TextMetrics
+
+    return [canvas, ctx]
+
+}
+
+function resize(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    let dpr = window.devicePixelRatio || 1
+    canvas.style.width = `${w}px`
+    canvas.style.height = `${h}px`
+    if (dpr < 1) dpr = 1
+    var rect = canvas.getBoundingClientRect()
+    canvas.width = rect.width * dpr
+    canvas.height = rect.height * dpr
+    ctx.scale(dpr, dpr)
+}
+
+export default { setup, resize }
