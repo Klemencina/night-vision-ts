@@ -76,11 +76,11 @@ $effect(() => {
     }
 })
 
-onMount(() => {
+onMount(async () => {
 
     hub.calcSubset(range)
     hub.detectMain()
-    hub.loadScripts(range, scan.tf, true)
+    await hub.loadScripts(true)
     meta.init(props)
 
     scan.updatePanesHash()
@@ -153,7 +153,7 @@ function update(opt = {}, emit = true) {
 // or the list of panes/overlays is changed
 // TODO: we can update only panes with
 // overlay changes. But it requires more work
-function fullUpdate(opt = {}) {
+async function fullUpdate(opt = {}) {
 
     let prevIbMode = scan.ibMode
     interval = scan.detectInterval()
@@ -167,7 +167,7 @@ function fullUpdate(opt = {}) {
     hub.init(hub.data)
     hub.detectMain()
     // TODO: exec only if scripts changed
-    hub.loadScripts()
+    await hub.loadScripts(true)
     meta.init(props)
     meta.restore()
     scan.updatePanesHash()

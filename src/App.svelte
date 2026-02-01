@@ -2,10 +2,8 @@
 <script>
 import.meta.hot
 import { NightVision } from './index.js'
-import { onMount } from 'svelte'
 import data from '../data/data-ohlcv-rsi.json?id=main'
-import data2 from '../data/data-area.json?id=main-2'
-import data3 from '../data/data-aapl.json?id=main-3'
+import dataIndexed from '../data/data-ohlcv-rsi-indexed.json?id=main-indexed'
 import TestStack from '../tests/testStack.js'
 
 
@@ -48,76 +46,131 @@ TODO: data-api interface:
 
 // TODO: Memory leak tests
 
+// Element references using Svelte 5 bind:this
+let container1 = $state(null)
+let container2 = $state(null)
+
 let stack = new TestStack()
 let chart = $state(null)
 
+// Create second test stack for index-based chart
+let stack2 = new TestStack()
+let chart2 = $state(null)
+
+// Track if charts are already initialized
+let chartsInitialized = $state(false)
+
 //data.indexBased = true
 
-onMount(() => {
+// Debug: Log which data files are loaded
+const regularData = data?.panes?.[0]?.overlays?.[0]?.data
+const indexedData = dataIndexed?.panes?.[0]?.overlays?.[0]?.data
+console.log('=== DATA VERIFICATION ===')
+console.log('Regular data first 3 timestamps:', regularData?.slice(0, 3).map(d => d[0]))
+console.log('Indexed data first 3 timestamps:', indexedData?.slice(0, 3).map(d => d[0]))
+console.log('Regular intervals:', regularData?.[1]?.[0] - regularData?.[0]?.[0], 'ms')
+console.log('Indexed intervals:', indexedData?.[1]?.[0] - indexedData?.[0]?.[0], 'ms')
+
+// Use $effect to create charts after DOM elements are ready
+$effect(() => {
+    if (!container1 || !container2 || chartsInitialized) return
+    
+    chartsInitialized = true
+    
+    console.log('Creating TOP chart (time-based) with regular data')
+    // Time-based chart (top)
     chart = new NightVision('chart-container', {
+        id: 'chart-time',
         data: data,
-        //autoResize: true,
-        //indexBased: true
+        autoResize: true,
     })
-    //chart.data = data2
+    
+    console.log('Creating BOTTOM chart (index-based) with indexed data')
+    // Index-based chart (bottom)
+    chart2 = new NightVision('chart-container2', {
+        id: 'chart-index',
+        data: dataIndexed,
+        autoResize: true,
+        indexBased: true
+    })
+    
     window.chart = chart
+    window.chart2 = chart2
     window.stack = stack
+    window.stack2 = stack2
 
-    stack.setGroup('data-sync')
+    // Setup tests for time-based chart
+    setupTests(stack, chart)
+    
+    // Setup tests for index-based chart
+    setupTests(stack2, chart2)
 
-    fullReset(stack, chart)
-    paneAddRem(stack, chart)
-    paneSettings(stack, chart)
-    ovAddRem(stack, chart)
-    scaleChange(stack, chart)
-    mainOverlay(stack, chart)
-    ovSettings(stack, chart)
-    ovPropsChange(stack, chart)
-    ovDataChange(stack, chart)
-
-    stack.setGroup('real-time')
-
-    realTime(stack, chart)
-
-    stack.setGroup('tfs-test')
-
-    timeBased(stack, chart)
-    indexBasedTest(stack, chart)
-
-    stack.setGroup('ind-test')
-
-    indicators(stack, chart)
-
-    stack.setGroup('tools-test')
-
-    //rangeTool(stack, chart)
-    lineTool(stack, chart)
-
-    stack.setGroup('navy-test')
-
-    watchPropTest(stack, chart)
-
-    stack.setGroup('scales-test')
-
-    logScaleTest(stack, chart)
-
-    stack.setGroup('memory-test')
-
-    memoryTest(stack, chart)
-
-    //  Type in the console: stack.execAll()
-    //  or: stack.exec('<group>')    
+//  Type in the console: stack.execAll() or stack2.execAll()
+    //  or: stack.exec('<group>') or stack2.exec('<group>')
 
 })
 
+// Helper function to setup all tests on a stack/chart pair
+function setupTests(testStack, chartInstance) {
+    testStack.setGroup('data-sync')
+
+    fullReset(testStack, chartInstance)
+    paneAddRem(testStack, chartInstance)
+    paneSettings(testStack, chartInstance)
+    ovAddRem(testStack, chartInstance)
+    scaleChange(testStack, chartInstance)
+    mainOverlay(testStack, chartInstance)
+    ovSettings(testStack, chartInstance)
+    ovPropsChange(testStack, chartInstance)
+    ovDataChange(testStack, chartInstance)
+
+    testStack.setGroup('real-time')
+
+    realTime(testStack, chartInstance)
+
+    testStack.setGroup('tfs-test')
+
+    timeBased(testStack, chartInstance)
+    indexBasedTest(testStack, chartInstance)
+
+    testStack.setGroup('ind-test')
+
+    indicators(testStack, chartInstance)
+
+    testStack.setGroup('tools-test')
+
+    //rangeTool(testStack, chartInstance)
+    lineTool(testStack, chartInstance)
+
+    testStack.setGroup('navy-test')
+
+    watchPropTest(testStack, chartInstance)
+
+    testStack.setGroup('scales-test')
+
+    logScaleTest(testStack, chartInstance)
+
+    testStack.setGroup('memory-test')
+
+    memoryTest(testStack, chartInstance)
+}
+
 </script>
 <style>
-#chart-container {
-    position: absolute;
+.app {
+    display: flex;
+    flex-direction: column;
     width: 100%;
     height: 100%;
 }
+
+#chart-container, #chart-container2 {
+    position: relative;
+    width: 100%;
+    height: 50%;
+}
 </style>
 <div class="app">
-    <div id="chart-container"></div>
+    <div id="chart-container" bind:this={container1}></div>
+    <div id="chart-container2" bind:this={container2}></div>
 </div>

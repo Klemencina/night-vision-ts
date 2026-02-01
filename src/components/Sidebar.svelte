@@ -78,15 +78,24 @@ $effect(() => {
     }
 })
 
-onMount(async () => { await setup() })
+onMount(async () => { 
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => setup())
+})
 onDestroy(() => {
     if (mc) mc.destroy()
     clearInterval(updId)
 })
 
 async function setup() {
-    [canvas, ctx] = dpr.setup(
-        canvasId, layout.sbMax[S], layout.height)
+    if (!layout.sbMax || !layout.height) return
+    let result = dpr.setup(canvasId, layout.sbMax[S], layout.height)
+    if (!result[0]) {
+        // Canvas not ready, retry
+        requestAnimationFrame(() => setup())
+        return
+    }
+    [canvas, ctx] = result
 
     scale = getCurrentScale()
     update()
@@ -180,7 +189,7 @@ async function listeners() {
 
 function update($layout = layout) {
 
-    if (!$layout) return // If not exists
+    if (!$layout || !ctx) return // If not exists or canvas not ready
 
     scale = getCurrentScale()
 

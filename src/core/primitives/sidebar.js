@@ -8,6 +8,8 @@ const HPX = Const.HPX
 
 function body(props, layout, scale, side, ctx) {
 
+    if (!ctx) return // Guard against null context
+    
     var points = scale.ys
     ctx.font = props.config.FONT
 
@@ -37,6 +39,7 @@ function body(props, layout, scale, side, ctx) {
 }
 
 function border(props, layout, side, ctx) {
+    if (!ctx) return {x: 0, y: 0, w: 0, h: 0} // Guard against null context
     var S = side === 'right' ? 1 : 0
     var sb = layout.sbMax[S]
     var x, y, w, h
@@ -79,6 +82,7 @@ function border(props, layout, side, ctx) {
 
 function panel(props, layout, scale, side, ctx) {
 
+    if (!ctx) return // Guard against null context
     const panHeight = props.config.PANHEIGHT
     let $ = props.cursor.scales[scale.scaleSpecs.id] || 0
     let lbl = $.toFixed(scale.prec)
@@ -96,6 +100,7 @@ function panel(props, layout, scale, side, ctx) {
 }
 
 function tracker(props, layout, scale, side, ctx, tracker) {
+    if (!ctx) return // Guard against null context
     const panHeight = Math.floor(props.config.PANHEIGHT * 0.8)
     const ct = props.config.CANDLE_TIME && props.timeFrame >= Const.MINUTE
     let $ = tracker.value
@@ -134,6 +139,7 @@ function roundRect(ctx, x, y, w, h, r, s) {
 
 function upperBorder(props, layout, ctx) {
 
+    if (!ctx) return // Guard against null context
     ctx.strokeStyle = props.colors.scale
     ctx.beginPath()
     ctx.moveTo(0, 0.5)
@@ -144,6 +150,7 @@ function upperBorder(props, layout, ctx) {
 
 function error(props, layout, side, ctx) {
 
+    if (!ctx) return // Guard against null context
     var S = side === 'right' ? 1 : 0
     var sb = layout.sbMax[S]
     ctx.font = props.config.FONT

@@ -52,12 +52,20 @@ let canvas = $state(null) // Canvas ref
 let ctx = $state(null) // Canvas context
 let input = $state(null) // Input attacher to the renderer
 
-onMount(() => { setup() })
+onMount(() => { 
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => setup())
+})
 
 // Attach an input object
 // Remove input listeners on renderer dostroy() event
 export function attach($input) {
     input = $input
+    if (!canvas) {
+        // Canvas not ready, defer attachment
+        requestAnimationFrame(() => attach($input))
+        return
+    }
     input.setup({
         id, canvas, ctx, props, layout, rrUpdId, gridUpdId
     })
@@ -75,12 +83,15 @@ export function getInput() {
 }
 
 function setup() {
-
-    [canvas, ctx] = dpr.setup(
-        canvasId, layout.width, layout.height)
-
+    if (!layout.width || !layout.height) return
+    let result = dpr.setup(canvasId, layout.width, layout.height)
+    if (!result[0]) {
+        // Canvas not ready, retry
+        requestAnimationFrame(() => setup())
+        return
+    }
+    [canvas, ctx] = result
     //update()
-
 }
 
 function update($layout = layout) {

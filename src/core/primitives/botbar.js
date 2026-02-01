@@ -11,6 +11,8 @@ const {
 
 function body(props, layout, ctx) {
 
+    if (!ctx) return // Guard against null context
+    
     const width = layout.botbar.width
     const height = layout.botbar.height
 
@@ -54,6 +56,7 @@ function body(props, layout, ctx) {
 
 function panel(props, layout, ctx) {
 
+    if (!ctx) return // Guard against null context
     let lbl = formatCursorX(props)
     ctx.fillStyle = props.colors.panel
 

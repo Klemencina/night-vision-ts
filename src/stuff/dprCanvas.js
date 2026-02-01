@@ -6,6 +6,10 @@ import Utils from './utils.js'
 function setup(id, w, h) {
 
     let canvas = document.getElementById(id)
+    if (!canvas) {
+        console.warn(`Canvas element #${id} not found, retrying...`)
+        return [null, null]
+    }
     let dpr = window.devicePixelRatio || 1
     canvas.style.width = `${w}px`
     canvas.style.height = `${h}px`

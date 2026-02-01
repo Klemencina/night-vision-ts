@@ -41,6 +41,12 @@ export default class Input {
         this.meta = MetaHub.instance(this.props.id)
         this.events = Events.instance(this.props.id)
 
+        // Check if canvas is ready before attaching listeners
+        if (!this.canvas) {
+            console.warn('Pointer: canvas not ready, skipping setup')
+            return
+        }
+        
         await this.listeners()
         this.mouseEvents('addEventListener')
     }

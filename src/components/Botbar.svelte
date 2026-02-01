@@ -49,18 +49,26 @@ $effect(() => {
     }
 })
 
-onMount(() => { setup() })
+onMount(() => { 
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => setup())
+})
 
 function setup() {
     let botbar = layout.botbar;
-    [canvas, ctx] = dpr.setup(
-        canvasId, botbar.width, botbar.height)
-
+    if (!botbar) return
+    let result = dpr.setup(canvasId, botbar.width, botbar.height)
+    if (!result[0]) {
+        // Canvas not ready, retry
+        requestAnimationFrame(() => setup())
+        return
+    }
+    [canvas, ctx] = result
     update()
 }
 
 function update($layout = layout) {
-    if (!layout.botbar) return // If not exists
+    if (!layout.botbar || !ctx) return // If not exists or canvas not ready
 
     bb.body(props, layout, ctx)
 
