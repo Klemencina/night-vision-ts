@@ -8,7 +8,7 @@ import symstd from './symstd.js'
 import TS from './script_ts.js'
 
 const DEF_LIMIT = 5   // default buff length
-const WAIT_EXEC = 10  // merge script execs, ms
+// const WAIT_EXEC = 10  // merge script execs, ms // Currently unused
 
 class ScriptEngine {
 

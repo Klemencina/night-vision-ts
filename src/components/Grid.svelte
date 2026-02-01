@@ -5,7 +5,7 @@
 // Input: props (tf, range, ...), overlay scripts, data
 // Output: bunch of renderers, each for different context
 
-import { onMount, onDestroy } from 'svelte'
+import { onMount } from 'svelte'
 import Scripts from '../core/scripts.js'
 import DataHub from '../core/dataHub.js'
 import MetaHub from '../core/metaHub.js'
@@ -21,7 +21,7 @@ import Trackers from '../core/primitives/trackers.js'
 // Renderers
 import Canvas from '../components/renderers/Canvas.svelte'
 
-let { id, props, main, layout } = $props()
+let { id, props, layout } = $props()
 
 export function getLayers() { return layers }
 
@@ -59,11 +59,11 @@ onMount(() => {
     keyboard = new Keyboard(`grid-${id}`, events)
 })
 
-function make(event) {
+function make() {
 
     if (!hub.panes()[id]) return // If not exists
 
-    // console.log(`Grid ${id} ${event || 're-made'}`)
+    // console.log(`Grid ${id} re-made`)
 
     destroyLayers()
 
@@ -211,7 +211,7 @@ function onTask(event) {
 <style>
 </style>
 <div class="nvjs-grid" {style}>
-    {#each renderers as rr, i}
+    {#each renderers as rr}
         {#if rr.ctxType === 'Canvas'}
             <Canvas {id} bind:this={rr.ref}
                 layout={layout}

@@ -63,7 +63,6 @@ function sbStyle(i) {
 }
 
 function onClick(index) {
-    let scale = scales[index]
     let idxs = layout.settings.scaleSideIdxs
     idxs[S] = index
     events.emitSpec('hub', 'set-scale-index', {
@@ -95,7 +94,7 @@ function onClick(index) {
 </style>
 <div class="scale-selector" id={ssId} style={ssStyle}
     transition:fade={{duration: 150}}>
-    {#each scales as scale, i}
+    {#each scales as scale}
     {@const id = scale.scaleSpecs.id  }
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->

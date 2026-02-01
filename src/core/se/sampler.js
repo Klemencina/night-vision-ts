@@ -12,7 +12,7 @@ export default function(T, auto = false) {
     return function(x, t) {
 
         let tf = this.__tf__
-        let id = this.__id__
+        // let id = this.__id__ // Currently unused
         t = t || se.t
         let val = auto ? se[T][0] : x
         // TODO: closing at a specific time

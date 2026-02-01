@@ -27,7 +27,7 @@ import indexBasedTest from '../tests/tfs-test/allIndexBased.js'
 
 // More tests
 import indicators from '../tests/indicators/indicators.js'
-import rangeTool from '../tests/tools/rangeTool.js'
+// import rangeTool from '../tests/tools/rangeTool.js' // Currently unused
 import lineTool from '../tests/tools/lineTool.js'
 import watchPropTest from '../tests/navy/watchPropTest.js'
 

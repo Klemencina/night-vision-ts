@@ -10,10 +10,10 @@ export default function avgVolume(ctx, core, props, cnv, vIndex = 5) {
     let len = props.avgVolumeSMA
     let sma = fastSma(core.data, vIndex, i1, i2, len)
     let layout  = core.layout
-    let maxv = cnv.maxVolume
+    // let maxv = cnv.maxVolume // Currently unused
     let vs = cnv.volScale
     let h = layout.height
-    let h05 = core.props.config.VOLSCALE * 0.5 * h
+    // let h05 = core.props.config.VOLSCALE * 0.5 * h // Currently unused
 
     ctx.lineJoin = "round"
     ctx.lineWidth = 0.75

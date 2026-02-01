@@ -13,7 +13,7 @@ function body(props, layout, scale, side, ctx) {
     var points = scale.ys
     ctx.font = props.config.FONT
 
-    var {x, y, w, h} = border(props, layout, side, ctx)
+    var {x, w} = border(props, layout, side, ctx)
 
     ctx.fillStyle = props.colors.text
     ctx.beginPath()

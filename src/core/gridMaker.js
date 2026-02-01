@@ -4,8 +4,7 @@ import Utils from '../stuff/utils.js'
 import layoutFn from './layoutFn.js'
 import Scale from './gridScale.js'
 
-const { TIMESCALES, $SCALES, WEEK, MONTH, YEAR, HOUR, DAY } = Const
-const MAX_INT = Number.MAX_SAFE_INTEGER
+const { TIMESCALES, WEEK, MONTH, YEAR, HOUR, DAY } = Const
 
 
 /* Scales System:
@@ -35,9 +34,9 @@ const MAX_INT = Number.MAX_SAFE_INTEGER
 function GridMaker(id, specs, mainGrid = null) {
 
     let { hub, meta, props, settings, height } = specs
-    let { interval, timeFrame, range, ctx, timezone } = props
+    let { interval, timeFrame, range, timezone } = props
 
-    let y_t = null // TODO: implement
+    // let y_t = null // TODO: implement
     let ls = !!settings.logScale // Pane's log scale
 
     // All overlays
@@ -213,7 +212,7 @@ function GridMaker(id, specs, mainGrid = null) {
         return 0
     }
 
-    function insertLine(prev, p, x, m0) {
+    function insertLine(prev, p, x) {
 
         let prevT = prev[0]
         let t = p[0]
@@ -222,8 +221,6 @@ function GridMaker(id, specs, mainGrid = null) {
             prevT += timezone * HOUR
             t += timezone * HOUR
         }
-        let d = timezone * HOUR
-
         // TODO: take this block =========> (see below)
         if ((prev[0] || timeFrame === YEAR) &&
             Utils.getYear(t) !== Utils.getYear(prevT)) {

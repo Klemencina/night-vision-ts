@@ -6,9 +6,8 @@
 // TODO: add support of overlays with
 // drawBotbar() function
 
-import { onMount, onDestroy } from 'svelte'
+import { onMount } from 'svelte'
 import Events from '../core/events.js'
-import Utils from '../stuff/utils.js'
 import dpr from '../stuff/dprCanvas.js'
 import bb from '../core/primitives/botbar.js'
 
@@ -67,7 +66,7 @@ function setup() {
     update()
 }
 
-function update($layout = layout) {
+function update() {
     if (!layout.botbar || !ctx) return // If not exists or canvas not ready
 
     bb.body(props, layout, ctx)

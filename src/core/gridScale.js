@@ -16,7 +16,7 @@ const MAX_INT = Number.MAX_SAFE_INTEGER
 
 export default function Scale(id, src, specs) {
 
-    let { hub, props, settings, height } = specs
+    let { props, height } = specs
     let { ctx } = props
     let meta = MetaHub.instance(props.id)
     let prefabs = ScriptHub.instance(props.id).prefabs
@@ -214,30 +214,26 @@ export default function Scale(id, src, specs) {
         let h = Math.min(self.B, height)
         if (h < props.config.GRIDY) return 1
         let n = h / props.config.GRIDY // target grid N
-        let yrange = self.$hi
+        // let yrange = self.$hi // Currently unused
         if (self.$lo > 0) {
             var yratio = self.$hi / self.$lo
         } else {
             yratio = self.$hi / 1 // TODO: small values
         }
-        let m = yrange * (props.config.GRIDY / h)
-        let p = parseInt(yrange.toExponential().split('e')[1])
         return Math.pow(yratio, 1/n)
     }
 
     function dollarMultLo() {
-
+ 
         let h = Math.min(height - self.B, height)
         if (h < props.config.GRIDY) return 1
         let n = h / props.config.GRIDY // target grid N
-        let yrange = Math.abs(self.$lo)
+        // let yrange = Math.abs(self.$lo) // Currently unused
         if (self.$hi < 0 && self.$lo < 0) {
             var yratio = Math.abs(self.$lo / self.$hi)
         } else {
             yratio = Math.abs(self.$lo) / 1
         }
-        let m = yrange * (props.config.GRIDY / h)
-        let p = parseInt(yrange.toExponential().split('e')[1])
         return Math.pow(yratio, 1/n)
     }
 

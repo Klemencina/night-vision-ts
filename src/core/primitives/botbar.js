@@ -4,7 +4,7 @@ import Const from '../../stuff/constants.js'
 import Utils from '../../stuff/utils.js'
 
 const {
-    MINUTE15, MINUTE, HOUR,
+    MINUTE15, HOUR,
     DAY, WEEK, MONTH, YEAR,
     MONTHMAP, HPX
 } = Const
@@ -17,7 +17,7 @@ function body(props, layout, ctx) {
     const height = layout.botbar.height
 
     const sb0 = layout.main.sbMax[0]
-    const sb1 = layout.main.sbMax[1]
+    // const sb1 = layout.main.sbMax[1] // Currently unused
 
     ctx.font = props.config.FONT
     ctx.clearRect(0, 0, width, height)

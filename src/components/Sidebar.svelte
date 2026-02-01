@@ -14,7 +14,6 @@
 // TODO: hiver hint component (e.g. for sidebar errors)
 
 import { onMount, onDestroy } from 'svelte'
-import { fade } from 'svelte/transition'
 import ScaleSelector from './ScaleSelector.svelte'
 import Events from '../core/events.js'
 import Utils from '../stuff/utils.js'
@@ -261,7 +260,6 @@ function calcRange(diff1 = 1, diff2 = 1) {
         // Use old mapping to get a new range
         let f = y => math.exp((y - drug.B) / drug.A)
 
-        let copy = range.slice()
         range[0] = f(new_hi)
         range[1] = f(new_lo)
 
@@ -271,12 +269,12 @@ function calcRange(diff1 = 1, diff2 = 1) {
 }
 
 // TODO: log scale work with distortions when auto is disabled
-function rezoomRange(delta, diff1, diff2) {
-
-    let yTransform = getYtransform()
-    if (!yTransform || yTransform.auto) return
-
-    zoom = 1.0
+// function rezoomRange(delta, diff1, diff2) {
+// 
+//     let yTransform = getYtransform()
+//     if (!yTransform || yTransform.auto) return
+// 
+//     zoom = 1.0
     // TODO: further work (improve scaling ratio)
     if (delta < 0) delta /= 3.75 // Btw, idk why 3.75, but it works
     delta *= 0.25
@@ -333,7 +331,7 @@ function getYtransform() {
     return meta.yTransforms[id][scaleId]
 }
 
-function onClick(e) {
+function onClick() {
     if (!scale) return
     events.emitSpec('hub', 'set-scale-index', {
         paneId: id,

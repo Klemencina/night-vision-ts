@@ -1,7 +1,7 @@
 // Calculations for candles & volume overlays
 // DEPRECATED
 
-import Utils from '../../../stuff/utils.js'
+// import Utils from '../../../stuff/utils.js'
 import Const from '../../../stuff/constants.js'
 
 const HPX = Const.HPX

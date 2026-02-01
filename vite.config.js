@@ -23,7 +23,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    port: 8085,
+    port: 4888,
   },
   build: {
     target: "es2022",

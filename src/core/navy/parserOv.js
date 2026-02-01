@@ -69,7 +69,7 @@ export default class ParserOV {
         do {
             var m = FREGX1.exec(code)
             if (m) {
-                let fkeyword = m[1].trim()
+                // let fkeyword = m[1].trim() // Not used
                 let fname = m[2]
                 let fargs = m[3]
 
@@ -103,7 +103,7 @@ export default class ParserOV {
         do {
             var m = FREGX2.exec(code)
             if (m) {
-                let fkeyword = m[1].trim()
+                // let fkeyword = m[1].trim() // Not used
                 let fname = m[2]
                 let fargs = m[3]
 
@@ -137,7 +137,7 @@ export default class ParserOV {
         do {
             var m = FREGX3.exec(code)
             if (m) {
-                let fkeyword = m[1].trim()
+                // let fkeyword = m[1].trim() // Not used
                 let fname = m[2]
                 let fargs = m[3]
 

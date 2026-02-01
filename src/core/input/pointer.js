@@ -253,8 +253,8 @@ export default class Input {
        }, add))
    }
 
-   panFade(event) {
-       let dt = Utils.now() - this.drug.t0
+    panFade() {
+        let dt = Utils.now() - this.drug.t0
        let dx = this.range[1] - this.drug.r[1]
        let v = 42 * dx / dt
        let v0 = Math.abs(v * 0.01)

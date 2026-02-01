@@ -2,7 +2,6 @@
 // Container for y-transforms, meta functions, other info
 // about overlays (e.g. yRange)
 
-import Utils from '../stuff/utils.js'
 import Events from './events.js'
 import DataHub from './dataHub.js'
 

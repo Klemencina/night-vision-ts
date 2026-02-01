@@ -1,12 +1,11 @@
 <script>
 // Legend block (collection of LegendLines)
 
-import { onMount, onDestroy } from 'svelte'
 import Events from '../core/events.js'
 import DataHub from '../core/dataHub.js'
 import LegendLine from './LegendLine.svelte'
 
-let { id, props, main, layout } = $props()
+let { id, props, layout } = $props()
 
 let hub = DataHub.instance(props.id)
 let events = Events.instance(props.id)
@@ -40,7 +39,7 @@ function update() {
 {#key legendRR} <!-- Full chart re-render -->
 {#if hub.panes()[id]}
 <div class="nvjs-legend" {style}>
-    {#each hub.panes()[id].overlays as ov, i}
+    {#each hub.panes()[id].overlays as ov}
     <LegendLine gridId={id}
         {props} {layout} {ov} />
     {/each}

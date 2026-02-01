@@ -3,7 +3,7 @@
 
 export default function resizeTracker(chart) {
 
-    const resizeObserver = new ResizeObserver((entries) => {
+    const resizeObserver = new ResizeObserver(() => {
         let rect = chart.root.getBoundingClientRect()
         chart.width = rect.width
         chart.height = rect.height

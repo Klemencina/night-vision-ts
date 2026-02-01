@@ -1,9 +1,6 @@
 // Layout calculations (grid, scales, etc)
 
 import GridMaker from './gridMaker.js'
-import Utils from '../stuff/utils.js'
-import math from '../stuff/math.js'
-import logScale from './logScale.js'
 
 function Layout(props, hub, meta) {
 

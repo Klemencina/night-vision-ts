@@ -40,7 +40,7 @@ export default function(self, range, overlay = null) {
             return Math.floor(y * self.A + self.B) + HPX
         },
         // Time-axis nearest step
-        tMagnet: t => {
+        tMagnet: () => {
             // TODO: reimplement
             //if (ib) t = self.tiMap.smth2i(t)
             /*const cn = self.candles || self.master_grid.candles
@@ -65,7 +65,7 @@ export default function(self, range, overlay = null) {
             return range[0] + x / r
         },
         // $-axis nearest step
-        $magnet: price => { },
+        $magnet: () => { },
         // Nearest candlestick
         cMagnet: t => {
             const cn = self.candles || self.master_grid.candles
@@ -74,7 +74,7 @@ export default function(self, range, overlay = null) {
             return cn[i]
         },
         // Nearest data points
-        dataMagnet: t => {  /* TODO: implement */ }
+        dataMagnet: () => {  /* TODO: implement */ }
     })
 
     return self

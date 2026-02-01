@@ -18,10 +18,10 @@ let {
     toolbar = false,
     scripts = [],
     config = {},
-    indexBased = false,
+    // indexBased = false, // Currently unused
     timezone = 0,
-    data = {},
-    autoResize = false
+    // data = {}, // Currently unused
+    // autoResize = false // Currently unused
 } = $props()
 
 let configMerge = $derived(Object.assign(Const.ChartConfig, config))

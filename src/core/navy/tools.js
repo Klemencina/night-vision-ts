@@ -3,9 +3,9 @@
 
 import strip from '@freecodecamp/strip-comments'
 
-const COMMENTS = /(\/\*([\s\S]*?)\*\/)|(\/\/(.*)$)/gm
+// const COMMENTS = /(\/\*([\s\S]*?)\*\/)|(\/\/(.*)$)/gm
 
-function decomment(src, file) {
+function decomment(src) {
     //src = maskStrings(src, file)
     //src = strip(maskRegex(src))//.replace(COMMENTS, '')
     //src = maskRegex(src, atob)
@@ -18,9 +18,9 @@ function decomment(src, file) {
 
 // Mask comments inside all strings
 // (needed b/c there could  be comment symbols // & /*)
-function maskStrings(src, file) {
+function maskStrings(src) {
 
-    let quotes = findStrings(src, file)
+    let quotes = findStrings(src)
     for (var q of quotes) {
         let tmp = src.slice(0, q[0] + 1)
         tmp += src.slice(q[0] + 1, q[1])
@@ -34,7 +34,7 @@ function maskStrings(src, file) {
 }
 
 // Unmask comment symbols back
-function unmaskStrings(src, file) {
+function unmaskStrings(src) {
     return src
         .replaceAll('[!C~1!]', '/*')
         .replaceAll('[!C~2!]', '//')
@@ -42,7 +42,7 @@ function unmaskStrings(src, file) {
 
 
 // Find all strings (``, '' or "")
-function findStrings(src, file) {
+function findStrings(src) {
 
     let count = { '\'' : 0, '"' : 0, '`' : 0 }
     let pairs = []
@@ -81,9 +81,10 @@ function findStrings(src, file) {
 
 }
 
-function errsrc(src, i) {
-    return `\n>>> ${src.slice(i-25, i+25)}`
-}
+// function errsrc(src, i) {
+//     return `
+// >>> ${src.slice(i-25, i+25)}`
+// }
 
 // Hide/show RegExp content with base64
 //(needed b/c there could be comment symbols // & /*)

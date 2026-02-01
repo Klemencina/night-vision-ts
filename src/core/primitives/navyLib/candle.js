@@ -1,9 +1,8 @@
 
 // Candle object for Candles overlay
 
-import Const from '../../../stuff/constants.js'
-
-const HPX = Const.HPX
+// import Const from '../../../stuff/constants.js'
+// const HPX = Const.HPX
 
 export default class Candle {
 

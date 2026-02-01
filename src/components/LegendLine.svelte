@@ -89,13 +89,13 @@ let eyeStyle = $derived(`
     margin-bottom: -2px;
 `)
 
-let touchBoxStyle = $derived(`
-    width: ${boundary.width}px;
-    height: ${boundary.height}px;
-    background: #55f9;
-    top: -1px;
-    left: -2px;
-`)
+// let touchBoxStyle = $derived(`
+//     width: ${boundary.width}px;
+//     height: ${boundary.height}px;
+//     background: #55f9;
+//     top: -1px;
+//     left: -2px;
+// `)
 
 let kingStyle = $derived(`
     background-image: url(${icons['king3']});
@@ -136,7 +136,7 @@ function onMouseMove(e) {
     }
 }
 
-function onMouseLeave(e) {
+function onMouseLeave() {
     setTimeout(() => {
         hover = false
     })
@@ -149,7 +149,7 @@ function onClick() {
     selected = true
 }
 
-function onDeselect(event) {
+function onDeselect() {
     selected = false
 }
 
@@ -167,9 +167,9 @@ function findOverlayScale(scales) {
     ) || scales[layout.scaleIndex]
 }
 
-function disableLegend() {
-    console.log('here')
-}
+// function disableLegend() {
+//     console.log('here')
+// }
 
 </script>
 <style>
@@ -257,7 +257,7 @@ function disableLegend() {
         {:else if legendHtml && data.length}
             {@html legendHtml(data, prec, formatter)}
         {:else if data.length}
-            {#each legend(data, prec) || [] as v, i}
+            {#each legend(data, prec) || [] as v}
             <span class="nvjs-ll-value"
                   style={`color: ${v[1]}`}>
                 {formatter(v[0])}

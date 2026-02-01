@@ -7,7 +7,7 @@
 import ScriptStd from './script_std.js'
 import se from './script_engine.js'
 import * as u from './script_utils.js'
-import TS from './script_ts.js'
+// import TS from './script_ts.js' // Currently unused
 import Pane from './pane.js'
 
 const FDEFS1 = /(function |)([$A-Z_][0-9A-Z_$\.]*)[\s]*?\((.*?\s*)\)/mi

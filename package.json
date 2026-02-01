@@ -11,7 +11,16 @@
     "dev": "vite --host",
     "build": "vite build && node ./types/build-script.cjs",
     "build-cdn": "vite build --config vite.cdn.config.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "format": "prettier --write \"src/**/*.{js,svelte}\" \"tests/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.{js,svelte}\" \"tests/**/*.js\"",
+    "audit": "npm audit",
+    "ci": "npm run lint && npm run test && npm run build"
   },
   "main": "./dist/night-vision.js",
   "module": "./dist/night-vision.js",
@@ -33,8 +42,16 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-svelte": "^3.14.0",
+    "globals": "^17.3.0",
+    "happy-dom": "^20.4.0",
+    "prettier": "^3.8.1",
+    "prettier-plugin-svelte": "^3.4.1",
     "vite": "^6.0.0",
     "vite-plugin-banner": "^0.7.1",
+    "vitest": "^4.0.18",
     "ws": "^8.18.0"
   }
 }

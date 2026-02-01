@@ -6,7 +6,7 @@
 // Input: props, layout, layers (data+overlay), Input object
 // Output: Graphix
 
-import { onMount, onDestroy } from 'svelte'
+import { onMount } from 'svelte'
 import Events from '../../core/events.js'
 import dpr from '../../stuff/dprCanvas.js'
 

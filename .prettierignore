@@ -1,0 +1,28 @@
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+
+# Legacy test files
+tests/tvjs-test/
+
+# Documentation
+docs/
+
+# Data files
+data/
+
+# Type definitions (auto-generated)
+types/
+
+# Config files
+vite/
+*.config.js
+*.config.cjs
+
+# Misc
+*.md
+*.json
+*.html
+*.css

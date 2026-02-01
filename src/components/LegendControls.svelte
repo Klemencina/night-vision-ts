@@ -1,7 +1,6 @@
 <script>
 // Legend control buttons
 
-import { onMount } from 'svelte'
 import Events from '../core/events.js'
 import icons from '../assets/icons.json'
 

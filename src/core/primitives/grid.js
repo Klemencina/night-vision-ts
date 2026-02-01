@@ -40,14 +40,14 @@ export default class Grid extends Layer {
         ctx.beginPath()
 
         const ymax = layout.height
-        for (var [x, p] of layout.xs) {
+        for (var [x] of layout.xs) {
 
             ctx.moveTo(x + HPX, 0)
             ctx.lineTo(x + HPX, ymax)
 
         }
 
-        for (var [y, y$] of layout.ys) {
+        for (var [y] of layout.ys) {
 
             ctx.moveTo(0, y + HPX)
             ctx.lineTo(layout.width, y + HPX)

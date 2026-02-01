@@ -2,7 +2,7 @@
 
 // Pane component: combines grid, sidebars & legend
 
-import { onMount, onDestroy } from 'svelte'
+import { onMount } from 'svelte'
 import Grid from './Grid.svelte'
 import Sidebar from './Sidebar.svelte'
 import SidebarStub from './SidebarStub.svelte'
