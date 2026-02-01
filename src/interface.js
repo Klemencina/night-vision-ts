@@ -1,6 +1,7 @@
 
 // Vanilla JS interface
 
+import { mount, unmount } from 'svelte'
 import NightVisionComp from './NightVision.svelte'
 import DataHub from './core/dataHub.js'
 import MetaHub from './core/metaHub.js'
@@ -18,6 +19,7 @@ class NightVision {
 
         this._data = props.data || {}
         this._scripts = props.scripts || []
+        this._props = { ...props }
 
         let id = props.id || 'nvjs'
 
@@ -35,9 +37,9 @@ class NightVision {
         this.scriptHub.init(this._scripts)
 
         this.root = document.getElementById(target)
-        this.comp = new NightVisionComp({
+        this.comp = mount(NightVisionComp, {
             target: this.root,
-            props: props
+            props: this._props
         })
 
         // TODO: remove the observer on chart destroy
@@ -53,45 +55,50 @@ class NightVision {
 
     // Chart container id (should be unique)
     get id() {
-        return this.comp.id
+        return this._props.id
     }
     set id(val) {
-        this.comp.$set({id: val})
+        this._props.id = val
+        this._remount()
     }
 
     // Width of the chart
     get width() {
-        return this.comp.width
+        return this._props.width
     }
     set width(val) {
-        this.comp.$set({width: val})
+        this._props.width = val
+        this._remount()
         setTimeout(() => this.update())
     }
 
     // Height of the chart
     get height() {
-        return this.comp.height
+        return this._props.height
     }
     set height(val) {
-        this.comp.$set({height: val})
+        this._props.height = val
+        this._remount()
         setTimeout(() => this.update())
     }
 
     // Colors (modify specific colors)
     // TODO: not reactive enough
     get colors() {
-        return this.comp.colors
+        return this._props.colors
     }
     set colors(val) {
-        this.comp.$set({colors: val})
+        this._props.colors = val
+        this._remount()
     }
 
     // Show NV logo or not
     get showLogo() {
-        return this.comp.showLogo
+        return this._props.showLogo
     }
     set showLogo(val) {
-        this.comp.$set({id: val})
+        this._props.showLogo = val
+        this._remount()
     }
 
 
@@ -116,27 +123,39 @@ class NightVision {
 
     // Overwrites the default config values
     get config() {
-        return this.comp.config
+        return this._props.config
     }
     set config(val) {
-        this.comp.$set({config: val})
+        this._props.config = val
+        this._remount()
     }
 
     // Index-based mode of rendering
     get indexBased() {
-        return this.comp.indexBased
+        return this._props.indexBased
     }
     set indexBased(val) {
-        this.comp.$set({indexBased: val})
+        this._props.indexBased = val
+        this._remount()
     }
 
     // Timezone (Shift from UTC, hours)
     get timezone() {
-        return this.comp.timezone
+        return this._props.timezone
     }
     set timezone(val) {
-        this.comp.$set({timezone: val})
+        this._props.timezone = val
+        this._remount()
         setTimeout(() => this.update())
+    }
+
+    // Remount component with new props (Svelte 5 way to update props from outside)
+    _remount() {
+        unmount(this.comp)
+        this.comp = mount(NightVisionComp, {
+            target: this.root,
+            props: this._props
+        })
     }
 
     // *** Internal variables ***
@@ -239,7 +258,7 @@ class NightVision {
 
     // Should call this to clean-up memory / events
     destroy() {
-        this.comp.$destroy()
+        unmount(this.comp)
         this.ww.stop()
     } 
 }

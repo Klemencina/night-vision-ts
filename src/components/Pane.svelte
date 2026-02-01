@@ -10,37 +10,36 @@ import Legend from './Legend.svelte'
 import Events from '../core/events.js'
 import Utils from '../stuff/utils.js'
 
-export let id // Pane id
-export let props // General props
-export let main // Is this the main Pane
-export let layout // Pane/grid layout
+let { id, props, main, layout: initialLayout } = $props()
 
 let events = Events.instance(props.id)
-let lsb  // left sidebar ref
-let rsb  // right sidebar ref
-let grid // grid ref
+let lsb = $state(null)  // left sidebar ref
+let rsb = $state(null)  // right sidebar ref
+let grid = $state(null) // grid ref
+let layout = $state(initialLayout)
 
-$:leftSb = Utils.getScalesBySide(0, layout)
-$:rightSb = Utils.getScalesBySide(1, layout)
+let leftSb = $derived(Utils.getScalesBySide(0, layout))
+let rightSb = $derived(Utils.getScalesBySide(1, layout))
 
-$:style = `
+let style = $derived(`
     width: ${props.width}px;
     height: ${(layout || {}).height}px;
     /* didn't work, coz canvas draws through the border
     border-top: ${id ? '1px solid' : 'none'};
     border-color: ${props.colors.scale};
     box-sizing: border-box;*/
-`
+`)
 
 // EVENT INTEFACE
-events.on(`pane-${id}:update-pane`, update)
+$effect(() => {
+    events.on(`pane-${id}:update-pane`, update)
+    return () => {
+        events.off(`pane-${id}`)
+    }
+})
 
 onMount(() => {
     // console.log(`Pane ${id} mounted`)
-})
-
-onDestroy(() => {
-    events.off(`pane-${id}`)
 })
 
 // Send updates to all child components

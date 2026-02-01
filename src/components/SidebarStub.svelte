@@ -1,16 +1,13 @@
 <script>
 // Replacement for an empty scale
 
-export let id // Sidebar id (=pane/grid id)
-export let props = {} // General props
-export let layout = {} // Grid layout
-export let side // Left/right side
+let { id, props = {}, layout = {}, side } = $props()
 
-let S = side === 'right' ? 1 : 0
+let S = $derived(side === 'right' ? 1 : 0)
 
-let stubId = `${props.id}-stub-${id}-${side}`
+let stubId = $derived(`${props.id}-stub-${id}-${side}`)
 
-$:stubStyle = `
+let stubStyle = $derived(`
     left: ${S * (layout.width + layout.sbMax[0])}px;
     top: ${layout.offset || 0}px;
     width: ${layout.sbMax[S] - 1}px;
@@ -23,7 +20,7 @@ $:stubStyle = `
     border-top: ${id ? 'auto' : 'none'};
     border-color: ${props.colors.scale};
     background: ${props.colors.back}
-`
+`)
 
 </script>
 <style>

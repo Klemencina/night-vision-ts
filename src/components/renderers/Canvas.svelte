@@ -10,43 +10,49 @@ import { onMount, onDestroy } from 'svelte'
 import Events from '../../core/events.js'
 import dpr from '../../stuff/dprCanvas.js'
 
-export let id // Pane/grid id
-export let props = {} // General props
-export let rr = {} // Renderer props
-export let layout = {} // Grid layout
+let { id, props = {}, rr = {}, layout: initialLayout = {} } = $props()
 
 let events = Events.instance(props.id)
+let layout = $state(initialLayout)
 
-let rrUpdId = `rr-${id}-${rr.id}`
-let gridUpdId = `grid-${id}`
-let rrId = `${props.id}-rr-${id}-${rr.id}`
-let canvasId = `${props.id}-canvas-${id}-${rr.id}`
+let rrUpdId = $derived(`rr-${id}-${rr.id}`)
+let gridUpdId = $derived(`grid-${id}`)
+let rrId = $derived(`${props.id}-rr-${id}-${rr.id}`)
+let canvasId = $derived(`${props.id}-canvas-${id}-${rr.id}`)
 
 // TODO: separate renderer, meaning it's not bundled with
 // other overlay and can be update separately
 // EVENT INTERFACE
-events.on(`${rrUpdId}:update-rr`, update)
-events.on(`${rrUpdId}:run-rr-task`, onTask)
+$effect(() => {
+    events.on(`${rrUpdId}:update-rr`, update)
+    events.on(`${rrUpdId}:run-rr-task`, onTask)
+    return () => {
+        events.off(`${rrUpdId}`)
+        if (input) input.destroy()
+    }
+})
 
-$:rrStyle = `
+let rrStyle = $derived(`
     left: ${layout.sbMax[0]}px;
     top: ${layout.offset || 0}px;
     position: absolute;
     height: ${layout.height}px;
-}`
-$:width = layout.width
-$:height = layout.height
-$:resizeWatch(width, height)
+}`)
+let width = $derived(layout.width)
+let height = $derived(layout.height)
 
-let canvas // Canvas ref
-let ctx // Canvas context
-let input // Input attacher to the renderer
+// Watch for resize
+$effect(() => {
+    if (width && height) {
+        resizeWatch()
+    }
+})
+
+let canvas = $state(null) // Canvas ref
+let ctx = $state(null) // Canvas context
+let input = $state(null) // Input attacher to the renderer
 
 onMount(() => { setup() })
-onDestroy(() => {
-    events.off(`${rrUpdId}`)
-    if (input) input.destroy()
-})
 
 // Attach an input object
 // Remove input listeners on renderer dostroy() event

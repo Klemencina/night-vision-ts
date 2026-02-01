@@ -15,22 +15,20 @@ import MetaHub from '../core/metaHub.js'
 import logo from '../assets/logo.json'
 import icons from '../assets/icons.json'
 
-export let gridId // gridId
-export let ov // Overlay
-export let props // General props
-export let layout // Pane/grid layout
+let { gridId, ov, props, layout } = $props()
 
 let meta = MetaHub.instance(props.id)
 let events = Events.instance(props.id)
 
-let hover = false
-let ref // Reference to the legend-line div
-let nRef // Reference to the legend-name span
-let ctrlRef // Reference to the legend controls
-let selected = false
-let show = true
+let hover = $state(false)
+let ref = $state(null) // Reference to the legend-line div
+let nRef = $state(null) // Reference to the legend-name span
+let ctrlRef = $state(null) // Reference to the legend controls
+let selected = $state(false)
+let show = $state(true)
+let display = $state(ov.settings.display !== false)
 
-$:updId = `ll-${gridId}-${ov.id}`
+let updId = $derived(`ll-${gridId}-${ov.id}`)
 
 onMount(() => {
     // EVENT INTEFACE
@@ -43,9 +41,9 @@ onDestroy(() => {
     events.off(updId)
 })
 
-$:name = ov.name ?? (`${ov.type || 'Overlay'}-${ov.id}`)
-$:fontSz = parseInt(props.config.FONT.split('px').shift())
-$:styleBase = `
+let name = $derived(ov.name ?? (`${ov.type || 'Overlay'}-${ov.id}`))
+let fontSz = $derived(parseInt(props.config.FONT.split('px').shift()))
+let styleBase = $derived(`
     font: ${props.config.FONT};
     font-size: ${fontSz + (ov.main ? 5 : 3)}px;
     font-weight: 300;
@@ -62,65 +60,67 @@ $:styleBase = `
     border-color: ${
         selected ? props.colors.llSelect : 'auto'
     } !important;
-`
+`)
 
-$:styleHover = `
+let styleHover = $derived(`
     background: ${props.colors.back};
     border: 1px solid ${props.colors.grid};
 
-`
+`)
 
-$:dataStyle = `
+let dataStyle = $derived(`
     font-size: ${fontSz + (ov.main ? 3 : 2)}px;
     color: ${props.colors.llValue}
-`
+`)
 
-$:logoStyle = `
+let logoStyle = $derived(`
     background-image: url(${logo[0]});
     background-size: contain;
     background-repeat: no-repeat;
-`
+`)
 
-$:eyeStyle = `
+let state = $derived(display ? 'open' : 'closed')
+
+let eyeStyle = $derived(`
     background-image: url(${icons[state+'-eye']});
     background-size: contain;
     background-repeat: no-repeat;
     margin-top: ${(boundary.height - 20) * 0.5 - 3}px;
     margin-bottom: -2px;
-`
+`)
 
-$:touchBoxStyle = `
+let touchBoxStyle = $derived(`
     width: ${boundary.width}px;
     height: ${boundary.height}px;
     background: #55f9;
     top: -1px;
     left: -2px;
-`
+`)
 
-$:kingStyle = `
+let kingStyle = $derived(`
     background-image: url(${icons['king3']});
     background-size: contain;
     background-repeat: no-repeat;
     margin-left: ${
         hover || !display || !data.length ? 7 : 3
     }px;
-`
+`)
 
-$:boundary = ref ? ref.getBoundingClientRect() : {}
-$:nBoundary = nRef ? nRef.getBoundingClientRect() : {}
-$:style = styleBase + (hover ? styleHover : '')
-$:legendFns = meta.getLegendFns(gridId, ov.id) || {}
-$:legend = legendFns.legend
-$:legendHtml = legendFns.legendHtml
-$:values = props.cursor.values || []
-$:data = (values[gridId] || [])[ov.id] || []
-$:scale = findOverlayScale(layout.scales)
-$:prec = scale.prec
-$:display = ov.settings.display !== false
-$:state = display ? 'open' : 'closed'
+let boundary = $derived(ref ? ref.getBoundingClientRect() : {})
+let nBoundary = $derived(nRef ? nRef.getBoundingClientRect() : {})
+let style = $derived(styleBase + (hover ? styleHover : ''))
+let legendFns = $derived(meta.getLegendFns(gridId, ov.id) || {})
+let legend = $derived(legendFns.legend)
+let legendHtml = $derived(legendFns.legendHtml)
+let values = $derived(props.cursor.values || [])
+let data = $derived((values[gridId] || [])[ov.id] || [])
+let scale = $derived(findOverlayScale(layout.scales))
+let prec = $derived(scale.prec)
 
 // Disable legend if legend() returns null dynamically
-$:if(legend && data && !legend(data, prec)) show = false
+$effect(() => {
+    if(legend && data && !legend(data, prec)) show = false
+})
 
 function update() {
     display = ov.settings.display !== false
@@ -131,7 +131,6 @@ function onMouseMove(e) {
     if (e.clientX < nBoundary.x + nBoundary.width + 35
         && !hover) {
         setTimeout(() => {
-            updateBoundaries()
             hover = true
         })
     }
@@ -139,7 +138,6 @@ function onMouseMove(e) {
 
 function onMouseLeave(e) {
     setTimeout(() => {
-        updateBoundaries()
         hover = false
     })
 }
@@ -167,11 +165,6 @@ function findOverlayScale(scales) {
     return Object.values(scales).find(
         x => x.scaleSpecs.ovIdxs.includes(ov.id)
     ) || scales[layout.scaleIndex]
-}
-
-function updateBoundaries() {
-    if (!ref) return
-    boundary = ref.getBoundingClientRect()
 }
 
 function disableLegend() {
@@ -228,12 +221,12 @@ function disableLegend() {
 }*/
 </style>
 {#if !legendFns.noLegend && ov.settings.showLegend !== false && show}
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="nvjs-legend-line" {style}
-    on:mousemove={onMouseMove}
-    on:mouseleave={onMouseLeave}
-    on:click={onClick}
-    on:keypress={null}
+    onmousemove={onMouseMove}
+    onmouseleave={onMouseLeave}
+    onclick={onClick}
+    onkeypress={null}
     bind:this={ref}>
     {#if ov.main && props.showLogo}
     <div class="nvjs-logo" style={logoStyle}></div>

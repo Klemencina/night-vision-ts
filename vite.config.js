@@ -26,7 +26,7 @@ export default defineConfig({
     port: 8085,
   },
   build: {
-    target: "es2018",
+    target: "es2022",
     outDir: "../dist",
     emptyOutDir: true,
     lib: {

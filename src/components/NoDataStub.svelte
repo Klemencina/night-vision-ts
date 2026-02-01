@@ -1,9 +1,9 @@
 <script>
 // Show this when there's no main data
 
-export let props
+let { props } = $props()
 
-$:style = `
+let style = $derived(`
     display: flex;
     width: ${props.width}px;
     height: ${props.height}px;
@@ -15,7 +15,7 @@ $:style = `
     user-select: none;
     align-items:center;
     justify-content:center;
-`
+`)
 </script>
 <style>
 .nvjs-no-data-stub {

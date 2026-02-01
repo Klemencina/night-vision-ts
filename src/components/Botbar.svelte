@@ -12,36 +12,44 @@ import Utils from '../stuff/utils.js'
 import dpr from '../stuff/dprCanvas.js'
 import bb from '../core/primitives/botbar.js'
 
-export let props = {} // General props
-export let layout = {} // Grid layout
+let { props = {}, layout = {} } = $props()
 
 let bbUpdId = `botbar`
-let bbId = `${props.id}-botbar`
-let canvasId = `${props.id}-botbar-canvas`
+let bbId = $derived(`${props.id}-botbar`)
+let canvasId = $derived(`${props.id}-botbar-canvas`)
 
 let events = Events.instance(props.id)
 
-// EVENT INTERFACE
-events.on(`${bbUpdId}:update-bb`, update)
-events.on(`${bbUpdId}:show-bb-panel`, f => showPanel = f)
+let showPanel = $state(true)
 
-$:bbStyle = `
+// EVENT INTERFACE
+$effect(() => {
+    events.on(`${bbUpdId}:update-bb`, update)
+    events.on(`${bbUpdId}:show-bb-panel`, f => showPanel = f)
+    return () => {
+        events.off(`${bbUpdId}`)
+    }
+})
+
+let bbStyle = $derived(`
     background: ${props.colors.back};
     width: ${(layout.botbar || {}).width}px;
     height: ${(layout.botbar || {}).height}px;
-`
+`)
 
-let canvas // Canvas ref
-let ctx // Canvas context
-let showPanel = true
+let canvas = $state(null) // Canvas ref
+let ctx = $state(null) // Canvas context
 
-$:width = (layout.botbar || {}).width
-$:resizeWatch(width)
+let width = $derived((layout.botbar || {}).width)
+
+// Watch for resize
+$effect(() => {
+    if (width) {
+        resizeWatch()
+    }
+})
 
 onMount(() => { setup() })
-onDestroy(() => {
-    events.off(`${bbUpdId}`)
-})
 
 function setup() {
     let botbar = layout.botbar;
@@ -52,8 +60,6 @@ function setup() {
 }
 
 function update($layout = layout) {
-    layout = $layout
-
     if (!layout.botbar) return // If not exists
 
     bb.body(props, layout, ctx)

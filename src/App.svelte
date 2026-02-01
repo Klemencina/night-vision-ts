@@ -25,7 +25,7 @@ import realTime from '../tests/real-time/realTime.js'
 
 // More tests
 import timeBased from '../tests/tfs-test/allTimeBased.js'
-import indexBased from '../tests/tfs-test/allIndexBased.js'
+import indexBasedTest from '../tests/tfs-test/allIndexBased.js'
 
 // More tests
 import indicators from '../tests/indicators/indicators.js'
@@ -49,7 +49,7 @@ TODO: data-api interface:
 // TODO: Memory leak tests
 
 let stack = new TestStack()
-let chart = null
+let chart = $state(null)
 
 //data.indexBased = true
 
@@ -82,7 +82,7 @@ onMount(() => {
     stack.setGroup('tfs-test')
 
     timeBased(stack, chart)
-    indexBased(stack, chart)
+    indexBasedTest(stack, chart)
 
     stack.setGroup('ind-test')
 

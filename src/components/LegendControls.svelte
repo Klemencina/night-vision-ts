@@ -5,24 +5,22 @@ import { onMount } from 'svelte'
 import Events from '../core/events.js'
 import icons from '../assets/icons.json'
 
-export let gridId // gridId
-export let ov // Overlay
-export let props // General props
-export let height // Legend-line height
+let { gridId, ov, props, height } = $props()
 
 let events = Events.instance(props.id)
 
-$:display = ov.settings.display !== false
-$:state = display ? 'open' : 'closed'
+let display = $state(ov.settings.display !== false)
+let state = $derived(display ? 'open' : 'closed')
 
-$:eyeStyle = `
+let eyeStyle = $derived(`
     background-image: url(${icons[state+'-eye']});
     background-size: contain;
     background-repeat: no-repeat;
     margin-top: ${(height - 20) * 0.5 - 3}px;
     /* FIX 'overflow: hidden' changes baseline */
     margin-bottom: -2px;
-`
+`)
+
 export function update() {
     display = ov.settings.display !== false
 }
@@ -49,8 +47,8 @@ function onDisplayClick() {
     filter: brightness(1.25);
 }
 </style>
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="nvjs-eye" style={eyeStyle}
-    on:click|stopPropagation={onDisplayClick}>
+    onclick={(e) => { e.stopPropagation(); onDisplayClick() }}>
 </div>

@@ -17,7 +17,7 @@ import Pane from './Pane.svelte'
 import Botbar from './Botbar.svelte'
 import NoDataStub from './NoDataStub.svelte'
 
-export let props = {}
+let { props = {} } = $props()
 
 // Getters
 export function getLayout() { return layout }
@@ -47,28 +47,34 @@ let scan = Scan.instance(props.id)
 
 scan.init(props)
 
-let interval = scan.detectInterval()
-let timeFrame = scan.getTimeframe()
-let range = scan.defaultRange()
-let cursor = new Cursor(meta)
+let interval = $state(scan.detectInterval())
+let timeFrame = $state(scan.getTimeframe())
+let range = $state(scan.defaultRange())
+let cursor = $state(new Cursor(meta))
 let storage = {} // Storage for helper variables
 let ctx = new Context(props) // For measuring text
-let chartRR = 0
-let layout = null
+let chartRR = $state(0)
+let layout = $state(null)
 
 scan.calcIndexOffsets()
 
-$:chartProps = Object.assign(
+let chartProps = $derived(Object.assign(
     {interval, timeFrame, range, ctx, cursor},
     props
-)
+))
 
 // EVENT INTEFACE
-events.on('chart:cursor-changed', onCursorChanged)
-events.on('chart:cursor-locked', onCursorLocked)
-events.on('chart:range-changed', onRangeChanged)
-events.on('chart:update-layout', update)
-events.on('chart:full-update', fullUpdate)
+$effect(() => {
+    events.on('chart:cursor-changed', onCursorChanged)
+    events.on('chart:cursor-locked', onCursorLocked)
+    events.on('chart:range-changed', onRangeChanged)
+    events.on('chart:update-layout', update)
+    events.on('chart:full-update', fullUpdate)
+    return () => {
+        // Clean-up event listeners on 'chart' component
+        events.off('chart')
+    }
+})
 
 onMount(() => {
 
@@ -82,11 +88,6 @@ onMount(() => {
     layout = new Layout(chartProps, hub, meta)
 
     // console.log(layout) // DEBUG
-})
-
-onDestroy(() => {
-    // Clean-up event listeners on 'chart' component
-    events.off('chart')
 })
 
 function onCursorChanged($cursor, emit = true) {

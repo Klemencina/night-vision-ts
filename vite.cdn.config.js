@@ -24,7 +24,7 @@ export default defineConfig({
     }),
   ],
   build: {
-    target: "es2018",
+    target: "es2022",
     outDir: "../dist/cdn",
     emptyOutDir: true,
     inlineDynamicImports: true,

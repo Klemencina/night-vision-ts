@@ -21,10 +21,7 @@ import Trackers from '../core/primitives/trackers.js'
 // Renderers
 import Canvas from '../components/renderers/Canvas.svelte'
 
-export let id // Pane/grid id
-export let props // General props
-export let main // Is this the main grid?
-export let layout // Grid layout (scales, etc...)
+let { id, props, main, layout } = $props()
 
 export function getLayers() { return layers }
 
@@ -33,32 +30,33 @@ let meta = MetaHub.instance(props.id)
 let events = Events.instance(props.id)
 let scripts = Scripts.instance(props.id)
 
-let layers = []
-let renderers = []
-let input = null
-let keyboard = null
+let layers = $state([])
+let renderers = $state([])
+let input = $state(null)
+let keyboard = $state(null)
 
 // EVENT INTEFACE
-events.on(`grid-${id}:update-grid`, update)
-events.on(`grid-${id}:remake-grid`, make)
-events.on(`grid-${id}:propagate`, propagate)
-events.on(`grid-${id}:run-grid-task`, onTask)
+$effect(() => {
+    events.on(`grid-${id}:update-grid`, update)
+    events.on(`grid-${id}:remake-grid`, make)
+    events.on(`grid-${id}:propagate`, propagate)
+    events.on(`grid-${id}:run-grid-task`, onTask)
+    return () => {
+        events.off(`grid-${id}`)
+        if (keyboard) keyboard.off()
+    }
+})
 
-$:style = `
+let style = $derived(`
     width: ${layout.width}px;
     height: ${layout.height}px;
     background: ${props.colors.back};
     margin-left: ${layout.sbMax[0]}px;
-`
+`)
 
 onMount(() => {
     make('mounted')
     keyboard = new Keyboard(`grid-${id}`, events)
-})
-
-onDestroy(() => {
-    events.off(`grid-${id}`)
-    keyboard.off()
 })
 
 function make(event) {
@@ -104,7 +102,7 @@ function destroyLayers() {
 function makeLayers() {
 
     let list = hub.panes()[id].overlays || []
-    let layers = []
+    let newLayers = []
 
     for (var i = 0; i < list.length; i++) {
         let ov = list[i]
@@ -126,7 +124,7 @@ function makeLayers() {
         l.ctxType = prefab.ctx
         env.overlay = l.overlay // make a reference
         meta.exctractFrom(l.overlay)
-        layers.push(l)
+        newLayers.push(l)
 
         l.overlay.init()
 
@@ -135,15 +133,15 @@ function makeLayers() {
     // TODO: make crosshair customizable
     // TODO: check order if overlay list is changed
     // TODO: switch Grid/X from the pane settings
-    layers.push(new Crosshair(i++, props.id))
-    layers.push(new Grid(i++, props.id))
-    layers.push(new Trackers(i++, props, id))
-    layers.sort((l1, l2) => l1.zIndex - l2.zIndex)
+    newLayers.push(new Crosshair(i++, props.id))
+    newLayers.push(new Grid(i++, props.id))
+    newLayers.push(new Trackers(i++, props, id))
+    newLayers.sort((l1, l2) => l1.zIndex - l2.zIndex)
 
     // Submit meta-info to the hub (yRanges ...)
     meta.finish()
 
-    return layers
+    return newLayers
 }
 
 // Merge layers by context type
@@ -173,11 +171,10 @@ function mergeByCtx() {
 
 // Update all renderers
 function update($layout = layout) {
-    layout = $layout
-    if (input) input.layout = layout
+    if (input) input.layout = $layout
     for (var l of layers) {
         // Update environment variables
-        l.env.update(l.ovSrc, layout, props)
+        l.env.update(l.ovSrc, $layout, props)
         l.update()
     }
     // Prevent drawing before meta data extracted
@@ -186,7 +183,7 @@ function update($layout = layout) {
     // Now draw
     for (var rr of renderers) {
         events.emitSpec(`rr-${id}-${rr.id}`,
-            'update-rr', layout)
+            'update-rr', $layout)
     }
 }
 

@@ -6,27 +6,25 @@ import Events from '../core/events.js'
 import DataHub from '../core/dataHub.js'
 import LegendLine from './LegendLine.svelte'
 
-export let id // Legend/pane id
-export let props // General props
-export let main // Is this the main Pane
-export let layout // Pane/grid layout
+let { id, props, main, layout } = $props()
 
 let hub = DataHub.instance(props.id)
 let events = Events.instance(props.id)
 
-let legendRR = 0 // Re-render key
+let legendRR = $state(0) // Re-render key
 
-$:style = `
+let style = $derived(`
     left: ${layout.sbMax[0] + 5}px;
     top: ${(layout.offset || 0) + 5}px;
     position: absolute;
-`
+`)
 
 // EVENT INTEFACE
-events.on(`legend-${id}:update-legend`, update)
-
-onDestroy(() => {
-    events.off(`legend-${id}`)
+$effect(() => {
+    events.on(`legend-${id}:update-legend`, update)
+    return () => {
+        events.off(`legend-${id}`)
+    }
 })
 
 function update() {

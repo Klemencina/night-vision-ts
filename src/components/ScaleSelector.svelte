@@ -8,18 +8,14 @@ import Events from '../core/events.js'
 //TODO: Allow user to specify a scale color
 //TODO: Highlight an overlay on scale btn hover
 
-export let id
-export let props
-export let layout
-export let scales
-export let side
+let { id, props, layout, scales, side } = $props()
 
 let events = Events.instance(props.id)
 
-let S = side === 'right' ? 1 : 0
-let ssId = `${props.id}-ss-${id}-${side}`
+let S = $derived(side === 'right' ? 1 : 0)
+let ssId = $derived(`${props.id}-ss-${id}-${side}`)
 
-$:specs = (function ssWidth() {
+let specs = $derived((function ssWidth() {
     let obj = {}
     let sb = layout.sbMax[S]
     switch (scales.length) {
@@ -41,16 +37,16 @@ $:specs = (function ssWidth() {
             break
     }
     return obj
-})()
+})())
 
-$:ssStyle = `
+let ssStyle = $derived(`
     grid-template-columns: ${specs.tmp};
     font: ${props.config.FONT};
     width: ${specs.ssw}px;
     margin-left: ${specs.ssm}px;
-`
+`)
 
-$:sbStyle = i => {
+function sbStyle(i) {
     let sel = i === layout.settings.scaleSideIdxs[S]
     let color = sel ?
         props.colors.text :
@@ -101,8 +97,10 @@ function onClick(index) {
     transition:fade={{duration: 150}}>
     {#each scales as scale, i}
     {@const id = scale.scaleSpecs.id  }
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="scale-button" style={sbStyle(id)}
-        on:click|stopPropagation={() => onClick(id)}>
+        onclick={(e) => { e.stopPropagation(); onClick(id) }}>
         {id}
     </div>
     {/each}

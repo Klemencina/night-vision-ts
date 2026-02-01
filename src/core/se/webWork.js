@@ -4,6 +4,22 @@
 import Utils from '../../stuff/utils.js'
 import WebWorker from './worker.js?worker&inline'
 
+// Deep clone to unwrap any Proxy objects (Svelte 5 $state)
+// This is needed because postMessage can't clone Proxy objects
+function unwrapProxy(obj) {
+    if (obj === null || obj === undefined) return obj
+    if (typeof obj !== 'object') return obj
+    if (Array.isArray(obj)) {
+        return obj.map(item => unwrapProxy(item))
+    }
+    // Check if it's a plain object or proxy
+    const result = {}
+    for (const key of Object.keys(obj)) {
+        result[key] = unwrapProxy(obj[key])
+    }
+    return result
+}
+
 class WebWork {
 
     constructor(id, chart) {
@@ -36,11 +52,13 @@ class WebWork {
         /*if (this.dc.sett.node_url) {
             return this.sendToNode(msg, txKeys)
         }*/
+        // Unwrap any Svelte 5 Proxy objects before posting
+        const unwrappedMsg = unwrapProxy(msg)
         if (txKeys) {
-            let txObjs = txKeys.map(k => msg.data[k])
-            this.worker.postMessage(msg, txObjs)
+            let txObjs = txKeys.map(k => unwrappedMsg.data[k])
+            this.worker.postMessage(unwrappedMsg, txObjs)
         } else {
-            this.worker.postMessage(msg)
+            this.worker.postMessage(unwrappedMsg)
         }
     }
 

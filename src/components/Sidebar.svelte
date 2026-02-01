@@ -24,13 +24,9 @@ import dpr from '../stuff/dprCanvas.js'
 import sb from '../core/primitives/sidebar.js'
 import MetaHub from '../core/metaHub.js'
 
-export let id // Sidebar id (=pane/grid id)
-export let props = {} // General props
-export let layout = {} // Grid layout
-export let side // Left/right side
-export let scales = [] // List of scales
+let { id, props = {}, layout = {}, side, scales = [] } = $props()
 
-let layers = []
+let layers = $state([])
 export function setLayers($layers) {
     layers = $layers
 }
@@ -38,42 +34,52 @@ export function setLayers($layers) {
 let meta = MetaHub.instance(props.id)
 let events = Events.instance(props.id)
 
-let S = side === 'right' ? 1 : 0
+let S = $derived(side === 'right' ? 1 : 0)
 
-let sbUpdId = `sb-${id}-${side}`
-let sbId = `${props.id}-sb-${id}-${side}`
-let canvasId = `${props.id}-sb-canvas-${id}-${side}`
-let showSwitch = false
-let showPanel = true
+let sbUpdId = $derived(`sb-${id}-${side}`)
+let sbId = $derived(`${props.id}-sb-${id}-${side}`)
+let canvasId = $derived(`${props.id}-sb-canvas-${id}-${side}`)
+let showSwitch = $state(false)
+let showPanel = $state(true)
 
 // EVENT INTERFACE
-events.on(`${sbUpdId}:update-sb`, update)
-events.on(`${sbUpdId}:show-sb-panel`, f => showPanel = f)
+$effect(() => {
+    events.on(`${sbUpdId}:update-sb`, update)
+    events.on(`${sbUpdId}:show-sb-panel`, f => showPanel = f)
+    return () => {
+        events.off(`${sbUpdId}`)
+    }
+})
 
-$:sbStyle = `
+let sbStyle = $derived(`
     left: ${S * (layout.width + layout.sbMax[0])}px;
     top: ${layout.offset || 0}px;
     position: absolute;
     background: ${props.colors.back};
     height: ${layout.height}px;
-`
-$:scale = getCurrentScale(layout)
+`)
+let scale = $state(null)
 
-let canvas // Canvas ref
-let ctx // Canvas context
-let mc // Mouse controller
-let zoom = 1
-let yRange
-let drug
-let updId 
+let canvas = $state(null) // Canvas ref
+let ctx = $state(null) // Canvas context
+let mc = $state(null) // Mouse controller
+let zoom = $state(1)
+let yRange = $state(null)
+let drug = $state(null)
+let updId = $state(null)
 
-$:width = layout.width
-$:height = layout.height
-$:resizeWatch(width, height)
+let width = $derived(layout.width)
+let height = $derived(layout.height)
+
+// Watch for resize
+$effect(() => {
+    if (width && height) {
+        resizeWatch()
+    }
+})
 
 onMount(async () => { await setup() })
 onDestroy(() => {
-    events.off(`${sbUpdId}`)
     if (mc) mc.destroy()
     clearInterval(updId)
 })
@@ -82,6 +88,7 @@ async function setup() {
     [canvas, ctx] = dpr.setup(
         canvasId, layout.sbMax[S], layout.height)
 
+    scale = getCurrentScale()
     update()
     if (scale) await listeners()
 
@@ -175,8 +182,6 @@ function update($layout = layout) {
 
     if (!$layout) return // If not exists
 
-    layout = $layout
-    //scales = Utils.getScalesBySide(S, layout)
     scale = getCurrentScale()
 
     if (!scale) {
@@ -340,10 +345,13 @@ function onMouseLeave() {
 <style>
 .nvjs-sidebar {}
 </style>
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_mouse_events_have_key_events -->
 <div id={sbId} style={sbStyle} class="nvjs-sidebar"
-    on:click={onClick}
-    on:mouseover={onMouseOver}
-    on:mouseleave={onMouseLeave}>
+    onclick={onClick}
+    onmouseover={onMouseOver}
+    onmouseleave={onMouseLeave}>
     <canvas id={canvasId}></canvas>
     {#if scales.length > 1 && showSwitch}
         <ScaleSelector {id} {props} {layout}
