@@ -21,7 +21,7 @@ export default function Scale(id, src, specs) {
     let meta = MetaHub.instance(props.id)
     let prefabs = ScriptHub.instance(props.id).prefabs
     let self = {}
-    let yt = (meta.yTransforms[src.gridId] || [])[id]
+    let yt = ((meta.yTransforms || [])[src.gridId] || [])[id] || null
     let gridId = src.gridId
     let ovs = src.ovs
     let ls = src.log
@@ -29,7 +29,7 @@ export default function Scale(id, src, specs) {
 
     function calcSidebar() {
 
-        let maxlen = Math.max(...ovs.map(x => x.dataSubset.length))
+        let maxlen = Math.max(0, ...ovs.map(x => (x.dataSubset?.length ?? 0)))
 
         if (maxlen < 2) {
             self.prec = 0
@@ -77,15 +77,15 @@ export default function Scale(id, src, specs) {
         var hi = -Infinity, lo = Infinity
         for (var ov of ovs) {
             if (ov.settings.display === false) continue
-            let yfn = (meta.yRangeFns[gridId] || [])[ov.id]
-            let yfnStatic = prefabs[ov.type].static.yRange 
+            let yfn = ((meta.yRangeFns || [])[gridId] || [])[ov.id] || null
+            let yfnStatic = prefabs[ov.type]?.static?.yRange
             if (yfnStatic) {
                 yfn = { 
                     exec: yfnStatic,
                     preCalc: yfnStatic.length > 1 // Do we need h & l
                 }
             }
-            let data = ov.dataSubset
+            let data = ov.dataSubset ?? []
             // Intermediate hi & lo
             var h = -Infinity, l = Infinity
             // Look for a user-defined y-range f()
@@ -152,14 +152,17 @@ export default function Scale(id, src, specs) {
 
         // Sample N random elements from the current subset
         let f = meta.getPreSampler(gridId, ov.id)
-        f = f || prefabs[ov.type].static.preSampler 
+        f = f || prefabs[ov.type]?.static?.preSampler
         f = f || Utils.defaultPreSampler
+        let subset = ov.dataSubset ?? []
         for (var i = 0; i < SAMPLE; i++) {
             // Random element n
-            let n = Math.floor(Math.random() * ov.dataSubset.length)
-            let x = f(ov.dataSubset[n])
-            if (typeof x === 'number') sample.push(x)
-            else sample = sample.concat(x)
+            let n = subset.length ? Math.floor(Math.random() * subset.length) : 0
+            let x = subset[n] != null ? f(subset[n]) : null
+            if (x != null) {
+                if (typeof x === 'number') sample.push(x)
+                else sample = sample.concat(x)
+            }
         }
 
         sample.forEach(x => {

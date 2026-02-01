@@ -28,7 +28,13 @@ $effect(() => {
     events.on(`${rrUpdId}:run-rr-task`, onTask)
     return () => {
         events.off(`${rrUpdId}`)
-        if (input) input.destroy()
+        if (input) {
+            try {
+                input.destroy()
+            } catch (_) {
+                // Input may be half-initialized (e.g. no canvas)
+            }
+        }
     }
 })
 

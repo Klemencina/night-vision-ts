@@ -31,8 +31,7 @@ class Scripts {
         this.iScripts = {} // Indicator scripts
         this.parse()
 
-        this.ww.exec('upload-scripts', {
-            // Removing make() functions
+        await this.ww.exec('upload-scripts', {
             prefabs: Object.keys(this.prefabs).reduce((a, k) => {
                 a[k] = {
                     name: this.prefabs[k].name,

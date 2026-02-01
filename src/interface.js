@@ -34,9 +34,14 @@ class NightVision {
         this.events = Events.instance(id)
         this.scriptHub = Scripts.instance(id)
         this.hub.init(this._data)
-        this.scriptHub.init(this._scripts)
+        this._scriptsReady = this.scriptHub.init(this._scripts)
+        this._props.scriptsReady = this._scriptsReady
 
-        this.root = document.getElementById(target)
+        this.root = typeof target === 'string' ? document.getElementById(target) : target
+        if (!this.root) {
+            console.warn('[NightVision] Container not found:', target, '- ensure element exists when creating chart')
+            return
+        }
         this.comp = mount(NightVisionComp, {
             target: this.root,
             props: this._props
@@ -161,32 +166,44 @@ class NightVision {
     // *** Internal variables ***
 
     get layout() {
-        let chart = this.comp.getChart()
-        if (!chart) return null
-        return chart.getLayout()
+        try {
+            let chart = this.comp?.getChart?.()
+            if (!chart || typeof chart.getLayout !== 'function') return null
+            return chart.getLayout()
+        } catch (_) {
+            return null
+        }
     }
 
     get range() {
-        let chart = this.comp.getChart()
-        if (!chart) return null
-        return chart.getRange()
+        try {
+            let chart = this.comp?.getChart?.()
+            if (!chart || typeof chart.getRange !== 'function') return null
+            return chart.getRange()
+        } catch (_) {
+            return null
+        }
     }
 
     set range(val) {
-        let chart = this.comp.getChart()
-        if (!chart) return
+        let chart = this.comp?.getChart?.()
+        if (!chart || typeof chart.setRange !== 'function') return
         chart.setRange(val)
     }
 
     get cursor() {
-        let chart = this.comp.getChart()
-        if (!chart) return null
-        return chart.getCursor()
+        try {
+            let chart = this.comp?.getChart?.()
+            if (!chart || typeof chart.getCursor !== 'function') return null
+            return chart.getCursor()
+        } catch (_) {
+            return null
+        }
     }
 
     set cursor(val) {
-        let chart = this.comp.getChart()
-        if (!chart) return
+        let chart = this.comp?.getChart?.()
+        if (!chart || typeof chart.setCursor !== 'function') return
         chart.setCursor(val)
     }
 

@@ -79,14 +79,34 @@ onMount(async () => {
 
     hub.calcSubset(range)
     hub.detectMain()
-    await hub.loadScripts(true)
+
+    if (!hub.chart) {
+        const panes = hub.data?.panes
+        console.warn(
+            '[Chart] No main chart detected. id=%s panes=%s overlays=%s',
+            props.id,
+            panes?.length ?? 0,
+            panes?.map(p => p?.overlays?.length ?? 0)
+        )
+    }
+
+    // MetaHub must be inited before Layout (Layout reads meta.preSamplers etc.)
     meta.init(props)
 
+    // Set layout immediately so chart shows even if loadScripts hangs/fails
     scan.updatePanesHash()
-
     layout = new Layout(chartProps, hub, meta)
 
-    // console.log(layout) // DEBUG
+    try {
+        if (props.scriptsReady) await props.scriptsReady
+        await hub.loadScripts(true)
+        meta.init(props)
+        scan.updatePanesHash()
+        layout = new Layout(chartProps, hub, meta)
+    } catch (e) {
+        console.warn('Chart loadScripts failed, showing chart without scripts:', e)
+        meta.init(props)
+    }
 })
 
 function onCursorChanged($cursor, emit = true) {
@@ -136,11 +156,21 @@ function quantizeCursor() {
 function update(opt = {}, emit = true) {
     // Emit a global event (hook)
     if (emit) events.emit('$chart-pre-update')
-    //Utils.callsPerSecond()
     // If we changed UUIDs of but don't want to trigger
     // the full update, we need to set updateHash:true
     if (opt.updateHash) scan.updatePanesHash()
-    if (scan.panesChanged()) return fullUpdate(opt)
+    // When only panes/overlays changed (e.g. script-produced overlays),
+    // update layout and remake grid without re-running fullUpdate (loadScripts).
+    if (scan.panesChanged()) {
+        scan.updatePanesHash()
+        cursor = cursor
+        layout = new Layout(chartProps, hub, meta)
+        events.emit('update-pane', layout)
+        events.emitSpec('botbar', 'update-bb', layout)
+        events.emit('remake-grid')
+        if (emit) events.emit('$chart-update')
+        return
+    }
     cursor = cursor // Trigger Svelte update
     layout = new Layout(chartProps, hub, meta)
     events.emit('update-pane', layout) // Update all panes

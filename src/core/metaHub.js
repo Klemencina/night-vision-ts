@@ -174,7 +174,8 @@ class MetaHub {
 
     // [API] Get a precision smapler of a specific overlay
     getPreSampler(gridId, ovId) {
-        return (this.preSamplers[gridId] || [])[ovId]
+        const grid = (this.preSamplers || [])[gridId]
+        return grid ? grid[ovId] : undefined
     }
 
     // [API] Get legend formatter of a specific overlay

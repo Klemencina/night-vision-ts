@@ -3,7 +3,6 @@
 import GridMaker from './gridMaker.js'
 
 function Layout(props, hub, meta) {
-
     let chart = hub.chart
     let offchart = hub.offchart
     let panes = hub.panes().filter(x => x.settings)

@@ -20,7 +20,8 @@ let {
     config = {},
     // indexBased = false, // Currently unused
     timezone = 0,
-    // data = {}, // Currently unused
+    data = {},
+    scriptsReady,
     // autoResize = false // Currently unused
 } = $props()
 
@@ -41,7 +42,8 @@ let props = $derived({
     //extensions,
     //xSettings,
     //skin,
-    timezone
+    timezone,
+    scriptsReady
 })
 let style = $derived(`
     width: ${props.width}px;

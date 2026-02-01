@@ -456,7 +456,9 @@ export default class Input {
     }
 
     destroy() {
-        let rm = this.canvas.removeEventListener
+        if (!this.canvas) return
+        if (typeof this.canvas.removeEventListener !== 'function') return
+        let rm = this.canvas.removeEventListener.bind(this.canvas)
         rm("gesturestart", this.gesturestart)
         rm("gesturechange", this.gesturechange)
         rm("gestureend", this.gestureend)

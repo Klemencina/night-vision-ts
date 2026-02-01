@@ -21,7 +21,7 @@ import Trackers from '../core/primitives/trackers.js'
 // Renderers
 import Canvas from '../components/renderers/Canvas.svelte'
 
-let { id, props, layout } = $props()
+let { id, props, main, layout } = $props()
 
 export function getLayers() { return layers }
 

@@ -9,8 +9,10 @@ class SeClient {
     constructor(id, chart) {
 
         this.chart = chart
-        this.ww = chart.ww
-        this.ww.onevent = this.onEvent.bind(this)
+        this.ww = chart?.ww || null
+        if (this.ww) {
+            this.ww.onevent = this.onEvent.bind(this)
+        }
 
     }
 
@@ -24,18 +26,30 @@ class SeClient {
         switch (e.data.type) {
             case 'overlay-data':
                 this.onOverlayData(e.data.data)
+                break
             case 'engine-state':
                 this.onEngineState(e.data.data)
-            break
+                break
         }
     }
 
     // Upload initial data
     async uploadData() {
-        if (!this.hub.mainOv) return
+        if (!this.hub.mainOv?.data?.length) return
+        let range
+        try {
+            range = this.chart?.range ?? this.scan?.defaultRange?.() ?? []
+        } catch (_) {
+            range = this.scan?.defaultRange?.() ?? []
+        }
+        // Fallback: derive range from main overlay so worker can run scripts (RSI etc.)
+        if (!range?.length) {
+            let main = this.hub.mainOv.data
+            range = [main[0][0], main[main.length - 1][0]]
+        }
         await this.ww.exec('upload-data', {
             meta: {
-                range: this.chart.range,
+                range,
                 tf: this.scan.tf
             },
             dss: {
@@ -98,6 +112,21 @@ class SeClient {
                 pane.overlays.push(...p.overlays)
             }
         }
+        // New overlays need dataView/dataSubset for rendering
+        let range
+        try {
+            range = this.chart?.range ?? this.scan?.defaultRange?.() ?? []
+        } catch (_) {
+            range = this.scan?.defaultRange?.() ?? []
+        }
+        // Fallback: derive range from main overlay data so RSI/indicators get dataSubset
+        if (!range?.length && this.hub.mainOv?.data?.length) {
+            let main = this.hub.mainOv.data
+            range = [main[0][0], main[main.length - 1][0]]
+        }
+        if (range?.length) {
+            this.hub.calcSubset(range)
+        }
         this.chart.update()
     }
 
@@ -150,6 +179,13 @@ let instances = {}
 function instance(id, chart) {
     if (!instances[id]) {
         instances[id] = new SeClient(id, chart)
+    } else if (chart && !instances[id].chart) {
+        // Update chart reference if provided later
+        instances[id].chart = chart
+        instances[id].ww = chart.ww
+        if (instances[id].ww) {
+            instances[id].ww.onevent = instances[id].onEvent.bind(instances[id])
+        }
     }
     return instances[id]
 }

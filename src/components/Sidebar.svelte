@@ -270,48 +270,38 @@ function calcRange(diff1 = 1, diff2 = 1) {
 
 // TODO: log scale work with distortions when auto is disabled
 // function rezoomRange(delta, diff1, diff2) {
-// 
 //     let yTransform = getYtransform()
 //     if (!yTransform || yTransform.auto) return
-// 
 //     zoom = 1.0
-    // TODO: further work (improve scaling ratio)
-    if (delta < 0) delta /= 3.75 // Btw, idk why 3.75, but it works
-    delta *= 0.25
-    yRange = [
-        scale.$hi,
-        scale.$lo
-    ]
-    drug = {
-        y: 0,
-        z: zoom,
-        mid: math.log_mid(yRange, layout.height),
-        A: scale.A,
-        B: scale.B
-    }
-    zoom = calcZoom({
-        center: {
-            y: delta * layout.height
-        }
-    })
-
-    events.emit('sidebar-transform', {
-        gridId: id,
-        scaleId: scale.scaleSpecs.id,
-        zoom: zoom,
-        auto: false,
-        range: calcRange(diff1, diff2),
-        drugging: true,
-        updateLayout: true // Update layout
-    })
-    drug = null
-    events.emit('sidebar-transform', {
-        gridId: id,
-        scaleId: scale.scaleSpecs.id,
-        drugging: false,
-        updateLayout: true
-    })
-}
+//     // TODO: further work (improve scaling ratio)
+//     if (delta < 0) delta /= 3.75
+//     delta *= 0.25
+//     yRange = [scale.$hi, scale.$lo]
+//     drug = {
+//         y: 0,
+//         z: zoom,
+//         mid: math.log_mid(yRange, layout.height),
+//         A: scale.A,
+//         B: scale.B
+//     }
+//     zoom = calcZoom({center: {y: delta * layout.height}})
+//     events.emit('sidebar-transform', {
+//         gridId: id,
+//         scaleId: scale.scaleSpecs.id,
+//         zoom: zoom,
+//         auto: false,
+//         range: calcRange(diff1, diff2),
+//         drugging: true,
+//         updateLayout: true
+//     })
+//     drug = null
+//     events.emit('sidebar-transform', {
+//         gridId: id,
+//         scaleId: scale.scaleSpecs.id,
+//         drugging: false,
+//         updateLayout: true
+//     })
+// }
 
 // Get current scale displayed on this side.
 // Should be in the scales list & template

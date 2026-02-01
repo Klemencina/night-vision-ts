@@ -18,8 +18,8 @@ self.onmessage = async e => {
     //console.log('Worker got:', e.data.type)
     switch (e.data.type) {
         case 'upload-scripts':
-            //console.log('SCRIPTS', e.data.data)
             self.scriptLib = e.data.data
+            self.postMessage({ type: 'upload-scripts-done', id: e.data.id, data: {} })
             break
         case 'send-meta-info':
             //console.log('META', e.data.data)
@@ -37,11 +37,13 @@ self.onmessage = async e => {
             se.recalc_size()
             se.send('data-uploaded', {}, e.data.id)
             break
-        case 'exec-all-scripts':
-            //console.log('EXEC', e.data.data)
+        case 'exec-all-scripts': {
+            const reqId = e.data.id
             self.paneStruct = e.data.data
-            se.exec_all()
+            await se.exec_all()
+            self.postMessage({ type: 'exec-all-scripts-done', id: reqId, data: {} })
             break
+        }
         case 'update-data':
             //console.log('UPDATE', e.data.data)
             DatasetWW.update_all(se, e.data.data)
