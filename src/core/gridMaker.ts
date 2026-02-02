@@ -260,7 +260,7 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
                 let ti = self.indexBased ? i : p[0]
                 let x = Math.floor((ti - range[0]) * r)
 
-                insertLine(prev, p, x)
+                insertLine(prev, p, x, i)
 
                 // Filtering lines that are too near
                 let xs = self.xs![self.xs!.length - 1] || [0, []]
@@ -280,6 +280,9 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
 
             // TODO: fix grid extension for bigger timeframes
             if (!self.indexBased && timeFrame < WEEK && r > 0) {
+                extendLeft(dt, r)
+                extendRight(dt, r)
+            } else if (self.indexBased && r > 0) {
                 extendLeft(dt, r)
                 extendRight(dt, r)
             }
@@ -310,7 +313,7 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
         return 0
     }
 
-    function insertLine(prev: any[], p: any[], x: number): void {
+    function insertLine(prev: any[], p: any[], x: number, i: number): void {
         let prevT = prev[0]
         let t = p[0]
 
@@ -330,6 +333,11 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
             // rank2 = 0 means lower priority
             let r2 = Utils.getDay(t) === 13 ? 0 : 0.9
             self.xs!.push([x, t, DAY, r2])
+        } else if (self.indexBased) {
+            let step = Math.max(1, Math.round(self.tStep! / timeFrame))
+            if (i % step === 0) {
+                self.xs!.push([x, t, timeFrame, 1])
+            }
         } else if (t % self.tStep! === 0) {
             self.xs!.push([x, t, timeFrame, 1])
         }
@@ -339,13 +347,24 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
         if (!self.xs!.length || !isFinite(r)) return
 
         let t = self.xs![0][1]
+        let i = view.i1
         while (true) {
-            t -= self.tStep!
-            let x = Math.floor((t - range[0]) * r)
-            if (x < 0) break
-            // TODO: ==========> And insert it here somehow
-            if (t % timeFrame === 0) {
-                self.xs!.unshift([x, t, timeFrame, 1])
+            if (self.indexBased) {
+                let step = Math.max(1, Math.round(self.tStep! / timeFrame))
+                i -= step
+                let x = Math.floor((i - range[0]) * r)
+                if (x < 0) break
+                let p = view.src[i]
+                if (!p) break
+                self.xs!.unshift([x, p[0], timeFrame, 1])
+            } else {
+                t -= self.tStep!
+                let x = Math.floor((t - range[0]) * r)
+                if (x < 0) break
+                // TODO: ==========> And insert it here somehow
+                if (t % timeFrame === 0) {
+                    self.xs!.unshift([x, t, timeFrame, 1])
+                }
             }
         }
     }
@@ -354,12 +373,23 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
         if (!self.xs!.length || !isFinite(r)) return
 
         let t = self.xs![self.xs!.length - 1][1]
+        let i = view.i2
         while (true) {
-            t += self.tStep!
-            let x = Math.floor((t - range[0]) * r)
-            if (x > self.spacex!) break
-            if (t % interval === 0) {
-                self.xs!.push([x, t, interval, 1])
+            if (self.indexBased) {
+                let step = Math.max(1, Math.round(self.tStep! / timeFrame))
+                i += step
+                let x = Math.floor((i - range[0]) * r)
+                if (x > self.spacex!) break
+                let p = view.src[i]
+                if (!p) break
+                self.xs!.push([x, p[0], timeFrame, 1])
+            } else {
+                t += self.tStep!
+                let x = Math.floor((t - range[0]) * r)
+                if (x > self.spacex!) break
+                if (t % interval === 0) {
+                    self.xs!.push([x, t, interval, 1])
+                }
             }
         }
     }
