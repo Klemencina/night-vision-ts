@@ -1,39 +1,39 @@
 <!-- App.svelte -->
 <script>
 import.meta.hot
-import { NightVision } from './index.js'
+import { NightVision } from './index'
 import data from '../data/data-ohlcv-rsi.json?id=main'
 import dataIndexed from '../data/data-ohlcv-rsi-indexed.json?id=main-indexed'
-import TestStack from '../tests/testStack.js'
+import TestStack from '../tests/testStack'
 
 
 // Tests
-import fullReset from '../tests/data-sync/fullReset.js'
-import paneAddRem from '../tests/data-sync/paneAddRem.js'
-import paneSettings from '../tests/data-sync/paneSettings.js'
-import ovAddRem from '../tests/data-sync/ovAddRem.js'
-import scaleChange from '../tests/data-sync/scaleChange.js'
-import mainOverlay from '../tests/data-sync/mainOverlay.js'
-import ovSettings from '../tests/data-sync/ovSettings.js'
-import ovPropsChange from '../tests/data-sync/ovPropsChange.js'
-import ovDataChange from '../tests/data-sync/ovDataChange.js'
+import fullReset from '../tests/data-sync/fullReset'
+import paneAddRem from '../tests/data-sync/paneAddRem'
+import paneSettings from '../tests/data-sync/paneSettings'
+import ovAddRem from '../tests/data-sync/ovAddRem'
+import scaleChange from '../tests/data-sync/scaleChange'
+import mainOverlay from '../tests/data-sync/mainOverlay'
+import ovSettings from '../tests/data-sync/ovSettings'
+import ovPropsChange from '../tests/data-sync/ovPropsChange'
+import ovDataChange from '../tests/data-sync/ovDataChange'
 
 // More tests
-import realTime from '../tests/real-time/realTime.js'
+import realTime from '../tests/real-time/realTime'
 
 // More tests
-import timeBased from '../tests/tfs-test/allTimeBased.js'
-import indexBasedTest from '../tests/tfs-test/allIndexBased.js'
+import timeBased from '../tests/tfs-test/allTimeBased'
+import indexBasedTest from '../tests/tfs-test/allIndexBased'
 
 // More tests
-import indicators from '../tests/indicators/indicators.js'
-// import rangeTool from '../tests/tools/rangeTool.js' // Currently unused
-import lineTool from '../tests/tools/lineTool.js'
-import watchPropTest from '../tests/navy/watchPropTest.js'
+import indicators from '../tests/indicators/indicators'
+// import rangeTool from '../tests/tools/rangeTool' // Currently unused
+import lineTool from '../tests/tools/lineTool'
+import watchPropTest from '../tests/navy/watchPropTest'
 
 // More tests
-import logScaleTest from '../tests/scales/logScale.js'
-import memoryTest from '../tests/memory/memoryTest.js'
+import logScaleTest from '../tests/scales/logScale'
+import memoryTest from '../tests/memory/memoryTest'
 
 /*
 TODO: data-api interface:

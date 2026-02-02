@@ -1,9 +1,8 @@
-
 // Container for y-transforms, meta functions, other info
 // about overlays (e.g. yRange)
 
-import Events from './events.js'
-import DataHub from './dataHub.js'
+import Events from './events'
+import DataHub from './dataHub'
 
 interface YRangeFn {
     exec: (data: any[], h: number, l: number) => [number, number, boolean?] | null
@@ -74,7 +73,6 @@ class MetaHub {
     scrollLock: boolean = false
 
     constructor(nvId: string) {
-
         let events = Events.instance(nvId)
         this.hub = DataHub.instance(nvId)
         this.events = events
@@ -90,7 +88,6 @@ class MetaHub {
     }
 
     init(props: Props): void {
-
         this.panes = 0 // Panes processed
         this.ready = false
         // [API] read-only
@@ -112,7 +109,6 @@ class MetaHub {
         this.ohlcMap = {} // time => OHLC map of the main ov
         this.ohlcFn = undefined // OHLC mapper function
         this.scrollLock = false // Scroll lock state
-
     }
 
     // Extract meta functions from overlay
@@ -122,10 +118,12 @@ class MetaHub {
 
         // yRange functions
         var yrfs = this.yRangeFns[gridId] || []
-        yrfs[id] = overlay.yRange ? {
-            exec: overlay.yRange,
-            preCalc: overlay.yRangePreCalc
-        } : null
+        yrfs[id] = overlay.yRange
+            ? {
+                  exec: overlay.yRange,
+                  preCalc: overlay.yRangePreCalc
+              }
+            : null
 
         // Precision samplers
         var aps = this.preSamplers[gridId] || []
@@ -153,11 +151,10 @@ class MetaHub {
         this.preSamplers[gridId] = aps
         this.legendFns[gridId] = lfs
         this.valueTrackers[gridId] = vts
-
     }
 
     // Maps timestamp => ohlc, index
-    // TODO: should add support for indexBased? 
+    // TODO: should add support for indexBased?
     calcOhlcMap(): void {
         this.ohlcMap = {}
         let data = this.hub.mainOv.data
@@ -207,7 +204,6 @@ class MetaHub {
                 this.storage[hash] = paneYts[scaleId]
             }
         }
-
     }
 
     // Restore that info after an update in the
@@ -218,11 +214,11 @@ class MetaHub {
             let [type, uuid1, uuid2] = hash.split(':')
             let pane = this.hub.panes().find((x: any) => x.uuid === uuid1)
             if (!pane) continue
-            switch(type) {
+            switch (type) {
                 case 'yts': // Y-transforms
                     if (!yts[pane.id]) yts[pane.id] = []
-                    yts[pane.id][uuid2 as any] =  this.storage[hash]
-                break
+                    yts[pane.id][uuid2 as any] = this.storage[hash]
+                    break
             }
         }
         this.store() // Store new state
@@ -239,7 +235,10 @@ class MetaHub {
     }
 
     // [API] Get a precision smapler of a specific overlay
-    getPreSampler(gridId: number, ovId: number): ((dataPoint: any[]) => number | number[]) | undefined {
+    getPreSampler(
+        gridId: number,
+        ovId: number
+    ): ((dataPoint: any[]) => number | number[]) | undefined {
         const grid = (this.preSamplers || [])[gridId]
         return grid ? grid[ovId] : undefined
     }
@@ -294,7 +293,6 @@ class MetaHub {
     }
 }
 
-
 let instances: Record<string, MetaHub> = {}
 
 function instance(id: string): MetaHub {
@@ -304,4 +302,5 @@ function instance(id: string): MetaHub {
     return instances[id]
 }
 
+export { MetaHub, instance }
 export default { instance }

@@ -1,4 +1,3 @@
-
 // Symbol (contains several samplers, e.g. high, low, close...)
 
 import * as u from './script_utils'
@@ -45,7 +44,7 @@ export default class Sym {
     main: boolean
     idx: DataIndex
     tmap: Record<number, number>
-    
+
     open!: TimeSeries
     high!: TimeSeries
     low!: TimeSeries
@@ -74,7 +73,7 @@ export default class Sym {
         // sparse data
         if (this.aggtype === 'ohlcv') {
             for (var id of OHLCV) {
-                (this as any)[id] = TS(`${this.id}_${id}`, [])
+                ;(this as any)[id] = TS(`${this.id}_${id}`, [])
                 ;(this as any)[id].__fn__ = Sampler(id).bind((this as any)[id])
                 ;(this as any)[id].__tf__ = this.tf
             }
@@ -86,7 +85,7 @@ export default class Sym {
         // on this.format
         if (this.aggtype === 'copy') {
             for (var id of OHLCV) {
-                (this as any)[id] = TS(`${this.id}_${id}`, [])
+                ;(this as any)[id] = TS(`${this.id}_${id}`, [])
                 ;(this as any)[id].__tf__ = this.tf
             }
             for (var i = 0; i < (this.data as any[]).length; i++) {
@@ -97,32 +96,26 @@ export default class Sym {
         // current window)
         if (typeof this.aggtype === 'function') {
             this.close = TS(`${this.id}_close`, [])
-            this.close.__fn__ = this.aggtype as Function
+            this.close.__fn__ = this.aggtype as (x: number, t?: number) => void
             this.close.__tf__ = this.tf
         }
 
         if (this.main) {
             if (!this.tf) throw 'Main tf should be defined'
-            se.custom_main = this
+            se.custom_main = this as unknown as TimeSeries
             let t0 = (this.data as any[])[0][0]
-            se.t = t0 - t0 % this.tf
+            se.t = t0 - (t0 % this.tf)
             this.update(null, se.t)
 
             // First candle should be formed before any updates()
-            se.data.ohlcv.data.length = 0
-            se.data.ohlcv.data.push([
-                se.t,
-                this.open[0],
-                this.high[0],
-                this.low[0],
-                this.close[0],
-                this.vol[0]
-            ])
+            const ohlcv = se.data.ohlcv.data as number[][]
+            ohlcv.length = 0
+            ohlcv.push([se.t, this.open[0], this.high[0], this.low[0], this.close[0], this.vol[0]])
         }
     }
 
     update(x: any, t?: number): boolean {
-        if(this.aggtype === 'ohlcv') {
+        if (this.aggtype === 'ohlcv') {
             return this.update_ohlcv(x, t)
         } else if (this.aggtype === 'copy') {
             return this.update_copy(x, t)
@@ -140,7 +133,7 @@ export default class Sym {
         let idx = this.idx
         switch (this.data_type) {
             case ARR:
-                if (t > (this.data as any[])[(this.data as any[]).length-1][0]) return false
+                if (t > (this.data as any[])[(this.data as any[]).length - 1][0]) return false
                 let t0 = this.window ? t - this.window + this.tf : t
                 let dt = t0 % this.tf
                 t0 -= dt
@@ -151,7 +144,7 @@ export default class Sym {
                 // but not before a new candle
                 if (t < (this.vol.__t0__ || 0) + this.tf) this.vol[0] = 0
                 let noevent = true
-                for(var i = i0; i < (this.data as any[]).length; i++) {
+                for (var i = i0; i < (this.data as any[]).length; i++) {
                     noevent = false
                     let dp = (this.data as any[])[i]
                     if (dp[idx.time] >= t1) break
@@ -194,7 +187,7 @@ export default class Sym {
                 let tsn = OHLCV[k]
                 ;(this as any)[tsn].unshift(undefined)
             }
-            this.__t0__ = t! - t! % this.tf
+            this.__t0__ = t! - (t! % this.tf)
             let last = (this.data as any[]).length - 1
             if (this.__t0__ === (this.data as any[])[last][0]) {
                 this.tmap[this.__t0__] = last
@@ -222,7 +215,7 @@ export default class Sym {
         switch (this.data_type) {
             case ARR:
                 if (!(this.data as any[]).length) return false
-                if (t! > (this.data as any[])[(this.data as any[]).length-1][0]) return false
+                if (t! > (this.data as any[])[(this.data as any[]).length - 1][0]) return false
                 let t0 = this.window ? t! - this.window + this.tf : t!
                 let dt = t0 % this.tf
                 t0 -= dt
@@ -231,7 +224,7 @@ export default class Sym {
                 let t1 = t! + se.tf!
 
                 let sub: any[] = []
-                for(var i = i0; i < (this.data as any[]).length; i++) {
+                for (var i = i0; i < (this.data as any[]).length; i++) {
                     let dp = (this.data as any[])[i]
                     if (dp[idx.time] >= t1) break
                     sub.push(dp)
@@ -246,7 +239,7 @@ export default class Sym {
                 let ts0 = this.close.__t0__
                 if (!ts0 || t! >= ts0 + this.tf) {
                     this.close.unshift(val)
-                    this.close.__t0__ = t! - t! % this.tf
+                    this.close.__t0__ = t! - (t! % this.tf)
                 } else {
                     this.close[0] = val
                 }
@@ -264,7 +257,7 @@ export default class Sym {
     // Calculates data indices from the format
     data_idx(): DataIndex {
         let idx: Partial<DataIndex> = {}
-        switch(this.aggtype) {
+        switch (this.aggtype) {
             case 'ohlcv':
                 // Trying to detect the format from the
                 // first data point
@@ -272,8 +265,7 @@ export default class Sym {
                     let x0 = (this.data as any[])[0]
                     if (!x0 || x0.length === 6) {
                         this.format = 'time:open:high:low:close:vol'
-                    }
-                    else if (x0.length === 3) {
+                    } else if (x0.length === 3) {
                         this.format = 'time:open,high,low,close:vol'
                     }
                 }
@@ -285,7 +277,7 @@ export default class Sym {
         this.format!.split(':').forEach((x, i) => {
             if (!x.length) return
             let list = x.split(',')
-            list.forEach(y => (idx as any)[y] = i)
+            list.forEach(y => ((idx as any)[y] = i))
         })
         return idx as DataIndex
     }

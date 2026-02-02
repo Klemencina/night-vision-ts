@@ -4,7 +4,7 @@
 
 // TODO: stop on a first console.error
 
-import Utils from '../src/stuff/utils.js'
+import Utils from '../src/stuff/utils'
 
 export default class TestStack {
 

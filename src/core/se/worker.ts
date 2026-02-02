@@ -1,4 +1,3 @@
-
 // Web-worker
 
 import se from './script_engine'
@@ -7,10 +6,10 @@ import * as u from './script_utils'
 import { DatasetWW } from './dataset'
 
 // Storage of indicators & overlays
-(self as any).scriptLib = {};
+;(self as any).scriptLib = {}
 
 // Pane structure
-(self as any).paneStruct = {}
+;(self as any).paneStruct = {}
 
 interface WorkerMessage {
     data: {
@@ -24,7 +23,7 @@ interface WorkerMessage {
 self.onmessage = async (e: WorkerMessage) => {
     switch (e.data.type) {
         case 'upload-scripts':
-            (self as any).scriptLib = e.data.data
+            ;(self as any).scriptLib = e.data.data
             self.postMessage({ type: 'upload-scripts-done', id: e.data.id, data: {} })
             break
         case 'send-meta-info':
@@ -36,7 +35,7 @@ self.onmessage = async (e: WorkerMessage) => {
             se.range = e.data.data.meta.range
             for (var id in e.data.data.dss) {
                 let data = e.data.data.dss[id]
-                se.data[id] = new DatasetWW(id, data)
+                se.data[id] = new DatasetWW(id, data) as any
             }
             se.recalc_size()
             se.send('data-uploaded', {}, e.data.id)
@@ -53,7 +52,14 @@ self.onmessage = async (e: WorkerMessage) => {
                 console.error('[Worker] exec_all failed:', err)
                 // Still send overlay-data so client gets current state
                 const paneStruct = (self as any).paneStruct || []
-                se.send('overlay-data', paneStruct.map((x: any) => ({ id: x.id, uuid: x.uuid, overlays: x.overlays || [] })))
+                se.send(
+                    'overlay-data',
+                    paneStruct.map((x: any) => ({
+                        id: x.id,
+                        uuid: x.uuid,
+                        overlays: x.overlays || []
+                    }))
+                )
             }
             self.postMessage({ type: 'exec-all-scripts-done', id: reqId, data: {} })
             break

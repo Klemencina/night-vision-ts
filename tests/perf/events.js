@@ -1,5 +1,5 @@
 
-import events from '../../src/core/events.js'
+import events from '../../src/core/events'
 
 
 events.on('component1:event-type-1', () => {})

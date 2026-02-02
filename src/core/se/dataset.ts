@@ -1,4 +1,3 @@
-
 // Dataset proxy between vuejs & WebWorker
 
 import { now } from './script_utils'
@@ -54,7 +53,9 @@ export default class Dataset {
         let proto = Object.getPrototypeOf(this)
         Object.setPrototypeOf(desc, proto)
         Object.defineProperty(desc, 'dc', {
-            get() { return dc }
+            get() {
+                return dc
+            }
         })
     }
 
@@ -132,10 +133,7 @@ export default class Dataset {
 
     // Fetch data from WW
     async data(): Promise<any[] | undefined> {
-        let ds = await this.dc.ww.exec(
-            'get-dataset',
-            this.id
-        )
+        let ds = await this.dc.ww.exec('get-dataset', this.id)
         if (!ds) return undefined
         return ds.data
     }
@@ -165,12 +163,15 @@ export class DatasetWW {
 
     // Update from 'update-data' event
     // TODO: ds size limit (in MB / data points)
-    static update_all(se: typeof import('./script_engine').default, data: Record<string, any[]>): void {
+    static update_all(
+        se: typeof import('./script_engine').default,
+        data: Record<string, any[]>
+    ): void {
         for (var k in data) {
             if (k === 'ohlcv') continue
             let id = k.split('.')[1] || k
             if (!se.data[id]) continue
-            let arr = se.data[id].data
+            let arr = se.data[id].data as number[][]
             let iN = arr.length - 1
             let last = arr[iN]
 
@@ -199,7 +200,7 @@ export class DatasetWW {
     // On dataset operation
     op(se: typeof import('./script_engine').default, op: DatasetOp): void {
         this.last_upd = now()
-        switch(op.type) {
+        switch (op.type) {
             case 'set':
                 this.data = op.data as any[]
                 se.recalc_size()

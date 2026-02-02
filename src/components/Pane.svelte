@@ -7,8 +7,8 @@ import Grid from './Grid.svelte'
 import Sidebar from './Sidebar.svelte'
 import SidebarStub from './SidebarStub.svelte'
 import Legend from './Legend.svelte'
-import Events from '../core/events.js'
-import Utils from '../stuff/utils.js'
+import Events from '../core/events'
+import Utils from '../stuff/utils'
 
 let { id, props, main, layout: initialLayout } = $props()
 

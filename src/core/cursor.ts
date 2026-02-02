@@ -3,8 +3,8 @@
 // - grid magnet (cursor sticks to the t-axis values)
 // - sets current cursor values (nearest data points)
 
-import Utils from '../stuff/utils.js'
-import math from '../stuff/math.js'
+import Utils from '../stuff/utils'
+import math from '../stuff/math'
 
 interface CursorMeta {
     scrollLock: boolean

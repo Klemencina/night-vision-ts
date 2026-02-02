@@ -1,4 +1,3 @@
-
 // Data meta-analysis (detects starting range, interval, etc)
 // + tracks changes in the pane/overlay order
 
@@ -42,7 +41,7 @@ class DataScanner {
             this.ibMode = false
             return 0
         }
-        
+
         this.all = Utils.allOverlays(panes)
         if (this.all.filter((x: any) => x.main).length > 1) {
             console.warn(`Two or more overlays with flagged as 'main'`)
@@ -75,20 +74,16 @@ class DataScanner {
 
         if (this.main.length < 2) return []
         if (this.main.length <= dl) {
-            var s = 0, d = ml
+            var s = 0,
+                d = ml
         } else {
-            s = l - dl; d = 0.5
+            s = l - dl
+            d = 0.5
         }
         if (!this.hub?.data?.indexBased) {
-            return [
-                this.main[s][0] - this.interval * d,
-                this.main[l][0] + this.interval * ml
-            ]
+            return [this.main[s][0] - this.interval * d, this.main[l][0] + this.interval * ml]
         } else {
-            return [
-                s - this.interval * d,
-                l + this.interval * ml
-            ]
+            return [s - this.interval * d, l + this.interval * ml]
         }
     }
 
@@ -134,4 +129,5 @@ function instance(id: string): DataScanner {
     return instances[id]
 }
 
+export { DataScanner, instance }
 export default { instance }

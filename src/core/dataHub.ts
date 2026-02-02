@@ -1,12 +1,11 @@
-
 // Data container (original plus subset data)
 // + Completes the structure to a full state
 // + Implements various update operations.
 
-import Utils from '../stuff/utils.js'
-import Events, { EventHandler } from './events.js'
-import SeClient from './se/seClient.js'
-import DataView$ from './dataView.js'
+import Utils from '../stuff/utils'
+import Events, { EventHandler } from './events'
+import SeClient, { SeClient as SeClientType } from './se/seClient'
+import DataView$ from './dataView'
 
 interface Overlay {
     id?: number
@@ -55,8 +54,8 @@ interface DisplayOvEvent {
 }
 
 class DataHub {
-    events: Events
-    se: SeClient
+    events: ReturnType<typeof Events.instance>
+    se: SeClientType
     data!: Data
     indexBased!: boolean
     chart: Pane | null = null
@@ -65,7 +64,6 @@ class DataHub {
     mainPaneId: number | null = null
 
     constructor(nvId: string) {
-
         let events = Events.instance(nvId)
         let se = SeClient.instance(nvId)
         this.events = events
@@ -78,7 +76,6 @@ class DataHub {
     }
 
     init(data: Data): void {
-
         // [API] All here are read-only
 
         // Data object
@@ -120,7 +117,7 @@ class DataHub {
     calcSubset(range: [number, number]): void {
         var paneId = 0
         for (var pane of this.data.panes || []) {
-            pane.id =  paneId++
+            pane.id = paneId++
             pane.overlays = pane.overlays || []
             pane.settings = pane.settings || {}
             var ovId = 0
@@ -128,10 +125,7 @@ class DataHub {
                 ov.id = ovId++
                 ov.main = !!ov.main
                 ov.data = ov.data || []
-                ov.dataView = this.filter(
-                    ov.data, range,
-                    ov.indexOffset
-                )
+                ov.dataView = this.filter(ov.data, range, ov.indexOffset)
                 ov.dataSubset = ov.dataView.makeSubset()
                 ov.dataExt = ov.dataExt || {}
                 ov.settings = ov.settings || {}
@@ -163,7 +157,6 @@ class DataHub {
 
     // Detect the main chart, define offcharts
     detectMain(): void {
-
         // TODO: remove duplicate code here & in dataScanner
         let all: any[] = Utils.allOverlays(this.data.panes as any)
         let mainOv = all.find((x: any) => x.main) || all[0]
@@ -172,15 +165,11 @@ class DataHub {
 
         mainOv.main = true // If there is only one OV
 
-        this.chart = (this.data.panes || []).find(
-            (x: Pane) => x.overlays.find(
-                (y: Overlay) => y.main
-            )
-        ) || null
+        this.chart =
+            (this.data.panes || []).find((x: Pane) => x.overlays.find((y: Overlay) => y.main)) ||
+            null
 
-        this.offchart = (this.data.panes || []).filter(
-            (x: Pane) => x !== this.chart
-        )
+        this.offchart = (this.data.panes || []).filter((x: Pane) => x !== this.chart)
 
         this.mainOv = mainOv
         this.mainPaneId = this.chart ? this.panes().indexOf(this.chart) : null
@@ -189,25 +178,18 @@ class DataHub {
         for (var ov of all) {
             if (ov !== mainOv) ov.main = false
         }
-
     }
 
     // [API] Create a subset of timeseries
     filter(data: any[], range: [number, number], offset: number = 0): any {
-        let filter = this.indexBased ?
-            Utils.fastFilterIB : Utils.fastFilter2
-        var ix = filter(
-            data,
-            range[0] - offset,
-            range[1] - offset
-        )
+        let filter = this.indexBased ? Utils.fastFilterIB : Utils.fastFilter2
+        var ix = filter(data, range[0] - offset, range[1] - offset)
         return new DataView$(data, ix[0]!, ix[1]!)
     }
 
     // [API] Get all active panes (with uuid)
     panes(): Pane[] {
-        return (this.data.panes || []).filter((x: Pane) =>
-            x.uuid)
+        return (this.data.panes || []).filter((x: Pane) => x.uuid)
     }
 
     // [API] Get overlay ref by paneId & ovId
@@ -217,20 +199,17 @@ class DataHub {
 
     // [API] Get overlay data by paneId & ovId
     ovData(paneId: number, ovId: number): any[] | undefined {
-        return this.panes()[paneId]
-            ?.overlays[ovId]?.data
+        return this.panes()[paneId]?.overlays[ovId]?.data
     }
 
     // [API] Get overlay extra data by paneId & ovId
     ovDataExt(paneId: number, ovId: number): Record<string, any> | undefined {
-        return this.panes()[paneId]
-            ?.overlays[ovId]?.dataExt
+        return this.panes()[paneId]?.overlays[ovId]?.dataExt
     }
 
     // [API] Get overlay data subset by paneId & ovId
     ovDataSubset(paneId: number, ovId: number): any[] | undefined {
-        return this.panes()[paneId]
-            ?.overlays[ovId]?.dataSubset
+        return this.panes()[paneId]?.overlays[ovId]?.dataSubset
     }
 
     // [API] Get All overlays
@@ -242,7 +221,6 @@ class DataHub {
     // Event handlers
 
     onScaleIndex(event: ScaleIndexEvent): void {
-
         let pane = this.panes()[event.paneId]
         if (!pane) return
 
@@ -257,7 +235,6 @@ class DataHub {
     }
 
     onDisplayOv(event: DisplayOvEvent): void {
-
         let pane = this.panes()[event.paneId]
         if (!pane) return
 
@@ -271,9 +248,7 @@ class DataHub {
 
         this.events.emitSpec('chart', 'update-layout')
         this.events.emitSpec(`ll-${llId}`, 'update-ll')
-
     }
-
 }
 
 let instances: Record<string, DataHub> = {}
@@ -285,4 +260,6 @@ function instance(id: string): DataHub {
     return instances[id]
 }
 
+export type { Overlay, Script, Pane, Data }
+export { DataHub, instance }
 export default { instance }

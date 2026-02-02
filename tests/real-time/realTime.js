@@ -1,8 +1,8 @@
 // Real-time data test
 
-import { DataLoader } from './lib/dataLoader.js'
-import wsx from './lib/wsx.js'
-import sampler from './lib/ohlcvSampler.js'
+import { DataLoader } from './lib/dataLoader'
+import wsx from './lib/wsx'
+import sampler from './lib/ohlcvSampler'
 
 export default function test(stack, chart) {
 

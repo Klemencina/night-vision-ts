@@ -1,4 +1,3 @@
-
 // Webworker interface
 
 import Utils from '../../stuff/utils'
@@ -78,7 +77,7 @@ class WebWork {
     }
 
     async exec(type: string, data: unknown, txKeys?: string[]): Promise<unknown> {
-        return new Promise((rs) => {
+        return new Promise(rs => {
             let id = Utils.uuid()
             this.send({ type, id, data }, txKeys)
             this.tasks[id] = res => {
@@ -93,7 +92,7 @@ class WebWork {
     }
 
     async relay(event: Message & { txKeys?: string[] }, just = false): Promise<unknown> {
-        return new Promise((rs) => {
+        return new Promise(rs => {
             this.send(event, event.txKeys)
             if (!just) {
                 this.tasks[event.id] = res => {
@@ -117,4 +116,5 @@ function instance(id: string, chart: unknown): WebWork {
     return instances[id]
 }
 
+export { WebWork, instance }
 export default { instance }

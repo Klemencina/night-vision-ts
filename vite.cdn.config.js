@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { resolve } from "path";
-import viteRawPlugin from "./vite/vite-raw-plugin.js";
-import cleanDistCdn from './vite/clean-dist-cdn.js';
+import viteRawPlugin from "./vite/vite-raw-plugin";
+import cleanDistCdn from './vite/clean-dist-cdn';
 import banner from "vite-plugin-banner";
 import pkg from "./package.json";
 
@@ -29,7 +29,7 @@ export default defineConfig({
     emptyOutDir: true,
     inlineDynamicImports: true,
     lib: {
-      entry: resolve(__dirname, "src/index.js"),
+      entry: resolve(__dirname, "src/index.ts"),
       name: "NightVision",
       fileName: (format) => `night-vision.${format}.js`
     },

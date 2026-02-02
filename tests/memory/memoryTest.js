@@ -1,6 +1,6 @@
 
 import data from '../../data/data-ohlcv-rsi.json?id=main'
-import { NightVision } from '../../src/index.js'
+import { NightVision } from '../../src/index'
 
 export default function test(stack, chart) {
 

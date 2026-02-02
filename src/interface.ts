@@ -3,12 +3,12 @@
 import { mount, unmount, Component } from 'svelte'
 import NightVisionComp from './NightVision.svelte'
 import DataHub, { Data, Pane, Overlay } from './core/dataHub'
-import MetaHub from './core/metaHub'
-import DataScan from './core/dataScanner'
-import Scripts from './core/scripts'
-import Events from './core/events'
-import WebWork from './core/se/webWork'
-import SeClient from './core/se/seClient'
+import MetaHub, { MetaHub as MetaHubType } from './core/metaHub'
+import DataScan, { DataScanner as DataScanType } from './core/dataScanner'
+import Scripts, { Scripts as ScriptsType } from './core/scripts'
+import Events, { Events as EventsType } from './core/events'
+import WebWork, { WebWork as WebWorkType } from './core/se/webWork'
+import SeClient, { SeClient as SeClientType } from './core/se/seClient'
 
 import resizeTracker from './stuff/resizeTracker'
 
@@ -67,15 +67,15 @@ class NightVision {
     private _scripts: Script[]
     private _props: Props
     private _scriptsReady: Promise<unknown>
-    public ww: WebWork
-    public se: SeClient
-    public hub: DataHub
-    public meta: MetaHub
-    public scan: DataScan
-    public events: Events
-    public scriptHub: Scripts
+    public ww: WebWorkType
+    public se: SeClientType
+    public hub: ReturnType<typeof DataHub.instance>
+    public meta: MetaHubType
+    public scan: DataScanType
+    public events: EventsType
+    public scriptHub: ScriptsType
     public root: HTMLElement | null
-    public comp: ReturnType<typeof mount> | null
+    public comp: ReturnType<typeof mount> | null = null
 
     constructor(target: string | HTMLElement, props: Props = {}) {
         this._data = props.data || {}
@@ -99,7 +99,7 @@ class NightVision {
         this.events = Events.instance(id)
         this.scriptHub = Scripts.instance(id)
         this.hub.init(this._data)
-        this._scriptsReady = this.scriptHub.init(this._scripts)
+        this._scriptsReady = this.scriptHub.init(this._scripts.map(s => s.code))
         this._props.scriptsReady = this._scriptsReady
 
         this.root = typeof target === 'string' ? document.getElementById(target) : target
@@ -118,7 +118,7 @@ class NightVision {
 
         // TODO: remove the observer on chart destroy
         if (props.autoResize && this.root) {
-            resizeTracker(this as unknown as HTMLElement)
+            resizeTracker(this as unknown as { root: HTMLElement; width: number; height: number })
         }
 
         this.se.setRefs(this.hub, this.scan)
@@ -181,7 +181,7 @@ class NightVision {
     }
     set scripts(val: Script[]) {
         this._scripts = val
-        this.scriptHub.init(this._scripts)
+        this.scriptHub.init(this._scripts.map(s => s.code))
         this.update('full')
     }
 
@@ -229,7 +229,10 @@ class NightVision {
     // Remount component with new props (Svelte 5 way to update props from outside)
     _remount(): void {
         if (!this.root) return
-        unmount(this.comp)
+        if (this.comp) {
+            unmount(this.comp)
+            this.comp = null
+        }
         this.comp = mount(NightVisionComp, {
             target: this.root,
             props: this._props
@@ -293,7 +296,10 @@ class NightVision {
             case 'data':
                 // TODO: update cursor if it's ahead of the last candle
                 // (needs to track the new last)
-                this.hub.updateRange(this.range)
+                const range = this.range
+                if (range) {
+                    this.hub.updateRange(range)
+                }
                 this.meta.calcOhlcMap()
                 ev.emitSpec('chart', 'update-layout', opt)
                 break
@@ -328,6 +334,7 @@ class NightVision {
     // Go to time/index
     goto(ti: number): void {
         let range = this.range
+        if (!range) return
         let dti = range[1] - range[0]
         this.range = [ti - dti, ti]
     }
@@ -335,20 +342,27 @@ class NightVision {
     // Scroll on interval forward
     // TODO: keep legend updated, when the cursor is outside
     scroll(): void {
-        if (this.cursor.locked) return
-        let main = this.hub.mainOv.data
+        const cursor = this.cursor as { locked?: boolean } | null
+        if (cursor?.locked) return
+        let main = this.hub.mainOv?.data
+        if (!main) return
         let last = main[main.length - 1]
         let ib = this.hub.indexBased
         if (!last) return
         let tl = ib ? main.length - 1 : last[0]
-        let d = this.range[1] - tl
+        const range = this.range
+        if (!range) return
+        let d = range[1] - tl
         let int = this.scan.interval
-        if (d > 0) this.goto(this.range[1] + int)
+        if (d > 0) this.goto(range[1] + int)
     }
 
     // Should call this to clean-up memory / events
     destroy(): void {
-        unmount(this.comp)
+        if (this.comp) {
+            unmount(this.comp)
+            this.comp = null
+        }
         this.ww.stop()
     }
 }

@@ -1,8 +1,8 @@
 <script>
 // Legend block (collection of LegendLines)
 
-import Events from '../core/events.js'
-import DataHub from '../core/dataHub.js'
+import Events from '../core/events'
+import DataHub from '../core/dataHub'
 import LegendLine from './LegendLine.svelte'
 
 let { id, props, layout } = $props()

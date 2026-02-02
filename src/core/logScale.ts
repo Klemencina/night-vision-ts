@@ -3,7 +3,7 @@
 
 // TODO: all-negative numbers (sometimes wrong scaling)
 
-import math from '../stuff/math.js'
+import math from '../stuff/math'
 
 interface ScaleSelf {
     $hi: number

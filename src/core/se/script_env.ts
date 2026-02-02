@@ -3,7 +3,7 @@
 // script src, standart functions, input data,
 // other overlays & dependencies
 
-import ScriptStd, { TimeSeries } from './script_std'
+import ScriptStd, { TimeSeries, ScriptEnv as StdScriptEnv } from './script_std'
 import se from './script_engine'
 import * as u from './script_utils'
 import Pane from './pane'
@@ -20,7 +20,8 @@ interface Script {
         update: string
         post: string
     }
-    props?: { [key: string]: unknown }
+    props: { [key: string]: unknown }
+    sett: { [key: string]: unknown }
     settings?: { [key: string]: unknown }
 }
 
@@ -46,6 +47,8 @@ interface ScriptOutput {
     box_maker?: Function
 }
 
+export type { Script, SharedData }
+
 export default class ScriptEnv {
     std: ScriptStd
     id: string
@@ -64,10 +67,12 @@ export default class ScriptEnv {
 
     constructor(s: Script, data: SharedData) {
         this.std = (se as unknown as { std_inject(std: ScriptStd): ScriptStd }).std_inject(
-            new ScriptStd(this)
+            new ScriptStd(this as unknown as StdScriptEnv)
         )
         this.id = s.uuid
         this.src = s
+        this.src.props = this.src.props || {}
+        this.src.sett = this.src.sett || {}
         this.output = {}
         this.data = []
         this.tss = {}
@@ -88,19 +93,19 @@ export default class ScriptEnv {
     }
 
     init(): void {
-        this.output.init()
+        this.output.init?.()
     }
 
     step(unshift = true): void {
         if (unshift) this.unshift()
-        this.output.update()
+        this.output.update?.()
         this.limit()
     }
 
     unshift(): void {
         for (var id in this.tss) {
             if (this.tss[id].__tf__) continue
-            this.tss[id].unshift(undefined)
+            this.tss[id].unshift(undefined as unknown as number)
         }
     }
 
@@ -122,7 +127,8 @@ export default class ScriptEnv {
 
         let tss = ``
         for (var k in this.shared) {
-            if (this.shared[k] && this.shared[k].__id__) {
+            const ts = this.shared[k]
+            if (ts && (ts as TimeSeries).__id__) {
                 tss += `const ${k} = shared.${k}\n`
             }
         }
@@ -141,7 +147,7 @@ export default class ScriptEnv {
                 const ohlcv = shared.dss.ohlcv.data
                 ${dss}
                 const $props = self.src.props
-                const settings = self.src.settings
+                const settings = self.src.settings || self.src.sett || {}
                 const tf = shared.tf
                 const range = shared.range
                 const pane = self.pane
@@ -241,7 +247,7 @@ export default class ScriptEnv {
                 let m0 = this.parentheses(rest)
                 let off = m.index + 1
 
-                if (this.std[fname]) {
+                if ((this.std as unknown as Record<string, unknown>)[fname]) {
                     let [newSrc, replLen] = this.postfix(src, m, m0, ++call_id)
                     src = newSrc
                     off = m.index + replLen
@@ -308,7 +314,7 @@ export default class ScriptEnv {
     }
 
     fdef(fname: string): string {
-        return this.std[fname].toString()
+        return ((this.std as unknown as Record<string, unknown>)[fname] as Function).toString()
     }
 
     get_args(src: string): string[] {

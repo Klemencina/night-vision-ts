@@ -1,5 +1,5 @@
 
-import Const from '../../stuff/constants.js'
+import Const from '../../stuff/constants'
 
 const FDEFS = /(function |)([$A-Z_][0-9A-Z_$\.]*)[\s]*?\((.*?)\)/gmi
 const SBRACKETS = /([$A-Z_][0-9A-Z_$\.]*)[\s]*?\[([^"^\[^\]]+?)\]/gmi

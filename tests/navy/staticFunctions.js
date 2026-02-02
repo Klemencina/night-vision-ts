@@ -2,7 +2,7 @@
 // NavyScript syntax test (parse static functions)
 
 import fs from 'fs'
-import Parser from '../../src/core/navy/parser.js'
+import Parser from '../../src/core/navy/parser'
 
 const src = fs.readFileSync('./tests/navy/scripts/candles_static.navy', 'utf-8')
 

@@ -1,6 +1,6 @@
 // Calculations for candles & volume overlays
 
-// import Utils from '../../../stuff/utils.js'
+// import Utils from '../../../stuff/utils'
 import Const from '../../../stuff/constants'
 import math from '../../../stuff/math'
 

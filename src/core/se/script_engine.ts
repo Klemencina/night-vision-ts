@@ -11,7 +11,7 @@ const DEF_LIMIT = 5
 
 interface DataSource {
     id: string
-    data: TimeSeries
+    data: TimeSeries | number[][]
     last_upd?: number
 }
 
@@ -38,7 +38,7 @@ interface UpdateEvent {
 }
 
 class ScriptEngine {
-    map: { [key: string]: Script }
+    map: { [key: string]: any }
     data: { [key: string]: DataSource }
     queue: unknown[]
     delta_queue: unknown[]
@@ -48,11 +48,11 @@ class ScriptEngine {
     mods: { [key: string]: Mod }
     std_plus: { [key: string]: Function }
     tf: number | undefined
-    open: TimeSeries
-    high: TimeSeries
-    low: TimeSeries
-    close: TimeSeries
-    vol: TimeSeries
+    open!: TimeSeries
+    high!: TimeSeries
+    low!: TimeSeries
+    close!: TimeSeries
+    vol!: TimeSeries
     tss!: { [key: string]: TimeSeries }
     shared!: SharedData
     iter!: number
@@ -82,7 +82,9 @@ class ScriptEngine {
 
     async exec_all(): Promise<void> {
         if (!this.data.ohlcv) {
-            console.warn('[ScriptEngine] exec_all: no this.data.ohlcv, skipping (upload-data may not have run)')
+            console.warn(
+                '[ScriptEngine] exec_all: no this.data.ohlcv, skipping (upload-data may not have run)'
+            )
             return
         }
         // Let current run() finish; don't overwrite map/paneStruct or we get "reading 'step' of undefined"
@@ -116,7 +118,7 @@ class ScriptEngine {
         for (var id in delta) {
             if (!this.map[id]) continue
 
-            let props = this.map[id].src.props || {}
+            let props = this.map[id].src?.props || {}
             for (var k in props) {
                 if (k in delta[id]) {
                     props[k].val = delta[id][k]
@@ -148,9 +150,7 @@ class ScriptEngine {
             symstd.parse(s)
 
             for (var id in this.mods) {
-                if (this.mods[id].pre_env) {
-                    this.mods[id].pre_env(s.uuid, s)
-                }
+                this.mods[id].pre_env?.(s.uuid, s)
             }
 
             s.env = new ScriptEnv(
@@ -171,15 +171,13 @@ class ScriptEngine {
                         onclose: true
                     },
                     this.tss
-                )
+                ) as SharedData
             )
 
             this.map[s.uuid] = s
 
             for (var id in this.mods) {
-                if (this.mods[id].new_env) {
-                    this.mods[id].new_env(s.uuid, s)
-                }
+                this.mods[id].new_env?.(s.uuid, s)
             }
 
             s.env.build()
@@ -211,7 +209,7 @@ class ScriptEngine {
             }
 
             for (var id of sel) {
-                this.map[id].env.step(unshift)
+                this.map[id].env?.step?.(unshift)
             }
 
             for (var m = 0; m < mfs2.length; m++) {
@@ -220,9 +218,9 @@ class ScriptEngine {
         }
 
         try {
-            let ohlcv = this.data.ohlcv.data
+            let ohlcv = this.data.ohlcv.data as number[][]
             let i = ohlcv.length - 1
-            let last = ohlcv[i]
+            let last = ohlcv[i] as number[]
             let sel = Object.keys(this.map)
             let unshift = false
             this.shared.event = 'update'
@@ -243,7 +241,7 @@ class ScriptEngine {
 
             this.iter = i
             this.t = ohlcv[i][0]
-            this.step(ohlcv[i], unshift)
+            this.step(ohlcv[i] as number[], unshift)
 
             this.shared.onclose = false
             step(sel, unshift)
@@ -274,7 +272,7 @@ class ScriptEngine {
 
         this.tss = {}
         this.std_plus = {}
-        this.shared = {}
+        this.shared = {} as SharedData
 
         this.iter = 0
         this.t = 0
@@ -344,7 +342,7 @@ class ScriptEngine {
                 this.map[id].env.init()
             }
 
-            let ohlcv = this.data.ohlcv.data
+            let ohlcv = this.data.ohlcv.data as number[][]
             let start = this.start(ohlcv)
             this.shared.event = 'step'
 
@@ -363,7 +361,7 @@ class ScriptEngine {
                     mfs1[m](sel)
                 }
 
-                for (var id of sel) this.map[id].env.step()
+                for (var id of sel) this.map[id].env?.step?.()
 
                 for (var m = 0; m < mfs2.length; m++) {
                     mfs2[m](sel)
@@ -373,7 +371,7 @@ class ScriptEngine {
             }
 
             for (var id of sel) {
-                this.map[id].env.output.post()
+                this.map[id].env?.output?.post?.()
             }
         } catch (err) {
             console.error('[ScriptEngine] run failed:', err)
@@ -387,7 +385,7 @@ class ScriptEngine {
         this.send('overlay-data', this.format_data())
     }
 
-    step(data: any[], unshift = true): void {
+    step(data: number[], unshift = true): void {
         if (unshift) {
             this.open.unshift(data[1])
             this.high.unshift(data[2])
@@ -395,8 +393,11 @@ class ScriptEngine {
             this.close.unshift(data[4])
             this.vol.unshift(data[5])
             for (var id in this.tss) {
-                if (this.tss[id].__tf__) this.tss[id].__fn__()
-                else this.tss[id].unshift(this.tss[id].__fn__())
+                if (this.tss[id].__tf__) {
+                    this.tss[id].__fn__?.(0)
+                } else {
+                    this.tss[id].unshift((this.tss[id].__fn__?.(0) as unknown as number) ?? 0)
+                }
             }
         } else {
             this.open[0] = data[1]
@@ -405,8 +406,11 @@ class ScriptEngine {
             this.close[0] = data[4]
             this.vol[0] = data[5]
             for (var id in this.tss) {
-                if (this.tss[id].__tf__) this.tss[id].__fn__()
-                else this.tss[id][0] = this.tss[id].__fn__()
+                if (this.tss[id].__tf__) {
+                    this.tss[id].__fn__?.(0)
+                } else {
+                    this.tss[id][0] = (this.tss[id].__fn__?.(0) as unknown as number) ?? 0
+                }
             }
         }
     }
@@ -419,8 +423,8 @@ class ScriptEngine {
         this.vol.length = this.vol.__len__ || DEF_LIMIT
     }
 
-    start(ohlcv: any[]): number {
-        let depth = this.sett.script_depth
+    start(ohlcv: number[][]): number {
+        let depth = this.sett.script_depth as number | undefined
         return depth ? Math.max(ohlcv.length - depth, 0) : 0
     }
 
@@ -485,26 +489,22 @@ class ScriptEngine {
 
     pre_run_mods(sel: string[]): void {
         for (var id in this.mods) {
-            if (this.mods[id].pre_run) {
-                this.mods[id].pre_run(sel)
-            }
+            this.mods[id].pre_run?.(sel)
         }
     }
 
     post_run_mods(sel: string[]): void {
         for (var id in this.mods) {
-            if (this.mods[id].post_run) {
-                this.mods[id].post_run(sel)
-            }
+            this.mods[id].post_run?.(sel)
         }
     }
 
-    make_mods_hooks(name: string): any[] {
+    make_mods_hooks(name: keyof Mod): any[] {
         let arr: any[] = []
         for (var id in this.mods) {
-            if (this.mods[id][name]) {
-                arr.push(this.mods[id][name].bind(this.mods[id]))
-            }
+            const mod = this.mods[id]
+            const fn = mod[name]
+            if (fn) arr.push(fn.bind(mod))
         }
         return arr
     }
@@ -512,7 +512,7 @@ class ScriptEngine {
     recalc_size(): void {
         while (true) {
             var sz = u.size_of_dss(this.data) / (1024 * 1024)
-            let lim = this.sett.ww_ram_limit
+            let lim = this.sett.ww_ram_limit as number | undefined
             if (lim && sz > lim) {
                 this.limit_size()
             } else break
@@ -526,7 +526,7 @@ class ScriptEngine {
             id: x.id,
             t: x.last_upd
         }))
-        dss.sort((a, b) => a.t - b.t)
+        dss.sort((a, b) => (a.t ?? 0) - (b.t ?? 0))
         if (dss.length) {
             delete this.data[dss[0].id]
         }

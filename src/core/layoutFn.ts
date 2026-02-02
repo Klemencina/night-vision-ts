@@ -1,8 +1,8 @@
 // Layout functional interface
 
-import Utils from '../stuff/utils.js'
-import Const from '../stuff/constants.js'
-import math from '../stuff/math.js'
+import Utils from '../stuff/utils'
+import Const from '../stuff/constants'
+import math from '../stuff/math'
 
 const HPX = Const.HPX
 

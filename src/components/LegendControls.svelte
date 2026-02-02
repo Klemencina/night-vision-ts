@@ -1,7 +1,7 @@
 <script>
 // Legend control buttons
 
-import Events from '../core/events.js'
+import Events from '../core/events'
 import icons from '../assets/icons.json'
 
 let { gridId, ov, props, height } = $props()

@@ -10,8 +10,8 @@
 
 import { onMount, onDestroy } from 'svelte'
 import LegendControls from './LegendControls.svelte'
-import Events from '../core/events.js'
-import MetaHub from '../core/metaHub.js'
+import Events from '../core/events'
+import MetaHub from '../core/metaHub'
 import logo from '../assets/logo.json'
 import icons from '../assets/icons.json'
 

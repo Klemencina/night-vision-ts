@@ -1,8 +1,8 @@
-import Const from '../stuff/constants.js'
-import Utils from '../stuff/utils.js'
+import Const from '../stuff/constants'
+import Utils from '../stuff/utils'
 
-import layoutFn from './layoutFn.js'
-import Scale from './gridScale.js'
+import layoutFn from './layoutFn'
+import Scale from './gridScale'
 
 const { TIMESCALES, WEEK, MONTH, YEAR, HOUR, DAY } = Const
 

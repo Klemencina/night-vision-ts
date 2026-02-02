@@ -15,13 +15,13 @@
 
 import { onMount, onDestroy } from 'svelte'
 import ScaleSelector from './ScaleSelector.svelte'
-import Events from '../core/events.js'
-import Utils from '../stuff/utils.js'
-import Const from '../stuff/constants.js'
-import math from '../stuff/math.js'
-import dpr from '../stuff/dprCanvas.js'
-import sb from '../core/primitives/sidebar.js'
-import MetaHub from '../core/metaHub.js'
+import Events from '../core/events'
+import Utils from '../stuff/utils'
+import Const from '../stuff/constants'
+import math from '../stuff/math'
+import dpr from '../stuff/dprCanvas'
+import sb from '../core/primitives/sidebar'
+import MetaHub from '../core/metaHub'
 
 let { id, props = {}, layout = {}, side, scales = [] } = $props()
 

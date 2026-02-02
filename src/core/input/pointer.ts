@@ -5,12 +5,12 @@
 // Input: mouse events / touch events
 // Output: internal events
 
-import FrameAnimation from '../../stuff/frame.js'
-import Utils from '../../stuff/utils.js'
-import math from '../../stuff/math.js'
-import Events from '../events.js'
-import DataHub from '../dataHub.js'
-import MetaHub from '../metaHub.js'
+import FrameAnimation from '../../stuff/frame'
+import Utils from '../../stuff/utils'
+import math from '../../stuff/math'
+import Events from '../events'
+import DataHub from '../dataHub'
+import MetaHub from '../metaHub'
 
 interface Layout {
     scaleIndex: string

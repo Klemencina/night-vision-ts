@@ -2,7 +2,7 @@
 // NavyScript syntax test
 
 import fs from 'fs'
-import Parser from '../../src/core/navy/parser.js'
+import Parser from '../../src/core/navy/parser'
 
 const src = fs.readFileSync('./tests/navy/scripts/base_overlay.navy', 'utf-8')
 

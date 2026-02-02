@@ -1,5 +1,5 @@
 
-import Utils from '../../src/stuff/utils.js'
+import Utils from '../../src/stuff/utils'
 
 const FILES = import.meta.glob(
     '../../data/indicators/*.json', { eager: true })

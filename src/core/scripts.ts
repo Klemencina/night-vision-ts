@@ -42,7 +42,7 @@ class Scripts {
         this.iScripts = {}
     }
 
-    async init(srcs: string[]): Promise<void> {
+    async init(srcs: string[] = []): Promise<void> {
         this.srcLib = Object.values(Overlays).map(x => (x as any).default)
         this.srcLib.push(...Object.values(Tools).map(x => (x as any).default))
         this.srcLib.push(...Object.values(Indicators).map(x => (x as any).default))
@@ -101,4 +101,5 @@ function instance(id: string): Scripts {
     return instances[id]
 }
 
+export { Scripts, instance }
 export default { instance }

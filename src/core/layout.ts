@@ -1,6 +1,6 @@
 // Layout calculations (grid, scales, etc)
 
-import GridMaker from './gridMaker.js'
+import GridMaker from './gridMaker'
 
 interface Pane {
     id: number

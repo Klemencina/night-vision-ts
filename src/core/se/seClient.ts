@@ -196,4 +196,5 @@ function instance(id: string, chart?: Chart): SeClient {
     return instances[id]
 }
 
+export { SeClient }
 export default { instance }

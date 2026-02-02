@@ -1,7 +1,7 @@
 
 // Candle object for Candles overlay
 
-// import Const from '../../../stuff/constants.js'
+// import Const from '../../../stuff/constants'
 // const HPX = Const.HPX
 
 interface CandleData {

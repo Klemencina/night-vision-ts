@@ -1,6 +1,6 @@
 // Time-index mapping (for non-linear t-axis)
 
-import Utils from '../../stuff/utils.js'
+import Utils from '../../stuff/utils'
 
 const MAX_ARR = Math.pow(2, 32)
 

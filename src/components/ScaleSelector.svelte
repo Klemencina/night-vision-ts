@@ -2,7 +2,7 @@
 
 // Switching between scale on the same side
 import { fade } from 'svelte/transition'
-import Events from '../core/events.js'
+import Events from '../core/events'
 
 //TODO: Show a hint on the scale (name of overlay)
 //TODO: Allow user to specify a scale color

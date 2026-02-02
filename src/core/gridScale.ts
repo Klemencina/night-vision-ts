@@ -4,12 +4,12 @@
 
 // TODO: feature: display only overlays on the current scale
 
-import Const from '../stuff/constants.js'
-import Utils from '../stuff/utils.js'
-import math from '../stuff/math.js'
-import logScale from './logScale.js'
-import MetaHub from '../core/metaHub.js'
-import ScriptHub from '../core/scripts.js'
+import Const from '../stuff/constants'
+import Utils from '../stuff/utils'
+import math from '../stuff/math'
+import logScale from './logScale'
+import MetaHub from '../core/metaHub'
+import ScriptHub from '../core/scripts'
 
 const { $SCALES } = Const
 const MAX_INT = Number.MAX_SAFE_INTEGER
