@@ -1,4 +1,3 @@
-
 // Vanilla JS interface
 
 import { mount, unmount, Component } from 'svelte'
@@ -83,6 +82,10 @@ class NightVision {
         this._scripts = props.scripts || []
         this._props = { ...props }
 
+        if (props.indexBased !== undefined) {
+            this._data.indexBased = props.indexBased
+        }
+
         let id = props.id || 'nvjs'
 
         // Script engine & web-worker interfaces
@@ -101,7 +104,11 @@ class NightVision {
 
         this.root = typeof target === 'string' ? document.getElementById(target) : target
         if (!this.root) {
-            console.warn('[NightVision] Container not found:', target, '- ensure element exists when creating chart')
+            console.warn(
+                '[NightVision] Container not found:',
+                target,
+                '- ensure element exists when creating chart'
+            )
             return
         }
         this.comp = mount(NightVisionComp, {
@@ -168,7 +175,6 @@ class NightVision {
         this._remount()
     }
 
-
     // User-defined scripts (overlays & indicators)
     get scripts(): Script[] {
         return this._scripts
@@ -185,6 +191,9 @@ class NightVision {
     }
     set data(val: Data) {
         this._data = val
+        if (this._props.indexBased !== undefined) {
+            this._data.indexBased = this._props.indexBased
+        }
         this.update('full')
     }
 
@@ -203,6 +212,7 @@ class NightVision {
     }
     set indexBased(val: boolean) {
         this._props.indexBased = val
+        this._data.indexBased = val
         this._remount()
     }
 
@@ -276,21 +286,21 @@ class NightVision {
     update(type: string = 'layout', opt: Record<string, any> = {}): void {
         var [t, id] = type.split('-')
         const ev = this.events
-        switch(t) {
+        switch (t) {
             case 'layout':
                 ev.emitSpec('chart', 'update-layout', opt)
-            break
+                break
             case 'data':
                 // TODO: update cursor if it's ahead of the last candle
                 // (needs to track the new last)
                 this.hub.updateRange(this.range)
                 this.meta.calcOhlcMap()
                 ev.emitSpec('chart', 'update-layout', opt)
-            break
+                break
             case 'full':
                 this.hub.init(this._data)
                 ev.emitSpec('chart', 'full-update', opt)
-            break
+                break
             case 'grid':
                 if (id === undefined) {
                     ev.emit('remake-grid')
@@ -298,7 +308,7 @@ class NightVision {
                     let gridId = `grid-${id}`
                     ev.emitSpec(gridId, 'remake-grid', opt)
                 }
-            break
+                break
             case 'legend':
                 if (id === undefined) {
                     ev.emit('update-legend')
@@ -306,13 +316,13 @@ class NightVision {
                     let gridId = `legend-${id}`
                     ev.emitSpec(gridId, 'update-legend', opt)
                 }
-            break
+                break
         }
     }
 
     // Reset everything
     fullReset(): void {
-        this.update('full', {resetRange: true})
+        this.update('full', { resetRange: true })
     }
 
     // Go to time/index
@@ -340,9 +350,7 @@ class NightVision {
     destroy(): void {
         unmount(this.comp)
         this.ww.stop()
-    } 
+    }
 }
 
-export {
-    NightVision
-}
+export { NightVision }

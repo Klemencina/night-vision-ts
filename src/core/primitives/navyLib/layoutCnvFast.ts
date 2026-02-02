@@ -1,4 +1,3 @@
-
 // Calculations for candles & volume overlays
 
 // import Utils from '../../../stuff/utils.js'
@@ -26,6 +25,7 @@ interface Core {
         A: number
         B: number
         pxStep: number
+        indexBased?: boolean
     }
     view: {
         i1: number
@@ -71,7 +71,6 @@ export default function layoutCnvFast(
     maxVolume: number
     volScale: number
 } {
-
     let config = core.props.config
     let interval = core.props.interval
     let data = core.data
@@ -95,9 +94,12 @@ export default function layoutCnvFast(
     if ($v) {
         let volScale = vScale ?? config.VOLSCALE
         maxv = maxVolume(core.dataSubset, vIndex)
-        vs = (volScale ?? 0) * layout.height / maxv
+        vs = ((volScale ?? 0) * layout.height) / maxv
     }
-    var x1: number = 0, x2: number = 0, mid: number, prev: number | undefined = undefined
+    var x1: number = 0,
+        x2: number = 0,
+        mid: number,
+        prev: number | undefined = undefined
     let { A, B, pxStep } = layout
     let w = pxStep * config.CANDLEW
 
@@ -111,30 +113,32 @@ export default function layoutCnvFast(
         mid = ti2x(p[0], i) + 1
 
         // Clear volume bar if there is a time gap
-        if (data[i - 1] && p[0] - data[i - 1][0] > interval) {
+        if (!layout.indexBased && data[i - 1] && p[0] - data[i - 1][0] > interval) {
             prev = undefined
         }
 
         if ($c) {
-            let candle: CandleData = ls ? {
-                x: mid,
-                w: w,
-                o: Math.floor(math.log(p[1]) * A + B),
-                h: Math.floor(math.log(p[2]) * A + B),
-                l: Math.floor(math.log(p[3]) * A + B),
-                c: Math.floor(math.log(p[4]) * A + B),
-                green: green,
-                src: p
-            } : {
-                x: mid,
-                w: w,
-                o: Math.floor(p[1] * A + B),
-                h: Math.floor(p[2] * A + B),
-                l: Math.floor(p[3] * A + B),
-                c: Math.floor(p[4] * A + B),
-                green: green,
-                src: p
-            }
+            let candle: CandleData = ls
+                ? {
+                      x: mid,
+                      w: w,
+                      o: Math.floor(math.log(p[1]) * A + B),
+                      h: Math.floor(math.log(p[2]) * A + B),
+                      l: Math.floor(math.log(p[3]) * A + B),
+                      c: Math.floor(math.log(p[4]) * A + B),
+                      green: green,
+                      src: p
+                  }
+                : {
+                      x: mid,
+                      w: w,
+                      o: Math.floor(p[1] * A + B),
+                      h: Math.floor(p[2] * A + B),
+                      l: Math.floor(p[3] * A + B),
+                      c: Math.floor(p[4] * A + B),
+                      green: green,
+                      src: p
+                  }
             if (green) {
                 upBodies.push(candle)
                 upWicks.push(candle)
@@ -165,12 +169,15 @@ export default function layoutCnvFast(
     }
 
     return {
-        upBodies, upWicks, dwBodies, dwWicks,
-        upVolbars, dwVolbars,
+        upBodies,
+        upWicks,
+        dwBodies,
+        dwWicks,
+        upVolbars,
+        dwVolbars,
         maxVolume: maxv,
         volScale: vs
     }
-
 }
 
 function maxVolume(data: number[][], index: number): number {

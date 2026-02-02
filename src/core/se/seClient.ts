@@ -61,7 +61,11 @@ class SeClient {
         }
         if (!range?.length) {
             let main = this.hub.mainOv.data
-            range = [main[0][0], main[main.length - 1][0]]
+            if (this.hub?.data?.indexBased) {
+                range = [0, main.length - 1]
+            } else {
+                range = [main[0][0], main[main.length - 1][0]]
+            }
         }
         if (this.ww) {
             await this.ww.exec('upload-data', {
@@ -128,7 +132,11 @@ class SeClient {
         }
         if (!range?.length && this.hub?.mainOv?.data?.length) {
             let main = this.hub.mainOv.data
-            range = [main[0][0], main[main.length - 1][0]]
+            if (this.hub?.data?.indexBased) {
+                range = [0, main.length - 1]
+            } else {
+                range = [main[0][0], main[main.length - 1][0]]
+            }
         }
         if (range?.length) {
             this.hub.calcSubset(range)

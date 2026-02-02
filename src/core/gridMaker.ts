@@ -6,7 +6,6 @@ import Scale from './gridScale.js'
 
 const { TIMESCALES, WEEK, MONTH, YEAR, HOUR, DAY } = Const
 
-
 /* Scales System:
 
     scaleTemplate: [['C'], ['A','B']] // Scales displayed
@@ -132,7 +131,6 @@ interface GridMakerResult {
 
 // mainGrid - ref to the main grid
 function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null): GridMakerResult {
-
     let { hub, meta, props, settings, height } = specs
     let { interval, timeFrame, range, timezone } = props
 
@@ -167,7 +165,7 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
     // Unpack scales defined in pane.settings.scale
     function unpackScales(): Record<string, ScaleSrc> {
         let out: Record<string, ScaleSrc> = {
-            'A': defineNewScale('A')
+            A: defineNewScale('A')
         }
         for (var scaleId in settings.scales || {}) {
             let proto = settings.scales![scaleId]
@@ -176,7 +174,10 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
         return out
     }
 
-    function defineNewScale(scaleId: string, proto: { log?: boolean; precision?: number } = {}): ScaleSrc {
+    function defineNewScale(
+        scaleId: string,
+        proto: { log?: boolean; precision?: number } = {}
+    ): ScaleSrc {
         return {
             id: scaleId,
             gridId: id,
@@ -188,7 +189,6 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
     }
 
     function calcPositions(): void {
-
         if (data.length < 2) return
 
         let dt = range[1] - range[0]
@@ -202,8 +202,13 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
 
         // px / time ratio
         let r = self.spacex / dt
-        self.startx = (data[0][0] - range[0]) * r
 
+        // Fix for index-based mode: use view index instead of timestamp
+        if (self.indexBased) {
+            self.startx = (view.i1 - range[0]) * r
+        } else {
+            self.startx = (data[0][0] - range[0]) * r
+        }
     }
 
     // Select nearest good-loking t step (m is target scale)
@@ -215,13 +220,10 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
         return Utils.nearestA(m, s)[1]!
     }
 
-
     function gridX(): void {
-
         // If this is a subgrid, no need to calc a timeline,
         // we just borrow it from the mainGrid
         if (!mainGrid) {
-
             calcPositions()
 
             self.tStep = timeStep()
@@ -253,8 +255,8 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
             }
             for (var i = i0, n = view.i2; i <= n; i++) {
                 let p = view.src[i]
-                let prev = view.src[i-1] || []
-                let prev_xs = self.xs![self.xs!.length - 1] || [0,[]]
+                let prev = view.src[i - 1] || []
+                let prev_xs = self.xs![self.xs!.length - 1] || [0, []]
                 let ti = self.indexBased ? i : p[0]
                 let x = Math.floor((ti - range[0]) * r)
 
@@ -266,7 +268,6 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
                 if (prev_xs === xs) continue
 
                 if (xs[1] - (prev_xs as any)[1] < self.tStep! * 0.8) {
-
                     // prev_xs is a higher "rank" label
                     if (xs[2] * xs[3] <= (prev_xs as any)[2] * (prev_xs as any)[3]) {
                         self.xs!.pop()
@@ -282,15 +283,12 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
                 extendLeft(dt, r)
                 extendRight(dt, r)
             }
-
         } else {
-
             self.tStep = mainGrid.tStep
             self.pxStep = mainGrid.pxStep
             self.startx = mainGrid.startx
             self.spacex = mainGrid.spacex
             self.xs = mainGrid.xs
-
         }
     }
 
@@ -313,7 +311,6 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
     }
 
     function insertLine(prev: any[], p: any[], x: number): void {
-
         let prevT = prev[0]
         let t = p[0]
 
@@ -322,12 +319,9 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
             t += timezone * HOUR
         }
         // TODO: take this block =========> (see below)
-        if ((prev[0] || timeFrame === YEAR) &&
-            Utils.getYear(t) !== Utils.getYear(prevT)) {
+        if ((prev[0] || timeFrame === YEAR) && Utils.getYear(t) !== Utils.getYear(prevT)) {
             self.xs!.push([x, t, YEAR, 1]) // [px, time, rank]
-        }
-        else if (prev[0] &&
-            Utils.getMonth(t) !== Utils.getMonth(prevT)) {
+        } else if (prev[0] && Utils.getMonth(t) !== Utils.getMonth(prevT)) {
             self.xs!.push([x, t, MONTH, 1])
         }
         // TODO: should be added if this day !== prev day
@@ -336,20 +330,18 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
             // rank2 = 0 means lower priority
             let r2 = Utils.getDay(t) === 13 ? 0 : 0.9
             self.xs!.push([x, t, DAY, r2])
-        }
-        else if (t % self.tStep! === 0) {
+        } else if (t % self.tStep! === 0) {
             self.xs!.push([x, t, timeFrame, 1])
         }
     }
 
     function extendLeft(dt: number, r: number): void {
-
         if (!self.xs!.length || !isFinite(r)) return
 
         let t = self.xs![0][1]
         while (true) {
             t -= self.tStep!
-            let x = Math.floor((t  - range[0]) * r)
+            let x = Math.floor((t - range[0]) * r)
             if (x < 0) break
             // TODO: ==========> And insert it here somehow
             if (t % timeFrame === 0) {
@@ -359,13 +351,12 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
     }
 
     function extendRight(dt: number, r: number): void {
-
         if (!self.xs!.length || !isFinite(r)) return
 
         let t = self.xs![self.xs!.length - 1][1]
         while (true) {
             t += self.tStep!
-            let x = Math.floor((t  - range[0]) * r)
+            let x = Math.floor((t - range[0]) * r)
             if (x > self.spacex!) break
             if (t % interval === 0) {
                 self.xs!.push([x, t, interval, 1])
@@ -389,7 +380,6 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
 
     // Select left and right sidebars, set the main scale
     function selectSidebars(): void {
-
         if (!self.scales![settings.scaleIndex!]) {
             settings.scaleIndex = 'A'
         }
@@ -397,7 +387,7 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
 
         // Scale sides config
         if (!settings.scaleTemplate) {
-             settings.scaleTemplate = [[], Object.keys(self.scales!)]
+            settings.scaleTemplate = [[], Object.keys(self.scales!)]
         }
         let sides = settings.scaleTemplate
         if (!sides[0] || !sides[1]) {
@@ -423,7 +413,6 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
         // Right sidebar id
         let rid = sides[1].includes(idxs[1]) ? idxs[1] : null
         self.sb[1] = self.scales![rid!] ? self.scales![rid!].sb : 0
-
     }
 
     // Merge current selected scale with x-axis variables
@@ -462,10 +451,11 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
             // plugin creators
             self.ohlc = meta.ohlc.bind(meta)
             return layoutFn(self as unknown as any, range) as unknown as LayoutSelf
-
         },
         getLayout: (): LayoutSelf => self as unknown as LayoutSelf,
-        setMaxSidebar: (v: [number, number]): void => { self.sbMax = v },
+        setMaxSidebar: (v: [number, number]): void => {
+            self.sbMax = v
+        },
         getSidebar: (): [number, number] => self.sb!,
         id: (): number => id
     }
