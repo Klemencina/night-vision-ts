@@ -116,8 +116,8 @@ function update($layout = layout) {
         if (l.opacity) ctx.globalAlpha = l.opacity
         try {
             r.draw(ctx)
-        } catch(e) {
-            console.log(`Layer ${id}.${l.id}`, e)
+        } catch (e) {
+            console.warn(`Layer ${id}.${l.id} draw error:`, e)
         }
         ctx.globalAlpha = 1
         //if (r.postDraw) r.postDraw(ctx)

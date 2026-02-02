@@ -62,22 +62,12 @@ let chartsInitialized = $state(false)
 
 //data.indexBased = true
 
-// Debug: Log which data files are loaded
-const regularData = data?.panes?.[0]?.overlays?.[0]?.data
-const indexedData = dataIndexed?.panes?.[0]?.overlays?.[0]?.data
-console.log('=== DATA VERIFICATION ===')
-console.log('Regular data first 3 timestamps:', regularData?.slice(0, 3).map(d => d[0]))
-console.log('Indexed data first 3 timestamps:', indexedData?.slice(0, 3).map(d => d[0]))
-console.log('Regular intervals:', regularData?.[1]?.[0] - regularData?.[0]?.[0], 'ms')
-console.log('Indexed intervals:', indexedData?.[1]?.[0] - indexedData?.[0]?.[0], 'ms')
-
 // Use $effect to create charts after DOM elements are ready
 $effect(() => {
     if (!container1 || !container2 || chartsInitialized) return
     
     chartsInitialized = true
     
-    console.log('Creating TOP chart (time-based) with regular data')
     // Time-based chart (top)
     chart = new NightVision('chart-container', {
         id: 'chart-time',
@@ -85,7 +75,6 @@ $effect(() => {
         autoResize: true,
     })
     
-    console.log('Creating BOTTOM chart (index-based) with indexed data')
     // Index-based chart (bottom)
     chart2 = new NightVision('chart-container2', {
         id: 'chart-index',
