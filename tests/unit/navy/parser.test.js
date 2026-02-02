@@ -116,6 +116,21 @@ describe('NavyScript Parser', () => {
             const parser = new Parser(script)
             expect(parser.overlays.length).toBe(2)
         })
+
+        it('should parse overlays with mixed attributes and spacing', () => {
+            const script = `
+// NavyScript~0.2
+[OVERLAY name=Main, export=true, type=Spline]
+[OVERLAY  name=Secondary ,  export=false,  type=Bars ]
+[OVERLAY name=Third,export=true]
+[EOF]
+`
+            const parser = new Parser(script)
+            expect(parser.overlays.length).toBe(3)
+            expect(parser.overlays[0].tagProps.name).toBe('Main')
+            expect(parser.overlays[1].tagProps.name).toBe('Secondary')
+            expect(parser.overlays[2].tagProps.name).toBe('Third')
+        })
     })
 
     describe('Indicator tag parsing', () => {
@@ -144,6 +159,21 @@ calc(src) => src.close
 `
             const parser = new Parser(script)
             expect(parser.indicators.length).toBe(2)
+        })
+
+        it('should preserve indicator order', () => {
+            const script = `
+// NavyScript~0.1-lite
+[INDICATOR name=Fast, period=5]
+calc(src) => src.close
+[INDICATOR name=Slow, period=21]
+calc(src) => src.close
+[EOF]
+`
+            const parser = new Parser(script)
+            expect(parser.indicators.length).toBe(2)
+            expect(parser.indicators[0].tagProps.name).toBe('Fast')
+            expect(parser.indicators[1].tagProps.name).toBe('Slow')
         })
     })
 
