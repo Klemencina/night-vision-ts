@@ -96,6 +96,9 @@ export default class Input {
     pinch: Pinch | null
     fade?: FrameAnimation
     trackpad?: boolean
+    touchRafId: number | null
+    pendingPan?: { x: number; y: number }
+    pendingPinchScale?: number
     
     // Event handler references
     private _mousemove?: (e: MouseEvent) => void
@@ -112,6 +115,9 @@ export default class Input {
         this.deltas = 0
         this.drug = null
         this.pinch = null
+        this.touchRafId = null
+        this.pendingPan = undefined
+        this.pendingPinchScale = undefined
     }
 
     async setup(comp: Comp): Promise<void> {
@@ -210,10 +216,18 @@ export default class Input {
                 this.propagate('mousemove', this.touch2mouse(event))
             }
             if (this.drug) {
-                this.mousedrag(
-                    this.drug.x + event.deltaX,
-                    this.drug.y + event.deltaY,
-                )
+                if (this.shouldThrottleTouch(event)) {
+                    this.pendingPan = {
+                        x: this.drug.x + event.deltaX,
+                        y: this.drug.y + event.deltaY,
+                    }
+                    this.scheduleTouchRangeUpdate()
+                } else {
+                    this.mousedrag(
+                        this.drug.x + event.deltaX,
+                        this.drug.y + event.deltaY,
+                    )
+                }
                 /*this.events.emit('cursor-changed', {
                     gridId: this.gridId,
                     x: event.center.x + this.offsetX,
@@ -225,6 +239,9 @@ export default class Input {
         })
 
         mc.on('panend', (event: any) => {
+            if (this.shouldThrottleTouch(event)) {
+                this.flushTouchRangeUpdate()
+            }
             if (Utils.isMobile && this.drug) {
                 this.panFade()
             }
@@ -252,11 +269,18 @@ export default class Input {
         })
 
         mc.on('pinchend', () =>  {
+            this.flushTouchRangeUpdate()
             this.pinch = null
         })
 
         mc.on('pinch', (event: any) => {
-            if (this.pinch) this.pinchZoom(event.scale)
+            if (!this.pinch) return
+            if (this.shouldThrottleTouch(event)) {
+                this.pendingPinchScale = event.scale
+                this.scheduleTouchRangeUpdate()
+            } else {
+                this.pinchZoom(event.scale)
+            }
         })
 
         mc.on('press', (event: any) => {
@@ -371,6 +395,44 @@ export default class Input {
        })
    }
 
+   shouldThrottleTouch(event?: any): boolean {
+       if (Utils.isMobile) return true
+       if (!event) return false
+       if (event.pointerType === 'touch') return true
+       if (event.srcEvent?.pointerType === 'touch') return true
+       if (event.srcEvent?.touches && event.srcEvent.touches.length > 0) {
+           return true
+       }
+       return false
+   }
+
+   scheduleTouchRangeUpdate(): void {
+       if (this.touchRafId !== null) return
+       this.touchRafId = requestAnimationFrame(() => {
+           this.touchRafId = null
+           this.flushTouchRangeUpdate()
+       })
+   }
+
+   flushTouchRangeUpdate(): void {
+       let updated = false
+       if (this.pendingPan && this.drug) {
+           updated = this.mousedrag(
+               this.pendingPan.x,
+               this.pendingPan.y,
+               true,
+           ) || updated
+       }
+       if (this.pendingPinchScale !== undefined && this.pinch) {
+           updated = this.pinchZoom(this.pendingPinchScale, true) || updated
+       }
+       if (updated) {
+           this.changeRange()
+       }
+       this.pendingPan = undefined
+       this.pendingPinchScale = undefined
+   }
+
    calcOffset(): void {
        let rect = this.canvas.getBoundingClientRect()
        this.offsetX = -rect.x
@@ -444,9 +506,9 @@ export default class Input {
 
     }
 
-    mousedrag(x: number, y: number): void {
+    mousedrag(x: number, y: number, deferChange = false): boolean {
 
-        if (this.meta.scrollLock) return
+        if (this.meta.scrollLock) return false
 
         let dt = this.drug!.t * (this.drug!.x - x) / this.layout.width
         let d$ = this.layout.$hi - this.layout.$lo
@@ -482,18 +544,19 @@ export default class Input {
         this.range[0] = this.drug!.r[0] + dt
         this.range[1] = this.drug!.r[1] + dt
 
-        this.changeRange()
+        if (!deferChange) this.changeRange()
+        return true
 
     }
 
-    pinchZoom(scale: number): void {
+    pinchZoom(scale: number, deferChange = false): boolean {
 
-        if (this.meta.scrollLock) return
+        if (this.meta.scrollLock) return false
 
         let data = this.hub.mainOv.dataSubset
 
-        if (scale > 1 && data.length <= this.MIN_ZOOM) return
-        if (scale < 1 && data.length > this.MAX_ZOOM) return
+        if (scale > 1 && data.length <= this.MIN_ZOOM) return false
+        if (scale < 1 && data.length > this.MAX_ZOOM) return false
 
         let t = this.pinch!.t
         let nt = t * 1 / scale
@@ -501,7 +564,8 @@ export default class Input {
         this.range[0] = this.pinch!.r[0] - (nt - t) * 0.5
         this.range[1] = this.pinch!.r[1] + (nt - t) * 0.5
 
-        this.changeRange()
+        if (!deferChange) this.changeRange()
+        return true
 
     }
 
@@ -565,6 +629,10 @@ export default class Input {
         rm("gestureend", this.gestureend as any)
         if (this.mc) this.mc.destroy()
         if (this.hm) this.hm.unwheel()
+        if (this.touchRafId !== null) {
+            cancelAnimationFrame(this.touchRafId)
+            this.touchRafId = null
+        }
         this.mouseEvents('removeEventListener')
     }
 
