@@ -62,6 +62,7 @@ class DataHub {
     offchart: Pane[] | null = null
     mainOv: Overlay | null = null
     mainPaneId: number | null = null
+    legendCollapsed: boolean
 
     constructor(nvId: string) {
         let events = Events.instance(nvId)
@@ -69,6 +70,7 @@ class DataHub {
         this.events = events
         this.se = se
         se.hub = this // Set a ref to the hub
+        this.legendCollapsed = false
 
         // EVENT INTERFACE
         events.on('hub:set-scale-index', this.onScaleIndex.bind(this) as EventHandler)

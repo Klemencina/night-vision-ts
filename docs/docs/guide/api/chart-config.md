@@ -138,3 +138,11 @@ Quantize cursor after, ms
 - **Default:** `10`
 
 Sample size for auto-precision
+
+
+## config.LEGEND_COLLAPSED
+
+- **Type:** `boolean`
+- **Default:** `false`
+
+Collapse indicator legend lines by default

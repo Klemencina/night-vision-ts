@@ -87,6 +87,7 @@
     onMount(async () => {
         hub.calcSubset(range)
         hub.detectMain()
+        hub.legendCollapsed = !!props.config.LEGEND_COLLAPSED
 
         if (!hub.chart) {
             const panes = hub.data?.panes

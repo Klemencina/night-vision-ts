@@ -22,6 +22,9 @@ export interface DataHub {
   /** Main pane ID */
   readonly mainPaneId: number;
 
+  /** Legend collapsed state */
+  legendCollapsed: boolean;
+
   /** Create a subset of timeseries */
   filter(data: Data, range: any, offset?: number): DataView$;
 
