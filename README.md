@@ -1,6 +1,6 @@
 
 
-![PepeNV](https://github.com/project-nv/night-vision/blob/main/docs/docs/public/nv-banner.jpeg?raw=true)
+![PepeNV](https://github.com/Klemencina/night-vision-ts/blob/main/docs/docs/public/nv-banner.jpeg?raw=true)
 
 <div align="center">
 
@@ -12,9 +12,11 @@
 
 **NightVision** is a highly customizable charting library, created for professional traders. It is a continuation of [TradingVueJS](https://github.com/tvjsx/trading-vue-js) project, borrowing its core ideas, but applying better design decisions and improving performance. Built with Svelte.   
 
+Upstream: this repository is a maintained TypeScript fork of [project-nv/night-vision](https://github.com/project-nv/night-vision), which is currently unmaintained.
+
 Start your charting journey with our interactive [**[DOCS]**](https://nightvision.dev/guide/intro/night-vision-charts.html).
 
-![Screen](https://raw.githubusercontent.com/project-nv/night-vision/main/docs/docs/public/screen.png)
+![Screen](https://raw.githubusercontent.com/Klemencina/night-vision-ts/main/docs/docs/public/screen.png)
 
 ## Installation
 
@@ -90,6 +92,6 @@ chart.data = {
 
 Happy charting!
 
-<img src="https://raw.githubusercontent.com/project-nv/night-vision/main/docs/docs/public/wink.gif" alt="wink" width="64"/>
+<img src="https://raw.githubusercontent.com/Klemencina/night-vision-ts/main/docs/docs/public/wink.gif" alt="wink" width="64"/>
 
 </div>

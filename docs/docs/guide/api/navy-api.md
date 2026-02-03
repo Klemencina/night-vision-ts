@@ -314,16 +314,16 @@ Overlay props (`props` field of [OverlayObject](/guide/data-struct/overlay-objec
 
 Collection of primitives & helper functions.
 
-### $lib.Candle <span style="font-weight: 300;"> - Draws candle [src](https://github.com/project-nv/night-vision/blob/main/src/core/primitives/navyLib/candle.js)</span>
-### $lib.Volbar <span style="font-weight: 300;"> - Draws volume bar [src](https://github.com/project-nv/night-vision/blob/main/src/core/primitives/navyLib/volbar.js)</span>
-### $lib.layoutCnv <span style="font-weight: 300;"> - Calculates candle & volume layout [src](https://github.com/project-nv/night-vision/blob/main/src/core/primitives/navyLib/layoutCnvFast.js)</span>
-### $lib.formatCash <span style="font-weight: 300;"> - Formats number in the following format, e.g.: `1.2M` [src](https://github.com/project-nv/night-vision/blob/main/src/stuff/utils.js#L466)</span>
-### $lib.candleBody <span style="font-weight: 300;"> - Draws candle body fast [src](https://github.com/project-nv/night-vision/blob/main/src/core/primitives/navyLib/candleBody.js)</span>
-### $lib.candleWick <span style="font-weight: 300;"> - Draws candle wick fast [src](https://github.com/project-nv/night-vision/blob/main/src/core/primitives/navyLib/candleWick.js)</span>
-### $lib.volumeBar <span style="font-weight: 300;"> - Draws volume bar fast [src](https://github.com/project-nv/night-vision/blob/main/src/core/primitives/navyLib/volumeBar.js)</span>
-### $lib.fastSma <span style="font-weight: 300;"> - Calculates SMA fast [scr](https://github.com/project-nv/night-vision/blob/main/src/core/primitives/navyLib/helperFns.js#L6)</span>
-### $lib.avgVolume <span style="font-weight: 300;"> - Draws average volume fast [src](https://github.com/project-nv/night-vision/blob/main/src/core/primitives/navyLib/avgVolume.js)</span>
-### $lib.candleColor <span style="font-weight: 300;"> - Detects candle color [src](https://github.com/project-nv/night-vision/blob/main/src/core/primitives/navyLib/helperFns.js)</span>
+### $lib.Candle <span style="font-weight: 300;"> - Draws candle [src](https://github.com/Klemencina/night-vision-ts/blob/main/src/core/primitives/navyLib/candle.js)</span>
+### $lib.Volbar <span style="font-weight: 300;"> - Draws volume bar [src](https://github.com/Klemencina/night-vision-ts/blob/main/src/core/primitives/navyLib/volbar.js)</span>
+### $lib.layoutCnv <span style="font-weight: 300;"> - Calculates candle & volume layout [src](https://github.com/Klemencina/night-vision-ts/blob/main/src/core/primitives/navyLib/layoutCnvFast.js)</span>
+### $lib.formatCash <span style="font-weight: 300;"> - Formats number in the following format, e.g.: `1.2M` [src](https://github.com/Klemencina/night-vision-ts/blob/main/src/stuff/utils.js#L466)</span>
+### $lib.candleBody <span style="font-weight: 300;"> - Draws candle body fast [src](https://github.com/Klemencina/night-vision-ts/blob/main/src/core/primitives/navyLib/candleBody.js)</span>
+### $lib.candleWick <span style="font-weight: 300;"> - Draws candle wick fast [src](https://github.com/Klemencina/night-vision-ts/blob/main/src/core/primitives/navyLib/candleWick.js)</span>
+### $lib.volumeBar <span style="font-weight: 300;"> - Draws volume bar fast [src](https://github.com/Klemencina/night-vision-ts/blob/main/src/core/primitives/navyLib/volumeBar.js)</span>
+### $lib.fastSma <span style="font-weight: 300;"> - Calculates SMA fast [scr](https://github.com/Klemencina/night-vision-ts/blob/main/src/core/primitives/navyLib/helperFns.js#L6)</span>
+### $lib.avgVolume <span style="font-weight: 300;"> - Draws average volume fast [src](https://github.com/Klemencina/night-vision-ts/blob/main/src/core/primitives/navyLib/avgVolume.js)</span>
+### $lib.candleColor <span style="font-weight: 300;"> - Detects candle color [src](https://github.com/Klemencina/night-vision-ts/blob/main/src/core/primitives/navyLib/helperFns.js)</span>
 
 <br/><br/>
 
@@ -340,7 +340,7 @@ See [Script Engine Std Library](/guide/api/se-std-lib.html)
 
 ### self
 
-Script Environment of the script: [src](https://github.com/project-nv/night-vision/blob/main/src/core/se/script_env.js).
+Script Environment of the script: [src](https://github.com/Klemencina/night-vision-ts/blob/main/src/core/se/script_env.js).
 
 ### ohlcv
 
@@ -380,7 +380,7 @@ Current chart range. The same as [this](/guide/api/chart-api.html#chart-range).
 
 ### se
 
-Script Engine reference. [src](https://github.com/project-nv/night-vision/blob/main/src/core/se/script_engine.js)
+Script Engine reference. [src](https://github.com/Klemencina/night-vision-ts/blob/main/src/core/se/script_engine.js)
 
 <div class="tip custom-block section-split">Variables available in the [UPDATE] section of a script.</div>
 

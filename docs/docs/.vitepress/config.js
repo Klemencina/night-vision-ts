@@ -8,18 +8,18 @@ export default {
     ],
     themeConfig: {
         socialLinks: [
-            { icon: 'github', link: 'https://github.com/project-nv/night-vision' },
+            { icon: 'github', link: 'https://github.com/Klemencina/night-vision-ts' },
             { icon: 'twitter', link: 'https://twitter.com/nvxbased' }
         ],
         logo: '/favicon.png',
         nav: [
             { text: 'Guide', link: '/guide/intro/night-vision-charts' },
             { text: 'Examples', link: '/guide/intro/10-basic-examples' },
-            { text: 'Roadmap', link: 'https://github.com/project-nv/night-vision#roadmap' },
+            { text: 'Roadmap', link: 'https://github.com/Klemencina/night-vision-ts#roadmap' },
             {
-               text: '0.4.0',
+               text: '0.5.0',
                items: [
-                 { text: '0.4.0', link: 'https://www.npmjs.com/package/night-vision' },
+                 { text: '0.5.0', link: 'https://www.npmjs.com/package/night-vision-ts' },
                ]
              }
         ],

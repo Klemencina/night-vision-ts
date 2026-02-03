@@ -442,7 +442,7 @@ You should get the same result as in the [Getting Started example](/guide/intro/
 ## 10. Full real-time chart of Bitcoin
 
 ::: warning
-Due to the limitations of CodeSandBox, there are no updates via the websocket here. See [this](https://github.com/project-nv/night-vision/blob/main/tests/real-time/realTime.js) as a fully working example.  
+Due to the limitations of CodeSandBox, there are no updates via the websocket here. See [this](https://github.com/Klemencina/night-vision-ts/blob/main/tests/real-time/realTime.js) as a fully working example.  
 :::
 
 Are you ready for the full **NightVision** experience?

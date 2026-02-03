@@ -220,7 +220,7 @@ legendHtml(x, prec, f) => `
 `
 ```
 
-A good & complex example of `legendHtml` is [Candles](https://github.com/project-nv/night-vision/blob/main/src/scripts/candles.navy) overlay.
+A good & complex example of `legendHtml` is [Candles](https://github.com/Klemencina/night-vision-ts/blob/main/src/scripts/candles.navy) overlay.
 
 ## Precision Samplers
 
@@ -280,7 +280,7 @@ The `static` keyword also applies to `preSampler`. You can define your custom st
 
 ## More Info?
 
-Currenlty, it's recommended to eyeball all the built-in sources: https://github.com/project-nv/night-vision/tree/main/src/scripts
+Currenlty, it's recommended to eyeball all the built-in sources: https://github.com/Klemencina/night-vision-ts/tree/main/src/scripts
 
 Also, as you probably already know, good stuff is here: [NavyJS API](/guide/api/navy-api.html)
 

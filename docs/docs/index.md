@@ -14,7 +14,7 @@ hero:
       link: /guide/intro/getting-started
     - theme: alt
       text: View on GitHub
-      link: https://github.com/project-nv/night-vision
+      link: https://github.com/Klemencina/night-vision-ts
 
 features:
     - icon: ⚡️
