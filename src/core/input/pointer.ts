@@ -417,12 +417,14 @@ export default class Input {
    flushTouchRangeUpdate(): void {
        let updated = false
        if (this.pendingPan && this.drug) {
-           this.mousedrag(this.pendingPan.x, this.pendingPan.y, true)
-           updated = true
+           updated = this.mousedrag(
+               this.pendingPan.x,
+               this.pendingPan.y,
+               true,
+           ) || updated
        }
        if (this.pendingPinchScale !== undefined && this.pinch) {
-           this.pinchZoom(this.pendingPinchScale, true)
-           updated = true
+           updated = this.pinchZoom(this.pendingPinchScale, true) || updated
        }
        if (updated) {
            this.changeRange()
@@ -504,9 +506,9 @@ export default class Input {
 
     }
 
-    mousedrag(x: number, y: number, deferChange = false): void {
+    mousedrag(x: number, y: number, deferChange = false): boolean {
 
-        if (this.meta.scrollLock) return
+        if (this.meta.scrollLock) return false
 
         let dt = this.drug!.t * (this.drug!.x - x) / this.layout.width
         let d$ = this.layout.$hi - this.layout.$lo
@@ -543,17 +545,18 @@ export default class Input {
         this.range[1] = this.drug!.r[1] + dt
 
         if (!deferChange) this.changeRange()
+        return true
 
     }
 
-    pinchZoom(scale: number, deferChange = false): void {
+    pinchZoom(scale: number, deferChange = false): boolean {
 
-        if (this.meta.scrollLock) return
+        if (this.meta.scrollLock) return false
 
         let data = this.hub.mainOv.dataSubset
 
-        if (scale > 1 && data.length <= this.MIN_ZOOM) return
-        if (scale < 1 && data.length > this.MAX_ZOOM) return
+        if (scale > 1 && data.length <= this.MIN_ZOOM) return false
+        if (scale < 1 && data.length > this.MAX_ZOOM) return false
 
         let t = this.pinch!.t
         let nt = t * 1 / scale
@@ -562,6 +565,7 @@ export default class Input {
         this.range[1] = this.pinch!.r[1] + (nt - t) * 0.5
 
         if (!deferChange) this.changeRange()
+        return true
 
     }
 
