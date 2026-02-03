@@ -32,7 +32,9 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, "src/index.ts"),
       name: "NightVision",
-      fileName: "night-vision",
+      formats: ["es", "umd"],
+      fileName: (format) =>
+        format === "es" ? "night-vision.js" : "night-vision.umd.cjs",
     },
     rollupOptions: {
       output: {

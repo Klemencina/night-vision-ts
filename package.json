@@ -1,5 +1,5 @@
 {
-  "name": "night-vision",
+  "name": "night-vision-ts",
   "version": "0.4.0",
   "description": "Highly customizable charting library, created for professional traders",
   "homepage": "https://github.com/project-nv/night-vision",
@@ -22,12 +22,16 @@
     "format": "prettier --write \"src/**/*.{js,ts,svelte}\" \"tests/**/*.{js,ts}\"",
     "format:check": "prettier --check \"src/**/*.{js,ts,svelte}\" \"tests/**/*.{js,ts}\"",
     "audit": "npm audit",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "prepublishOnly": "npm run build"
   },
   "main": "./dist/night-vision.js",
   "module": "./dist/night-vision.js",
+  "types": "./dist/night-vision.d.ts",
+  "unpkg": "./dist/night-vision.umd.cjs",
   "exports": {
     ".": {
+      "types": "./dist/night-vision.d.ts",
       "import": "./dist/night-vision.js",
       "require": "./dist/night-vision.umd.cjs"
     }

@@ -4,7 +4,7 @@
 
 <div align="center">
 
-![npm](https://img.shields.io/npm/v/night-vision.svg?color=brightgreen&label=version) ![license](https://img.shields.io/badge/license-MIT-blue.svg) ![build](https://img.shields.io/badge/build-passing-brightgreen.svg)
+![npm](https://img.shields.io/npm/v/night-vision-ts.svg?color=brightgreen&label=version) ![license](https://img.shields.io/badge/license-MIT-blue.svg) ![build](https://img.shields.io/badge/build-passing-brightgreen.svg)
 
 </div>
 
@@ -19,14 +19,32 @@ Start your charting journey with our interactive [**[DOCS]**](https://nightvisio
 ## Installation
 
 ```sh
-npm i night-vision
+npm i night-vision-ts
+```
+
+## CDN
+
+ESM import:
+
+```js
+import { NightVision } from "https://unpkg.com/night-vision-ts@latest/dist/night-vision.js"
+```
+
+Script tag (global `window.NightVision`):
+
+```html
+<script src="https://unpkg.com/night-vision-ts@latest"></script>
+<script>
+  const { NightVision } = window.NightVision
+  const chart = new NightVision('<root-element-id>')
+</script>
 ```
 
 ## Usage
 
 ```js
 
-import { NightVision } from 'night-vision'
+import { NightVision } from 'night-vision-ts'
 
 let chart = new NightVision('<root-element-id>')
 
