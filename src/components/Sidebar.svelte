@@ -114,6 +114,12 @@
         mc.add(
             new Hammer.Pan({
                 direction: Hammer.DIRECTION_VERTICAL,
+                pointers: 0,
+                threshold: 0
+            })
+        )
+        mc.add(
+            new Hammer.Pinch({
                 threshold: 0
             })
         )
@@ -126,7 +132,11 @@
             })
         )
 
-        mc.on('panstart', event => {
+        mc.get('pan').recognizeWith('pinch')
+        mc.get('pinch').recognizeWith('pan')
+        mc.get('pinch').set({ enable: true })
+
+        const startGesture = event => {
             if (!scale) return
             let yTransform = getYtransform()
             if (yTransform) {
@@ -142,6 +152,10 @@
                 A: scale.A,
                 B: scale.B
             }
+        }
+
+        mc.on('panstart', event => {
+            startGesture(event)
         })
 
         mc.on('panmove', event => {
@@ -161,6 +175,37 @@
         })
 
         mc.on('panend', () => {
+            drug = null
+            if (!scale) return
+            events.emit('sidebar-transform', {
+                gridId: id,
+                scaleId: scale.scaleSpecs.id,
+                drugging: false,
+                updateLayout: true
+            })
+        })
+
+        mc.on('pinchstart', event => {
+            startGesture(event)
+        })
+
+        mc.on('pinch', event => {
+            if (drug) {
+                zoom = Utils.clamp(drug.z * event.scale, 0.005, 100)
+                events.emit('sidebar-transform', {
+                    gridId: id,
+                    scaleId: scale.scaleSpecs.id,
+                    zoom: zoom,
+                    auto: false,
+                    range: calcRange(),
+                    drugging: true,
+                    updateLayout: true
+                })
+                update()
+            }
+        })
+
+        mc.on('pinchend pinchcancel', () => {
             drug = null
             if (!scale) return
             events.emit('sidebar-transform', {
