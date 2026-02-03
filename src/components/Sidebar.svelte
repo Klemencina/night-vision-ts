@@ -114,6 +114,7 @@
         mc.add(
             new Hammer.Pan({
                 direction: Hammer.DIRECTION_VERTICAL,
+                pointers: 0,
                 threshold: 0
             })
         )
