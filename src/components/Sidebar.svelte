@@ -134,6 +134,7 @@
 
         mc.get('pan').recognizeWith('pinch')
         mc.get('pinch').recognizeWith('pan')
+        mc.get('pinch').set({ enable: true })
 
         const startGesture = event => {
             if (!scale) return
