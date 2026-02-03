@@ -1,11 +1,7 @@
-
 import IndexedArray from 'arrayslicer'
 import Const from './constants'
 
-const {
-    MINUTE, MINUTE5, MINUTE15, HOUR, HOUR4,
-    DAY, WEEK, MONTH, YEAR
-} = Const
+const { MINUTE, MINUTE5, MINUTE15, HOUR, HOUR4, DAY, WEEK, MONTH, YEAR } = Const
 
 // Type definitions for utility functions
 export type TimeSeries = number[][]
@@ -21,6 +17,28 @@ export type Overlay = {
     settings?: Record<string, unknown>
 }
 
+type IndexCache = {
+    ia: any
+    len: number
+    last: number | undefined
+}
+
+const indexCache = new WeakMap<TimeSeries, IndexCache>()
+
+function getIndex(arr: TimeSeries): any {
+    let last = arr.length ? arr[arr.length - 1][0] : undefined
+    let cached = indexCache.get(arr)
+    if (!cached || cached.len !== arr.length || cached.last !== last) {
+        cached = {
+            ia: new (IndexedArray as any)(arr, '0'),
+            len: arr.length,
+            last
+        }
+        indexCache.set(arr, cached)
+    }
+    return cached.ia
+}
+
 // Window type with custom properties
 declare global {
     interface Window {
@@ -31,14 +49,13 @@ declare global {
 }
 
 export default {
-
     clamp(num: number, min: number, max: number): number {
         return num <= min ? min : num >= max ? max : num
     },
 
     addZero(i: number): string {
         if (i < 10) {
-            return "0" + i;
+            return '0' + i
         }
         return i.toString()
     },
@@ -46,16 +63,13 @@ export default {
     // Start of the day (zero millisecond)
     dayStart(t: number): number {
         let start = new Date(t)
-        return start.setUTCHours(0,0,0,0)
+        return start.setUTCHours(0, 0, 0, 0)
     },
 
     // Start of the month
     monthStart(t: number): number {
         let date = new Date(t)
-        return Date.UTC(
-            date.getFullYear(),
-            date.getMonth(), 1
-        )
+        return Date.UTC(date.getFullYear(), date.getMonth(), 1)
     },
 
     // Start of the year
@@ -119,9 +133,7 @@ export default {
     // Strip? No, it's ugly floats in js
     strip(number: number | null | undefined): number | null {
         if (number == null) return null
-        return parseFloat(
-            parseFloat(number.toString()).toPrecision(12)
-        )
+        return parseFloat(parseFloat(number.toString()).toPrecision(12))
     },
 
     getDay(t: number): number | null {
@@ -143,7 +155,7 @@ export default {
         let len = Math.min(data.length - 1, 99)
         let min = Infinity
         data.slice(0, len).forEach((x, i) => {
-            let d = data[i+1][0] - x[0]
+            let d = data[i + 1][0] - x[0]
             if (d === d && d < min) min = d
         })
         // This saves monthly chart from being awkward
@@ -157,16 +169,14 @@ export default {
     fastFilter(arr: TimeSeries, t1: number, t2: number): [TimeSeries, number | undefined] {
         if (!arr.length) return [arr, undefined]
         try {
-            let ia = new (IndexedArray as any)(arr, "0")
+            let ia = getIndex(arr)
             let res = ia.getRange(t1, t2)
             let i0 = ia.valpos[t1.toString()]?.next
             return [res, i0]
-        } catch(e) {
+        } catch (e) {
             // Something wrong with fancy slice lib
             // Fast fix: fallback to filter
-            return [arr.filter(x =>
-                x[0] >= t1 && x[0] <= t2
-            ), 0]
+            return [arr.filter(x => x[0] >= t1 && x[0] <= t2), 0]
         }
     },
 
@@ -174,7 +184,7 @@ export default {
     fastFilter2(arr: TimeSeries, t1: number, t2: number): [number | null, number] {
         if (!arr.length) return [0, arr.length]
         try {
-            let ia = new (IndexedArray as any)(arr, "0")
+            let ia = getIndex(arr)
 
             // fetch start and default to the next index above
             ia.fetch(t1)
@@ -185,12 +195,10 @@ export default {
             let finish: number | null = ia.cursor ?? ia.nextlow
 
             return [start, (finish ?? 0) + 1]
-        } catch(e) {
+        } catch (e) {
             // Something wrong with fancy slice lib
             // Fast fix: fallback to filter
-            let subset = arr.filter(x =>
-                x[0] >= t1 && x[0] <= t2
-            )
+            let subset = arr.filter(x => x[0] >= t1 && x[0] <= t2)
             let i1 = arr.indexOf(subset[0])
             let i2 = arr.indexOf(subset[subset.length - 1])
 
@@ -201,24 +209,31 @@ export default {
     // Fast filter (index-based)
     fastFilterIB(arr: TimeSeries, t1: number, t2: number): [number, number] {
         if (!arr.length) return [0, 0]
-        let i1 =  Math.floor(t1)
+        let i1 = Math.floor(t1)
         if (i1 < 0) i1 = 0
-        let i2 =  Math.floor(t2 + 1)
+        let i2 = Math.floor(t2 + 1)
         //let res = arr.slice(i1, i2)
         return [i1, i2]
     },
 
     // Nearest indexes (left and right)
     fastNearest(arr: TimeSeries, t1: number): [number | null, number | null] {
-        let ia = new (IndexedArray as any)(arr, "0")
-        ia.fetch(t1)
-        return [ia.nextlow, ia.nexthigh]
+        try {
+            let ia = getIndex(arr)
+            ia.fetch(t1)
+            return [ia.nextlow, ia.nexthigh]
+        } catch (e) {
+            let idx = this.nearestTs(t1, arr)[0]
+            return [idx, idx]
+        }
     },
 
-    now(): number { return (new Date()).getTime() },
+    now(): number {
+        return new Date().getTime()
+    },
 
     pause(delay: number): Promise<void> {
-        return new Promise((rs) => setTimeout(rs, delay))
+        return new Promise(rs => setTimeout(rs, delay))
     },
 
     // Limit crazy wheel delta values
@@ -262,7 +277,6 @@ export default {
     // Detect index shift between the main data subset
     // and the overlay's subset (for IB-mode)
     indexShift(sub: TimeSeries, data: TimeSeries): number {
-
         // Find the second timestamp (by value)
         if (!data.length) return 0
         let first = data[0][0]
@@ -288,7 +302,11 @@ export default {
 
     // Fallback fix for Brave browser
     // https://github.com/brave/brave-browser/issues/1738
-    measureText(ctx: CanvasRenderingContext2D & { measureTextOrg?: typeof ctx.measureText }, text: string, nvId: string): TextMetrics | { width: number } {
+    measureText(
+        ctx: CanvasRenderingContext2D & { measureTextOrg?: typeof ctx.measureText },
+        text: string,
+        nvId: string
+    ): TextMetrics | { width: number } {
         let m = ctx.measureTextOrg ? ctx.measureTextOrg(text) : ctx.measureText(text)
         if (m.width === 0) {
             const doc = document
@@ -297,14 +315,14 @@ export default {
             if (!el) {
                 let base = doc.getElementById(nvId)
                 if (!base) return m
-                el = doc.createElement("div")
+                el = doc.createElement('div')
                 el.id = id
                 el.style.position = 'absolute'
                 el.style.top = '-1000px'
                 base.appendChild(el)
             }
-            if(ctx.font) el.style.font = ctx.font
-            el.innerText = text.replace(/ /g, '.');
+            if (ctx.font) el.style.font = ctx.font
+            el.innerText = text.replace(/ /g, '.')
             return { width: el.offsetWidth }
         } else {
             return m
@@ -312,11 +330,9 @@ export default {
     },
 
     uuid(temp = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'): string {
-        return temp
-            .replace(/[xy]/g, c => {
-            var r = Math.random() * 16 | 0, v = c == 'x' ?
-                r :
-                (r & 0x3 | 0x8)
+        return temp.replace(/[xy]/g, c => {
+            var r = (Math.random() * 16) | 0,
+                v = c == 'x' ? r : (r & 0x3) | 0x8
             return v.toString(16)
         })
     },
@@ -338,13 +354,14 @@ export default {
 
     // Checks if it's time to make a script update
     // (based on execInterval in ms)
-    delayedExec(v: { script?: { execInterval?: number }, settings: { $last_exec?: number } }): boolean {
-        if (!v.script || !v.script.execInterval)
-            return true
+    delayedExec(v: {
+        script?: { execInterval?: number }
+        settings: { $last_exec?: number }
+    }): boolean {
+        if (!v.script || !v.script.execInterval) return true
         let t = this.now()
         let dt = v.script.execInterval
-        if (!v.settings.$last_exec ||
-            t > v.settings.$last_exec + dt) {
+        if (!v.settings.$last_exec || t > v.settings.$last_exec + dt) {
             v.settings.$last_exec = t
             return true
         }
@@ -353,7 +370,7 @@ export default {
 
     // Format names such 'RSI, $length', where
     // length - is one of the settings
-    formatName(ov: { name?: string, settings?: Record<string, unknown> }): string | undefined {
+    formatName(ov: { name?: string; settings?: Record<string, unknown> }): string | undefined {
         if (!ov.name) return undefined
 
         let name = ov.name
@@ -372,7 +389,10 @@ export default {
         return this.isMobile ? 'explore' : 'default'
     },
 
-    defaultPrevented(event: { original?: { defaultPrevented: boolean }, defaultPrevented: boolean }): boolean {
+    defaultPrevented(event: {
+        original?: { defaultPrevented: boolean }
+        defaultPrevented: boolean
+    }): boolean {
         if (event.original) {
             return event.original.defaultPrevented
         }
@@ -380,7 +400,11 @@ export default {
     },
 
     // Call
-    afterAll(object: { __afterAllId__?: ReturnType<typeof setTimeout> }, f: () => void, time: number): void {
+    afterAll(
+        object: { __afterAllId__?: ReturnType<typeof setTimeout> },
+        f: () => void,
+        time: number
+    ): void {
         clearTimeout(object.__afterAllId__)
         object.__afterAllId__ = setTimeout(() => f(), time)
     },
@@ -399,13 +423,14 @@ export default {
     },
 
     // Get scales by side id (0 - left, 1 - right)
-    getScalesBySide(side: number, layout: { settings?: { scaleTemplate?: number[][] }, scales?: Record<number, unknown> }): unknown[] {
+    getScalesBySide(
+        side: number,
+        layout: { settings?: { scaleTemplate?: number[][] }; scales?: Record<number, unknown> }
+    ): unknown[] {
         if (!layout) return []
         let template = layout.settings?.scaleTemplate
         if (!template) return []
-        return template[side]
-            .map(id => layout.scales?.[id])
-            .filter(x => x) // Clean undefined
+        return template[side].map(id => layout.scales?.[id]).filter(x => x) // Clean undefined
     },
 
     // If scaleTemplate is changed there could be a
@@ -469,10 +494,10 @@ export default {
         if (n == undefined) return 'x'
         if (typeof n !== 'number') return String(n)
         if (n < 1e3) return n.toFixed(0)
-        if (n >= 1e3 && n < 1e6) return +(n / 1e3).toFixed(2) + "K"
-        if (n >= 1e6 && n < 1e9) return +(n / 1e6).toFixed(2) + "M"
-        if (n >= 1e9 && n < 1e12) return +(n / 1e9).toFixed(2) + "B"
-        if (n >= 1e12) return +(n / 1e12).toFixed(2) + "T"
+        if (n >= 1e3 && n < 1e6) return +(n / 1e3).toFixed(2) + 'K'
+        if (n >= 1e6 && n < 1e9) return +(n / 1e6).toFixed(2) + 'M'
+        if (n >= 1e9 && n < 1e12) return +(n / 1e9).toFixed(2) + 'B'
+        if (n >= 1e12) return +(n / 1e12).toFixed(2) + 'T'
         return n.toString()
     },
 
@@ -505,7 +530,9 @@ export default {
 
     // Get a hash of current overlay disposition:
     // pane1.uuid+ov1.type+ov2.type+...+pane2.uuid+...
-    ovDispositionHash(panes: { uuid: string, overlays: { main?: boolean, type: string }[] }[]): string {
+    ovDispositionHash(
+        panes: { uuid: string; overlays: { main?: boolean; type: string }[] }[]
+    ): string {
         let h = ''
         for (var pane of panes) {
             h += pane.uuid
@@ -519,49 +546,59 @@ export default {
 
     // Format cursor event for the '$cursor-update' hook
     // TODO: doesn't work for renko
-    makeCursorEvent($cursor: Record<string, unknown>, cursor: { values?: unknown[], ti?: number, time?: number }, layout: { main?: { ohlc: (t: number) => number[] | null, time2x: (ti: number) => number, value2y: (x: number) => number } }): Record<string, unknown> {
+    makeCursorEvent(
+        $cursor: Record<string, unknown>,
+        cursor: { values?: unknown[]; ti?: number; time?: number },
+        layout: {
+            main?: {
+                ohlc: (t: number) => number[] | null
+                time2x: (ti: number) => number
+                value2y: (x: number) => number
+            }
+        }
+    ): Record<string, unknown> {
         $cursor.values = cursor.values
         $cursor.ti = cursor.ti
         $cursor.time = cursor.time
         $cursor.ohlcCoord = () => {
             let ohlc = layout.main?.ohlc(cursor.time!)
-            return ohlc ? {
-                x: layout.main!.time2x(cursor.ti!),
-                ys: ohlc.map(x => layout.main!.value2y(x))
-            } : null;
+            return ohlc
+                ? {
+                      x: layout.main!.time2x(cursor.ti!),
+                      ys: ohlc.map(x => layout.main!.value2y(x))
+                  }
+                : null
         }
         return $cursor
     },
 
-    // Adjust mouse coords to fix the shift caused by 
+    // Adjust mouse coords to fix the shift caused by
     // css transforms
     adjustMouse(event: MouseEvent, canvas: HTMLCanvasElement): MouseEvent {
-       
-        const rect = canvas.getBoundingClientRect();
+        const rect = canvas.getBoundingClientRect()
 
         // Calculate the adjusted coordinates
-        const adjustedX = event.clientX - rect.left;
-        const adjustedY = event.clientY - rect.top;
+        const adjustedX = event.clientX - rect.left
+        const adjustedY = event.clientY - rect.top
 
         return new Proxy(event, {
             get(target, prop) {
                 // Intercept access to layerX and layerY
                 if (prop === 'layerX') {
-                    return adjustedX;
+                    return adjustedX
                 } else if (prop === 'layerY') {
-                    return adjustedY;
+                    return adjustedY
                 }
 
                 // Ensure methods like preventDefault keep their original context
                 if (typeof target[prop as keyof MouseEvent] === 'function') {
-                    return (target[prop as keyof MouseEvent] as Function).bind(target);
+                    return (target[prop as keyof MouseEvent] as Function).bind(target)
                 }
 
                 // Default behavior for other properties
-                return target[prop as keyof MouseEvent];
+                return target[prop as keyof MouseEvent]
             }
-        }) as MouseEvent;
-
+        }) as MouseEvent
     },
 
     // GPT to the moon!
@@ -572,62 +609,67 @@ export default {
             s = now.getUTCSeconds(),
             Mo = now.getUTCMonth(),
             D = now.getUTCDay(),
-            Y = now.getUTCFullYear();
+            Y = now.getUTCFullYear()
 
-        let rt: number; 
+        let rt: number
 
         switch (tf) {
             case MINUTE:
-                rt = 60 - s;
-                return `00:${rt < 10 ? '0' : ''}${rt}`;
+                rt = 60 - s
+                return `00:${rt < 10 ? '0' : ''}${rt}`
             case MINUTE5:
-                rt = 5 * 60 - (m % 5) * 60 - s;
-                return `${Math.floor(rt / 60)}:${rt % 60 < 10 ? '0' : ''}${rt % 60}`;
+                rt = 5 * 60 - (m % 5) * 60 - s
+                return `${Math.floor(rt / 60)}:${rt % 60 < 10 ? '0' : ''}${rt % 60}`
             case MINUTE15:
-                rt = 15 * 60 - (m % 15) * 60 - s;
-                return `${Math.floor(rt / 60)}:${rt % 60 < 10 ? '0' : ''}${rt % 60}`;
+                rt = 15 * 60 - (m % 15) * 60 - s
+                return `${Math.floor(rt / 60)}:${rt % 60 < 10 ? '0' : ''}${rt % 60}`
             case HOUR:
-                rt = 60 * 60 - m * 60 - s;
-                return `${(Math.floor(rt % 3600 / 60) + '').padStart(2, '0')}:` +
-                    `${(rt % 60 + '').padStart(2, '0')}`;
+                rt = 60 * 60 - m * 60 - s
+                return (
+                    `${(Math.floor((rt % 3600) / 60) + '').padStart(2, '0')}:` +
+                    `${((rt % 60) + '').padStart(2, '0')}`
+                )
             case HOUR4:
-                rt = 4 * 60 * 60 - (h % 4) * 3600 - m * 60 - s;
-                const hours = Math.floor(rt / 3600);
-                const minutes = Math.floor(rt % 3600 / 60);
+                rt = 4 * 60 * 60 - (h % 4) * 3600 - m * 60 - s
+                const hours = Math.floor(rt / 3600)
+                const minutes = Math.floor((rt % 3600) / 60)
                 if (hours === 0) {
-                    return `${minutes}:${(rt % 60 + '').padStart(2, '0')}`;
+                    return `${minutes}:${((rt % 60) + '').padStart(2, '0')}`
                 } else {
-                    return `${hours}:${(minutes + '').padStart(2, '0')}:${(rt % 60 + '').padStart(2, '0')}`;
+                    return `${hours}:${(minutes + '').padStart(2, '0')}:${((rt % 60) + '').padStart(2, '0')}`
                 }
             case DAY:
-                rt = 24 * 60 * 60 - h * 3600 - m * 60 - s;
-                return `${Math.floor(rt / 3600)}:` +
-                    `${(Math.floor(rt % 3600 / 60) + '').padStart(2, '0')}:` +
-                    `${(rt % 60 + '').padStart(2, '0')}`;
+                rt = 24 * 60 * 60 - h * 3600 - m * 60 - s
+                return (
+                    `${Math.floor(rt / 3600)}:` +
+                    `${(Math.floor((rt % 3600) / 60) + '').padStart(2, '0')}:` +
+                    `${((rt % 60) + '').padStart(2, '0')}`
+                )
             case WEEK:
-                rt = 7 * 24 * 60 * 60 - (D || 7) * 24 * 60 * 60 - h * 3600 - m * 60 - s;
-                return `${Math.floor(rt / (24 * 3600))}d ${Math.floor(rt % (24 * 3600) / 3600)}h`;
+                rt = 7 * 24 * 60 * 60 - (D || 7) * 24 * 60 * 60 - h * 3600 - m * 60 - s
+                return `${Math.floor(rt / (24 * 3600))}d ${Math.floor((rt % (24 * 3600)) / 3600)}h`
             case MONTH:
-                const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), Mo + 1, 1));
-                rt = (endOfMonth.getTime() - now.getTime()) / 1000;
-                return `${Math.floor(rt / (24 * 3600))}d ${Math.floor(rt % (24 * 3600) / 3600)}h`;
+                const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), Mo + 1, 1))
+                rt = (endOfMonth.getTime() - now.getTime()) / 1000
+                return `${Math.floor(rt / (24 * 3600))}d ${Math.floor((rt % (24 * 3600)) / 3600)}h`
             case YEAR:
-                const startOfYear = new Date(Date.UTC(Y, 0, 1));
-                const endOfYear = new Date(Date.UTC(Y + 1, 0, 1));
-                const totalSecondsInYear = (endOfYear.getTime() - startOfYear.getTime()) / 1000;
-                rt = totalSecondsInYear - ((now.getTime() - startOfYear.getTime()) / 1000);
-                return `${Math.floor(rt / (24 * 3600))}d ${Math.floor(rt % (24 * 3600) / 3600)}h`;
+                const startOfYear = new Date(Date.UTC(Y, 0, 1))
+                const endOfYear = new Date(Date.UTC(Y + 1, 0, 1))
+                const totalSecondsInYear = (endOfYear.getTime() - startOfYear.getTime()) / 1000
+                rt = totalSecondsInYear - (now.getTime() - startOfYear.getTime()) / 1000
+                return `${Math.floor(rt / (24 * 3600))}d ${Math.floor((rt % (24 * 3600)) / 3600)}h`
             default:
-                return "Unk TF";
+                return 'Unk TF'
         }
     },
 
     // WTF with modern web development
-    isMobile: (w => 'onorientationchange' in w &&
-       (!!navigator.maxTouchPoints ||
-        !!(navigator as Navigator & { msMaxTouchPoints?: number }).msMaxTouchPoints ||
-        ('ontouchstart' in w ||
-        !!(w as Window & { DocumentTouch?: new () => Document }).DocumentTouch)))
-        (typeof window !== 'undefined' ? window : {} as Window)
-
+    isMobile: (w =>
+        'onorientationchange' in w &&
+        (!!navigator.maxTouchPoints ||
+            !!(navigator as Navigator & { msMaxTouchPoints?: number }).msMaxTouchPoints ||
+            'ontouchstart' in w ||
+            !!(w as Window & { DocumentTouch?: new () => Document }).DocumentTouch))(
+        typeof window !== 'undefined' ? window : ({} as Window)
+    )
 }

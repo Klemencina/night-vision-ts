@@ -109,7 +109,7 @@
 
         if (!ctx || !layout) return
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.clearRect(0, 0, layout.width, layout.height)
         //if (this.$p.shaders.length) this.apply_shaders()
         rr.layers.forEach(l => {
             if (!l.display) return
@@ -149,8 +149,9 @@
     // TODO: potential performance improvement
     function resizeWatch() {
         if (!canvas) return
-        dpr.resize(canvas, ctx, layout.width, layout.height)
-        update()
+        if (dpr.resize(canvas, ctx, layout.width, layout.height)) {
+            update()
+        }
     }
 </script>
 
