@@ -145,7 +145,22 @@
         rangeUpdate($range)
         hub.updateRange(range)
         // TODO: Shoud be enabled (*), but it creates cursor lag
-        if (cursor.locked) return // filter double updates (**)
+        if (cursor.locked) {
+            if (layout?.main && cursor.x !== undefined) {
+                cursor.ti = layout.main.x2ti(cursor.x)
+                if (!layout.indexBased) {
+                    cursor.time = interval ? Math.round(cursor.ti / interval) * interval : cursor.ti
+                } else {
+                    const mainOv = hub.mainOv
+                    const off = mainOv?.indexOffset ?? 0
+                    const idx = Math.floor(cursor.ti - off) + 1
+                    const src = mainOv?.data || mainOv?.dataSubset
+                    cursor.time = src?.[idx]?.[0]
+                }
+            }
+            update({}, emit)
+            return
+        }
         cursor.xValues(hub, layout, chartProps)
         cursor.yValues(layout)
         update({}, emit)
