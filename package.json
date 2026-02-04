@@ -1,6 +1,6 @@
 {
   "name": "night-vision-ts",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Highly customizable charting library, created for professional traders",
   "homepage": "https://github.com/Klemencina/night-vision-ts",
   "type": "module",
