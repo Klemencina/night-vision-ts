@@ -1,4 +1,3 @@
-
 // Regular mouse/touch input. The object can be
 // attached to a renderer.
 // ~ Information flow ~
@@ -57,11 +56,14 @@ interface Drug {
     y_r?: number[]
     B: number
     t0: number
+    recentMoves: { t: number; x: number }[]
 }
 
 interface Pinch {
     t: number
     r: number[]
+    centerX: number
+    centerRatio: number
 }
 
 interface Cursor {
@@ -96,7 +98,7 @@ export default class Input {
     pinch: Pinch | null
     fade?: FrameAnimation
     trackpad?: boolean
-    
+
     // Event handler references
     private _mousemove?: (e: MouseEvent) => void
     private _mouseout?: (e: MouseEvent) => void
@@ -115,7 +117,6 @@ export default class Input {
     }
 
     async setup(comp: Comp): Promise<void> {
-
         this.MIN_ZOOM = comp.props.config.MIN_ZOOM
         this.MAX_ZOOM = comp.props.config.MAX_ZOOM
 
@@ -146,7 +147,7 @@ export default class Input {
             console.warn('Pointer: canvas not ready, skipping setup')
             return
         }
-        
+
         await this.listeners()
         this.mouseEvents('addEventListener')
     }
@@ -156,24 +157,24 @@ export default class Input {
         events.forEach(e => {
             if (cmd === 'addEventListener') {
                 // Save the handler to remove it later
-                (this as any)['_' + e] = (this as any)[e].bind(this)
+                ;(this as any)['_' + e] = (this as any)[e].bind(this)
             }
             ;(this.canvas as any)[cmd](e, (this as any)['_' + e])
         })
     }
 
     async listeners(): Promise<void> {
-        const Hamster = await import('hamsterjs');
-        const Hammer = await import('hammerjs');
+        const Hamster = await import('hamsterjs')
+        const Hammer = await import('hammerjs')
 
         this.hm = Hamster.default(this.canvas)
         this.hm.wheel((event: any, delta: number) => this.mousezoom(-delta * 50, event))
 
-        let mc = this.mc = new Hammer.Manager(this.canvas)
+        let mc = (this.mc = new Hammer.Manager(this.canvas))
         let T = Utils.isMobile ? 10 : 0
-        mc.add(new Hammer.Pan({ threshold: T}))
+        mc.add(new Hammer.Pan({ threshold: T }))
         mc.add(new Hammer.Tap())
-        mc.add(new Hammer.Pinch({ threshold: 0}))
+        mc.add(new Hammer.Pinch({ threshold: 0 }))
         mc.get('pinch').set({ enable: true })
         if (Utils.isMobile) mc.add(new Hammer.Press())
 
@@ -189,12 +190,11 @@ export default class Input {
                 y: event.center.y + this.offsetY,
                 r: this.range.slice(),
                 t: this.range[1] - this.range[0],
-                o: tfrm ?
-                    (tfrm.offset || 0) : 0,
-                y_r: tfrm && tfrm.range ?
-                    tfrm.range.slice() : undefined,
+                o: tfrm ? tfrm.offset || 0 : 0,
+                y_r: tfrm && tfrm.range ? tfrm.range.slice() : undefined,
                 B: this.layout.B,
-                t0: Utils.now()
+                t0: Utils.now(),
+                recentMoves: []
             }
             this.events.emit('cursor-locked', true)
             this.events.emit('cursor-changed', {
@@ -210,10 +210,14 @@ export default class Input {
                 this.propagate('mousemove', this.touch2mouse(event))
             }
             if (this.drug) {
-                this.mousedrag(
-                    this.drug.x + event.deltaX,
-                    this.drug.y + event.deltaY,
-                )
+                this.mousedrag(this.drug.x + event.deltaX, this.drug.y + event.deltaY)
+                // Track recent positions for momentum calculation
+                const now = Utils.now()
+                this.drug.recentMoves.push({ t: now, x: this.range[1] })
+                // Keep only the last 5 positions (about 100-150ms of history)
+                if (this.drug.recentMoves.length > 5) {
+                    this.drug.recentMoves.shift()
+                }
                 /*this.events.emit('cursor-changed', {
                     gridId: this.gridId,
                     x: event.center.x + this.offsetX,
@@ -243,15 +247,21 @@ export default class Input {
             this.events.emitSpec(this.rrId, 'update-rr')
         })
 
-        mc.on('pinchstart', () =>  {
+        mc.on('pinchstart', (event: any) => {
             this.drug = null
+            // Calculate center point and its ratio within the current range
+            const centerX = event.center.x + this.offsetX
+            const width = this.layout.width
+            const centerRatio = centerX / width
             this.pinch = {
                 t: this.range[1] - this.range[0],
-                r: this.range.slice()
+                r: this.range.slice(),
+                centerX: centerX,
+                centerRatio: centerRatio
             }
         })
 
-        mc.on('pinchend', () =>  {
+        mc.on('pinchend', () => {
             this.pinch = null
         })
 
@@ -270,14 +280,20 @@ export default class Input {
 
         // TODO: Add only once?
         let add = this.canvas.addEventListener.bind(this.canvas)
-        add("gesturestart", this.gesturestart)
-        add("gesturechange", this.gesturechange)
-        add("gestureend", this.gestureend)
+        add('gesturestart', this.gesturestart)
+        add('gesturechange', this.gesturechange)
+        add('gestureend', this.gestureend)
     }
 
-    gesturestart(event: Event): void { event.preventDefault() }
-    gesturechange(event: Event): void { event.preventDefault() }
-    gestureend(event: Event): void { event.preventDefault() }
+    gesturestart(event: Event): void {
+        event.preventDefault()
+    }
+    gesturechange(event: Event): void {
+        event.preventDefault()
+    }
+    gestureend(event: Event): void {
+        event.preventDefault()
+    }
 
     mousemove(event: MouseEvent): void {
         if (Utils.isMobile) return
@@ -316,69 +332,89 @@ export default class Input {
     }
 
     // Simulated mousedown (for mobile)
-   simMousedown(event: any): void {
-       event = Utils.adjustMouse(event, this.canvas)
-       if (event.srcEvent.defaultPrevented) return
-       this.events.emit('grid-mousedown', [this.gridId, event])
-       this.propagate('mousemove', this.touch2mouse(event))
-       this.events.emitSpec(this.rrId, 'update-rr')
-       this.propagate('mousedown', this.touch2mouse(event))
-       setTimeout(() => {
-           this.propagate('click', this.touch2mouse(event))
-       })
-   }
+    simMousedown(event: any): void {
+        event = Utils.adjustMouse(event, this.canvas)
+        if (event.srcEvent.defaultPrevented) return
+        this.events.emit('grid-mousedown', [this.gridId, event])
+        this.propagate('mousemove', this.touch2mouse(event))
+        this.events.emitSpec(this.rrId, 'update-rr')
+        this.propagate('mousedown', this.touch2mouse(event))
+        setTimeout(() => {
+            this.propagate('click', this.touch2mouse(event))
+        })
+    }
 
-   // Convert touch to "mouse" event
-   touch2mouse(e: any): any {
-       this.calcOffset()
-       return {
-           original: e.srcEvent,
-           layerX: e.center.x + this.offsetX,
-           layerY: e.center.y + this.offsetY,
-           preventDefault: function(this: any) {
-               this.original.preventDefault()
-           }
-       }
-   }
+    // Convert touch to "mouse" event
+    touch2mouse(e: any): any {
+        this.calcOffset()
+        return {
+            original: e.srcEvent,
+            layerX: e.center.x + this.offsetX,
+            layerY: e.center.y + this.offsetY,
+            preventDefault: function (this: any) {
+                this.original.preventDefault()
+            }
+        }
+    }
 
-   click(event: MouseEvent): void {
-       this.propagate('click', event)
-   }
+    click(event: MouseEvent): void {
+        this.propagate('click', event)
+    }
 
-   emitCursorCoord(event: any, add: Record<string, any> = {}): void {
-       this.events.emit('cursor-changed', Object.assign({
-           gridId: this.gridId,
-           x: event.center.x + this.offsetX,
-           y: event.center.y + this.offsetY //+ this.layout.offset
-       }, add))
-   }
+    emitCursorCoord(event: any, add: Record<string, any> = {}): void {
+        this.events.emit(
+            'cursor-changed',
+            Object.assign(
+                {
+                    gridId: this.gridId,
+                    x: event.center.x + this.offsetX,
+                    y: event.center.y + this.offsetY //+ this.layout.offset
+                },
+                add
+            )
+        )
+    }
 
     panFade(): void {
-        let dt = Utils.now() - this.drug!.t0
-       let dx = this.range[1] - this.drug!.r[1]
-       let v = 42 * dx / dt
-       let v0 = Math.abs(v * 0.01)
-       if (dt > 500) return
-       if (this.fade) this.fade.stop()
-       this.fade = new FrameAnimation((self: FrameAnimation) => {
-           v *= 0.85
-           if (Math.abs(v) < v0) {
-               self.stop()
-           }
-           this.range[0] += v
-           this.range[1] += v
-           this.changeRange()
-       })
-   }
+        const moves = this.drug!.recentMoves
+        if (moves.length < 2) return
 
-   calcOffset(): void {
-       let rect = this.canvas.getBoundingClientRect()
-       this.offsetX = -rect.x
-       this.offsetY = -rect.y
-   }
+        // Calculate velocity from the last 2-3 samples only
+        // This prevents momentum when user stops moving before releasing
+        const lastIndex = moves.length - 1
+        const recentStartIndex = Math.max(0, lastIndex - 2)
 
-   mousezoom(delta: number, event: any): void {
+        const recentDt = moves[lastIndex].t - moves[recentStartIndex].t
+        const recentDx = moves[lastIndex].x - moves[recentStartIndex].x
 
+        // Only apply momentum if there was recent movement
+        if (recentDt < 50 || recentDt > 200) return
+
+        let v = (42 * recentDx) / recentDt
+        let v0 = Math.abs(v * 0.01)
+
+        // Don't apply momentum if velocity is too low
+        if (Math.abs(v) < 0.5) return
+
+        if (this.fade) this.fade.stop()
+        this.fade = new FrameAnimation((self: FrameAnimation) => {
+            v *= 0.85
+            if (Math.abs(v) < v0) {
+                self.stop()
+            }
+            this.range[0] += v
+            this.range[1] += v
+            this.changeRange()
+        })
+    }
+
+    calcOffset(): void {
+        let rect = this.canvas.getBoundingClientRect()
+        this.offsetX = -rect.x
+        this.offsetY = -rect.y
+    }
+
+    mousezoom(delta: number, event: any): void {
         if (this.meta.scrollLock) return
 
         // TODO: for mobile
@@ -407,7 +443,7 @@ export default class Input {
 
         delta = Utils.smartWheel(delta)
 
-        const dpr = window.devicePixelRatio ?? 1;
+        const dpr = window.devicePixelRatio ?? 1
 
         // TODO: mouse zooming is a little jerky,
         // needs to follow f(mouse_wheel_speed) and
@@ -420,7 +456,7 @@ export default class Input {
         let tl = this.props.config.ZOOM_MODE === 'tl'
         if (event.originalEvent.ctrlKey || tl) {
             let offset = event.originalEvent.offsetX
-            let diff1 = offset / (this.canvas.width/dpr-1) * diff
+            let diff1 = (offset / (this.canvas.width / dpr - 1)) * diff
             let diff2 = diff - diff1
             this.range[0] -= diff1
             this.range[1] += diff2
@@ -430,25 +466,26 @@ export default class Input {
 
         if (tl) {
             let offset = event.originalEvent.offsetY
-            let diff1 = offset / (this.canvas.height/dpr-1) * 2
+            let diff1 = (offset / (this.canvas.height / dpr - 1)) * 2
             let diff2 = 2 - diff1
             let z = diff / (this.range[1] - this.range[0])
             //rezoom_range(z, diff_x, diff_y)
             // TODO: ?implement
             this.events.emit('rezoom-range', {
-                gridId: this.gridId, z, diff1, diff2
+                gridId: this.gridId,
+                z,
+                diff1,
+                diff2
             })
         }
         // TODO: fix doulbe updates (only on120hz macbook)
         /*if (!updated)*/ this.changeRange()
-
     }
 
     mousedrag(x: number, y: number): void {
-
         if (this.meta.scrollLock) return
 
-        let dt = this.drug!.t * (this.drug!.x - x) / this.layout.width
+        let dt = (this.drug!.t * (this.drug!.x - x)) / this.layout.width
         let d$ = this.layout.$hi - this.layout.$lo
         d$ *= (this.drug!.y - y) / this.layout.height
         let offset = this.drug!.o + d$
@@ -458,24 +495,19 @@ export default class Input {
         if (ls && this.drug!.y_r) {
             let dy = this.drug!.y - y
             range = this.drug!.y_r.slice()
-            range[0] = math.exp((0 - this.drug!.B + dy) /
-                this.layout.A)
-            range[1] = math.exp(
-                (this.layout.height - this.drug!.B + dy) /
-                this.layout.A)
+            range[0] = math.exp((0 - this.drug!.B + dy) / this.layout.A)
+            range[1] = math.exp((this.layout.height - this.drug!.B + dy) / this.layout.A)
         }
 
         let scaleId = this.layout.scaleIndex
         let yTransform = this.meta.getYtransform(this.gridId, scaleId)
-        if (this.drug!.y_r && yTransform &&
-            !yTransform.auto) {
+        if (this.drug!.y_r && yTransform && !yTransform.auto) {
             this.events.emit('sidebar-transform', {
                 gridId: this.gridId,
                 scaleId: scaleId,
-                range: ls ? (range || this.drug!.y_r) : [
-                    this.drug!.y_r[0] - offset,
-                    this.drug!.y_r[1] - offset,
-                ]
+                range: ls
+                    ? range || this.drug!.y_r
+                    : [this.drug!.y_r[0] - offset, this.drug!.y_r[1] - offset]
             })
         }
 
@@ -483,11 +515,9 @@ export default class Input {
         this.range[1] = this.drug!.r[1] + dt
 
         this.changeRange()
-
     }
 
     pinchZoom(scale: number): void {
-
         if (this.meta.scrollLock) return
 
         let data = this.hub.mainOv.dataSubset
@@ -496,17 +526,18 @@ export default class Input {
         if (scale < 1 && data.length > this.MAX_ZOOM) return
 
         let t = this.pinch!.t
-        let nt = t * 1 / scale
+        let nt = (t * 1) / scale
 
-        this.range[0] = this.pinch!.r[0] - (nt - t) * 0.5
-        this.range[1] = this.pinch!.r[1] + (nt - t) * 0.5
+        // Zoom centered on the pinch center point instead of the middle of the range
+        // centerRatio is 0-1 representing where between r[0] and r[1] the center is
+        const cr = this.pinch!.centerRatio
+        this.range[0] = this.pinch!.r[0] - (nt - t) * cr
+        this.range[1] = this.pinch!.r[1] + (nt - t) * (1 - cr)
 
         this.changeRange()
-
     }
 
     trackpadScroll(event: any): void {
-
         if (this.meta.scrollLock) return
 
         let dt = this.range[1] - this.range[0]
@@ -515,12 +546,9 @@ export default class Input {
         this.range[1] += event.deltaX * dt * 0.011
 
         this.changeRange()
-
-
     }
 
     changeRange(): void {
-
         // TODO: better way to limit the view. Problem:
         // when you are at the dead end of the data,
         // and keep scrolling,
@@ -534,17 +562,9 @@ export default class Input {
         let range = this.range
         let layout = this.layout
 
-        range[0] = Utils.clamp(
-            range[0],
-            -Infinity,
-            layout.ti(data[l][0], l) - this.interval * 5.5,
-        )
+        range[0] = Utils.clamp(range[0], -Infinity, layout.ti(data[l][0], l) - this.interval * 5.5)
 
-        range[1] = Utils.clamp(
-            range[1],
-            layout.ti(data[0][0], 0) + this.interval * 5.5,
-            Infinity
-        )
+        range[1] = Utils.clamp(range[1], layout.ti(data[0][0], 0) + this.interval * 5.5, Infinity)
 
         this.events.emit('range-changed', range)
     }
@@ -552,7 +572,8 @@ export default class Input {
     // Propagate mouse event to overlays
     propagate(name: string, event: any): void {
         this.events.emitSpec(this.gridUpdId, 'propagate', {
-            name, event
+            name,
+            event
         })
     }
 
@@ -560,12 +581,11 @@ export default class Input {
         if (!this.canvas) return
         if (typeof this.canvas.removeEventListener !== 'function') return
         let rm = this.canvas.removeEventListener.bind(this.canvas)
-        rm("gesturestart", this.gesturestart as any)
-        rm("gesturechange", this.gesturechange as any)
-        rm("gestureend", this.gestureend as any)
+        rm('gesturestart', this.gesturestart as any)
+        rm('gesturechange', this.gesturechange as any)
+        rm('gestureend', this.gestureend as any)
         if (this.mc) this.mc.destroy()
         if (this.hm) this.hm.unwheel()
         this.mouseEvents('removeEventListener')
     }
-
 }
