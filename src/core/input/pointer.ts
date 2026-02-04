@@ -62,8 +62,6 @@ interface Drug {
 interface Pinch {
     t: number
     r: number[]
-    centerX: number
-    centerRatio: number
 }
 
 interface Cursor {
@@ -98,6 +96,9 @@ export default class Input {
     pinch: Pinch | null
     fade?: FrameAnimation
     trackpad?: boolean
+    touchRafId: number | null
+    pendingPan?: { x: number; y: number }
+    pendingPinchScale?: number
 
     // Event handler references
     private _mousemove?: (e: MouseEvent) => void
@@ -114,6 +115,9 @@ export default class Input {
         this.deltas = 0
         this.drug = null
         this.pinch = null
+        this.touchRafId = null
+        this.pendingPan = undefined
+        this.pendingPinchScale = undefined
     }
 
     async setup(comp: Comp): Promise<void> {
@@ -210,13 +214,22 @@ export default class Input {
                 this.propagate('mousemove', this.touch2mouse(event))
             }
             if (this.drug) {
-                this.mousedrag(this.drug.x + event.deltaX, this.drug.y + event.deltaY)
                 // Track recent positions for momentum calculation
                 const now = Utils.now()
                 this.drug.recentMoves.push({ t: now, x: this.range[1] })
                 // Keep only the last 5 positions (about 100-150ms of history)
                 if (this.drug.recentMoves.length > 5) {
                     this.drug.recentMoves.shift()
+                }
+
+                if (this.shouldThrottleTouch(event)) {
+                    this.pendingPan = {
+                        x: this.drug.x + event.deltaX,
+                        y: this.drug.y + event.deltaY
+                    }
+                    this.scheduleTouchRangeUpdate()
+                } else {
+                    this.mousedrag(this.drug.x + event.deltaX, this.drug.y + event.deltaY)
                 }
                 /*this.events.emit('cursor-changed', {
                     gridId: this.gridId,
@@ -229,6 +242,9 @@ export default class Input {
         })
 
         mc.on('panend', (event: any) => {
+            if (this.shouldThrottleTouch(event)) {
+                this.flushTouchRangeUpdate()
+            }
             if (Utils.isMobile && this.drug) {
                 this.panFade()
             }
@@ -247,26 +263,27 @@ export default class Input {
             this.events.emitSpec(this.rrId, 'update-rr')
         })
 
-        mc.on('pinchstart', (event: any) => {
+        mc.on('pinchstart', () => {
             this.drug = null
-            // Calculate center point and its ratio within the current range
-            const centerX = event.center.x + this.offsetX
-            const width = this.layout.width
-            const centerRatio = centerX / width
             this.pinch = {
                 t: this.range[1] - this.range[0],
-                r: this.range.slice(),
-                centerX: centerX,
-                centerRatio: centerRatio
+                r: this.range.slice()
             }
         })
 
         mc.on('pinchend', () => {
+            this.flushTouchRangeUpdate()
             this.pinch = null
         })
 
         mc.on('pinch', (event: any) => {
-            if (this.pinch) this.pinchZoom(event.scale)
+            if (!this.pinch) return
+            if (this.shouldThrottleTouch(event)) {
+                this.pendingPinchScale = event.scale
+                this.scheduleTouchRangeUpdate()
+            } else {
+                this.pinchZoom(event.scale)
+            }
         })
 
         mc.on('press', (event: any) => {
@@ -376,26 +393,11 @@ export default class Input {
     }
 
     panFade(): void {
-        const moves = this.drug!.recentMoves
-        if (moves.length < 2) return
-
-        // Calculate velocity from the last 2-3 samples only
-        // This prevents momentum when user stops moving before releasing
-        const lastIndex = moves.length - 1
-        const recentStartIndex = Math.max(0, lastIndex - 2)
-
-        const recentDt = moves[lastIndex].t - moves[recentStartIndex].t
-        const recentDx = moves[lastIndex].x - moves[recentStartIndex].x
-
-        // Only apply momentum if there was recent movement
-        if (recentDt < 50 || recentDt > 200) return
-
-        let v = (42 * recentDx) / recentDt
+        let dt = Utils.now() - this.drug!.t0
+        let dx = this.range[1] - this.drug!.r[1]
+        let v = (42 * dx) / dt
         let v0 = Math.abs(v * 0.01)
-
-        // Don't apply momentum if velocity is too low
-        if (Math.abs(v) < 0.5) return
-
+        if (dt > 500) return
         if (this.fade) this.fade.stop()
         this.fade = new FrameAnimation((self: FrameAnimation) => {
             v *= 0.85
@@ -406,6 +408,40 @@ export default class Input {
             this.range[1] += v
             this.changeRange()
         })
+    }
+
+    shouldThrottleTouch(event?: any): boolean {
+        if (Utils.isMobile) return true
+        if (!event) return false
+        if (event.pointerType === 'touch') return true
+        if (event.srcEvent?.pointerType === 'touch') return true
+        if (event.srcEvent?.touches && event.srcEvent.touches.length > 0) {
+            return true
+        }
+        return false
+    }
+
+    scheduleTouchRangeUpdate(): void {
+        if (this.touchRafId !== null) return
+        this.touchRafId = requestAnimationFrame(() => {
+            this.touchRafId = null
+            this.flushTouchRangeUpdate()
+        })
+    }
+
+    flushTouchRangeUpdate(): void {
+        let updated = false
+        if (this.pendingPan && this.drug) {
+            updated = this.mousedrag(this.pendingPan.x, this.pendingPan.y, true) || updated
+        }
+        if (this.pendingPinchScale !== undefined && this.pinch) {
+            updated = this.pinchZoom(this.pendingPinchScale, true) || updated
+        }
+        if (updated) {
+            this.changeRange()
+        }
+        this.pendingPan = undefined
+        this.pendingPinchScale = undefined
     }
 
     calcOffset(): void {
@@ -482,8 +518,8 @@ export default class Input {
         /*if (!updated)*/ this.changeRange()
     }
 
-    mousedrag(x: number, y: number): void {
-        if (this.meta.scrollLock) return
+    mousedrag(x: number, y: number, deferChange = false): boolean {
+        if (this.meta.scrollLock) return false
 
         let dt = (this.drug!.t * (this.drug!.x - x)) / this.layout.width
         let d$ = this.layout.$hi - this.layout.$lo
@@ -514,27 +550,26 @@ export default class Input {
         this.range[0] = this.drug!.r[0] + dt
         this.range[1] = this.drug!.r[1] + dt
 
-        this.changeRange()
+        if (!deferChange) this.changeRange()
+        return true
     }
 
-    pinchZoom(scale: number): void {
-        if (this.meta.scrollLock) return
+    pinchZoom(scale: number, deferChange = false): boolean {
+        if (this.meta.scrollLock) return false
 
         let data = this.hub.mainOv.dataSubset
 
-        if (scale > 1 && data.length <= this.MIN_ZOOM) return
-        if (scale < 1 && data.length > this.MAX_ZOOM) return
+        if (scale > 1 && data.length <= this.MIN_ZOOM) return false
+        if (scale < 1 && data.length > this.MAX_ZOOM) return false
 
         let t = this.pinch!.t
         let nt = (t * 1) / scale
 
-        // Zoom centered on the pinch center point instead of the middle of the range
-        // centerRatio is 0-1 representing where between r[0] and r[1] the center is
-        const cr = this.pinch!.centerRatio
-        this.range[0] = this.pinch!.r[0] - (nt - t) * cr
-        this.range[1] = this.pinch!.r[1] + (nt - t) * (1 - cr)
+        this.range[0] = this.pinch!.r[0] - (nt - t) * 0.5
+        this.range[1] = this.pinch!.r[1] + (nt - t) * 0.5
 
-        this.changeRange()
+        if (!deferChange) this.changeRange()
+        return true
     }
 
     trackpadScroll(event: any): void {
@@ -586,6 +621,10 @@ export default class Input {
         rm('gestureend', this.gestureend as any)
         if (this.mc) this.mc.destroy()
         if (this.hm) this.hm.unwheel()
+        if (this.touchRafId !== null) {
+            cancelAnimationFrame(this.touchRafId)
+            this.touchRafId = null
+        }
         this.mouseEvents('removeEventListener')
     }
 }
