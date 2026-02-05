@@ -1,0 +1,141 @@
+// Navy ~ 0.2-lite
+// <ds>Divergence indicator (price vs RSI)</ds>
+
+[INDICATOR name=Divergence, version=1.0.0]
+
+prop('oscLength', { type: 'integer', def: 14 })
+prop('lbL', { type: 'integer', def: 7 })
+prop('lbR', { type: 'integer', def: 1 })
+prop('delayPlot', { type: 'boolean', def: true })
+prop('showHidden', { type: 'boolean', def: true })
+prop('oscColor', { type: 'color', def: '#3399ff' })
+prop('bullColor', { type: 'color', def: '#00ff00' })
+prop('bearColor', { type: 'color', def: '#ff0000' })
+prop('hiddenBullColor', { type: 'color', def: '#00ff0080' })
+prop('hiddenBearColor', { type: 'color', def: '#ff000080' })
+prop('upperBand', { type: 'number', def: 70 })
+prop('lowerBand', { type: 'number', def: 30 })
+prop('prec', { type: 'integer', def: 2 })
+prop('zIndex', { type: 'integer', def: 0 })
+
+this.oscSpecs = {
+    name: `Divergence RSI ${$props.oscLength}`,
+    props: {
+        color: $props.oscColor,
+        upperBand: $props.upperBand,
+        lowerBand: $props.lowerBand
+    },
+    settings: {
+        precision: $props.prec,
+        zIndex: $props.zIndex
+    }
+}
+
+this.bullSpecs = {
+    name: 'Bull Divergence',
+    props: {
+        color: $props.bullColor,
+        shape: 'triangle',
+        size: 5
+    },
+    settings: {
+        zIndex: $props.zIndex + 1
+    }
+}
+
+this.bearSpecs = {
+    name: 'Bear Divergence',
+    props: {
+        color: $props.bearColor,
+        shape: 'square',
+        size: 4
+    },
+    settings: {
+        zIndex: $props.zIndex + 1
+    }
+}
+
+this.hiddenBullSpecs = {
+    name: 'Hidden Bull Divergence',
+    props: {
+        color: $props.hiddenBullColor,
+        shape: 'triangle',
+        size: 4
+    },
+    settings: {
+        zIndex: $props.zIndex + 1
+    }
+}
+
+this.hiddenBearSpecs = {
+    name: 'Hidden Bear Divergence',
+    props: {
+        color: $props.hiddenBearColor,
+        shape: 'square',
+        size: 3
+    },
+    settings: {
+        zIndex: $props.zIndex + 1
+    }
+}
+
+this.state = {
+    prevLow: NaN,
+    prevLowPrice: NaN,
+    prevHigh: NaN,
+    prevHighPrice: NaN
+}
+
+[UPDATE]
+
+let $ = $props
+let osc = rsi(close, $.oscLength)
+let pl = pivotlow(osc, $.lbL, $.lbR)
+let ph = pivothigh(osc, $.lbL, $.lbR)
+let shouldPlot = !$.delayPlot || onclose()
+
+let bull = NaN
+let hiddenBull = NaN
+let bear = NaN
+let hiddenBear = NaN
+
+if (shouldPlot) {
+    if (!na(pl[0])) {
+        let oscLow = osc[$.lbR]
+        let priceLow = close[$.lbR]
+        if (!na(this.state.prevLow) && !na(this.state.prevLowPrice)) {
+            if (priceLow < this.state.prevLowPrice && oscLow > this.state.prevLow) {
+                bull = oscLow
+            }
+            if ($.showHidden && priceLow > this.state.prevLowPrice && oscLow < this.state.prevLow) {
+                hiddenBull = oscLow
+            }
+        }
+        this.state.prevLow = oscLow
+        this.state.prevLowPrice = priceLow
+    }
+
+    if (!na(ph[0])) {
+        let oscHigh = osc[$.lbR]
+        let priceHigh = close[$.lbR]
+        if (!na(this.state.prevHigh) && !na(this.state.prevHighPrice)) {
+            if (priceHigh > this.state.prevHighPrice && oscHigh < this.state.prevHigh) {
+                bear = oscHigh
+            }
+            if ($.showHidden && priceHigh < this.state.prevHighPrice && oscHigh > this.state.prevHigh) {
+                hiddenBear = oscHigh
+            }
+        }
+        this.state.prevHigh = oscHigh
+        this.state.prevHighPrice = priceHigh
+    }
+}
+
+Range(osc, this.oscSpecs)
+Sparse(bull, this.bullSpecs)
+Sparse(bear, this.bearSpecs)
+
+if ($.showHidden) {
+    Sparse(hiddenBull, this.hiddenBullSpecs)
+    Sparse(hiddenBear, this.hiddenBearSpecs)
+}
