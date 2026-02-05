@@ -158,6 +158,16 @@ class SeClient {
                         dst.name = src.name
                         dst.data = src.data
                         dst.uuid = src.uuid
+                        if (dst.props && src.props) {
+                            Object.assign(dst.props, src.props)
+                        } else if (src.props) {
+                            dst.props = src.props
+                        }
+                        if (dst.settings && src.settings) {
+                            Object.assign(dst.settings, src.settings)
+                        } else if (src.settings) {
+                            dst.settings = src.settings
+                        }
                     }
                 }
             }

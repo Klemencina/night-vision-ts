@@ -2,13 +2,13 @@
     // Floating panel for indicator settings
     // Styled to match project: uses props.colors.* and props.config.FONT
 
-    // Component uses Svelte 5 runes, no lifecycle hooks needed
+    import { onMount } from 'svelte'
     import Events from '../core/events'
     import DataHub from '../core/dataHub'
     import Scripts from '../core/scripts'
     import SeClient from '../core/se/seClient'
 
-    let { props, isOpen = $bindable(false), overlay = null, paneId = null } = $props()
+    let { props, overlay = null, paneId = null, onClose } = $props()
 
     let events = Events.instance(props.id)
     let hub = DataHub.instance(props.id)
@@ -21,49 +21,50 @@
     let indicatorUi = $state({ enabled: false, allowedProps: [] })
     let propsMeta = $state([])
 
-    // Initialize when panel opens or overlay changes
-    $effect(() => {
-        if (isOpen && overlay) {
-            // Reset state
-            script = null
-            scriptProps = {}
-            indicatorUi = { enabled: false, allowedProps: [] }
-            propsMeta = []
+    onMount(() => {
+        if (!overlay) return
+        // Reset state
+        script = null
+        scriptProps = {}
+        indicatorUi = { enabled: false, allowedProps: [] }
+        propsMeta = []
 
-            // Try to find script immediately
-            findScript()
+        // Try to find script immediately
+        const found = findScript()
 
-            // If not found, retry after a short delay (scripts might still be loading)
-            if (!script) {
-                setTimeout(() => {
-                    if (isOpen && !script) {
-                        findScript()
-                    }
-                }, 100)
-            }
+        // If not found, retry after a short delay (scripts might still be loading)
+        if (!found) {
+            setTimeout(() => {
+                findScript()
+            }, 100)
         }
     })
 
     function findScript() {
         // Find the script that produced this overlay
-        const pane = hub.panes()[paneId]
-
-        if (!pane || !pane.scripts) {
-            return
-        }
+        const panes = hub.panes() || []
 
         // overlay.prod contains the script uuid
         const scriptUuid = overlay.prod
         if (!scriptUuid) {
-            return
+            return false
         }
 
-        // Find script in pane
-        script = pane.scripts.find(s => s.uuid === scriptUuid)
+        // Find script across all panes (script can live on a different pane)
+        script = null
+        for (const pane of panes) {
+            if (!pane?.scripts) continue
+            script = pane.scripts.find(s => s.uuid === scriptUuid)
+            if (script) break
+        }
 
         if (!script) {
             // Try to find by type as fallback
-            script = pane.scripts.find(s => s.type === overlay.type)
+            for (const pane of panes) {
+                if (!pane?.scripts) continue
+                script = pane.scripts.find(s => s.type === overlay.type)
+                if (script) break
+            }
 
             if (!script) {
                 // Last resort: try to get metadata from iScripts directly using overlay type
@@ -75,7 +76,7 @@
                         settings: overlay.settings || {}
                     }
                 } else {
-                    return
+                    return false
                 }
             }
         }
@@ -88,7 +89,13 @@
         }
 
         // Initialize script props with defaults from metadata if not set
-        scriptProps = { ...script.props }
+        const baseProps =
+            script.settings?.indicatorProps ||
+            overlay?.settings?.indicatorProps ||
+            (script.props && Object.keys(script.props).length ? script.props : null) ||
+            overlay?.props ||
+            {}
+        scriptProps = { ...baseProps }
 
         // Ensure all props from metadata have values
         for (const meta of propsMeta) {
@@ -99,15 +106,17 @@
 
         // Get indicator UI settings
         indicatorUi = script.settings?.indicatorUi || { enabled: false, allowedProps: [] }
+
+        return true
     }
 
-    function onClose() {
-        isOpen = false
+    function onCloseClick() {
+        if (onClose) onClose()
     }
 
     function onBackdropClick(e) {
         if (e.target === e.currentTarget) {
-            onClose()
+            onCloseClick()
         }
     }
 
@@ -141,6 +150,14 @@
 
         // Update script props
         script.props = { ...scriptProps }
+        script.settings = script.settings || {}
+        script.settings.indicatorProps = { ...scriptProps }
+        if (overlay) {
+            overlay.props = overlay.props || {}
+            Object.assign(overlay.props, scriptProps)
+            overlay.settings = overlay.settings || {}
+            overlay.settings.indicatorProps = { ...scriptProps }
+        }
 
         // Send update to worker
         const delta = {
@@ -148,7 +165,7 @@
         }
         await seClient.updateScriptProps(delta)
 
-        onClose()
+        onCloseClick()
     }
 
     // Styling
@@ -162,7 +179,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 9999;
+    pointer-events: auto;
 `)
 
     let panelStyle = $derived(`
@@ -177,6 +195,7 @@
     font: ${props.config.FONT};
     color: ${props.colors.textLG};
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    pointer-events: auto;
 `)
 
     let headerStyle = $derived(`
@@ -290,138 +309,136 @@
 `)
 </script>
 
-{#if isOpen}
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="nvjs-indicator-settings-backdrop" style={backdropStyle} onclick={onBackdropClick}>
-        <div class="nvjs-indicator-settings-panel" style={panelStyle}>
-            <div class="nvjs-indicator-settings-header" style={headerStyle}>
-                <span class="nvjs-indicator-settings-title" style={titleStyle}>
-                    {overlay?.name || 'Indicator Settings'}
-                </span>
-                <button
-                    class="nvjs-indicator-settings-close"
-                    style={closeBtnStyle}
-                    onclick={onClose}
-                    title="Close"
-                >
-                    ×
-                </button>
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="nvjs-indicator-settings-backdrop" style={backdropStyle} onclick={onBackdropClick}>
+    <div class="nvjs-indicator-settings-panel" style={panelStyle}>
+        <div class="nvjs-indicator-settings-header" style={headerStyle}>
+            <span class="nvjs-indicator-settings-title" style={titleStyle}>
+                {overlay?.name || 'Indicator Settings'}
+            </span>
+            <button
+                class="nvjs-indicator-settings-close"
+                style={closeBtnStyle}
+                onclick={onCloseClick}
+                title="Close"
+            >
+                ×
+            </button>
+        </div>
+
+        {#if script}
+            <!-- Enable Chart Editing Toggle -->
+            <div class="nvjs-indicator-settings-section" style={sectionStyle}>
+                <label class="nvjs-indicator-settings-checkbox" style={checkboxStyle}>
+                    <input
+                        type="checkbox"
+                        checked={indicatorUi.enabled}
+                        onchange={onToggleEnabled}
+                    />
+                    <span>Enable chart editing</span>
+                </label>
             </div>
 
-            {#if script}
-                <!-- Enable Chart Editing Toggle -->
+            <!-- Props Configuration -->
+            {#if propsMeta.length > 0}
                 <div class="nvjs-indicator-settings-section" style={sectionStyle}>
-                    <label class="nvjs-indicator-settings-checkbox" style={checkboxStyle}>
-                        <input
-                            type="checkbox"
-                            checked={indicatorUi.enabled}
-                            onchange={onToggleEnabled}
-                        />
-                        <span>Enable chart editing</span>
-                    </label>
-                </div>
+                    <span class="nvjs-indicator-settings-label" style={labelStyle}>
+                        Properties
+                    </span>
 
-                <!-- Props Configuration -->
-                {#if propsMeta.length > 0}
-                    <div class="nvjs-indicator-settings-section" style={sectionStyle}>
-                        <span class="nvjs-indicator-settings-label" style={labelStyle}>
-                            Properties
-                        </span>
+                    {#each propsMeta as meta (meta.name)}
+                        <div class="nvjs-indicator-settings-prop-row" style={propRowStyle}>
+                            <label
+                                class="nvjs-indicator-settings-prop-label"
+                                style={propLabelStyle}
+                            >
+                                <span>{meta.name}</span>
+                                <input
+                                    type="checkbox"
+                                    checked={indicatorUi.allowedProps.includes(meta.name)}
+                                    onchange={() => onToggleProp(meta.name)}
+                                    title="Allow editing on chart"
+                                />
+                            </label>
 
-                        {#each propsMeta as meta (meta.name)}
-                            <div class="nvjs-indicator-settings-prop-row" style={propRowStyle}>
-                                <label
-                                    class="nvjs-indicator-settings-prop-label"
-                                    style={propLabelStyle}
-                                >
-                                    <span>{meta.name}</span>
+                            {#if meta.type === 'color'}
+                                <div style="display: flex; gap: 8px; align-items: center;">
                                     <input
-                                        type="checkbox"
-                                        checked={indicatorUi.allowedProps.includes(meta.name)}
-                                        onchange={() => onToggleProp(meta.name)}
-                                        title="Allow editing on chart"
+                                        type="color"
+                                        value={scriptProps[meta.name] || meta.def}
+                                        oninput={e => (scriptProps[meta.name] = e.target.value)}
+                                        style="width: 40px; height: 28px; padding: 0; border: none; background: none; cursor: pointer;"
                                     />
-                                </label>
-
-                                {#if meta.type === 'color'}
-                                    <div style="display: flex; gap: 8px; align-items: center;">
-                                        <input
-                                            type="color"
-                                            value={scriptProps[meta.name] || meta.def}
-                                            oninput={e => (scriptProps[meta.name] = e.target.value)}
-                                            style="width: 40px; height: 28px; padding: 0; border: none; background: none; cursor: pointer;"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={scriptProps[meta.name] || meta.def}
-                                            oninput={e => (scriptProps[meta.name] = e.target.value)}
-                                            style={inputStyle}
-                                        />
-                                    </div>
-                                {:else if meta.type === 'integer' || meta.type === 'number'}
-                                    <input
-                                        type="number"
-                                        value={scriptProps[meta.name] ?? meta.def}
-                                        oninput={e =>
-                                            (scriptProps[meta.name] =
-                                                meta.type === 'integer'
-                                                    ? parseInt(e.target.value)
-                                                    : parseFloat(e.target.value))}
-                                        style={inputStyle}
-                                    />
-                                {:else}
                                     <input
                                         type="text"
-                                        value={scriptProps[meta.name] ?? meta.def}
+                                        value={scriptProps[meta.name] || meta.def}
                                         oninput={e => (scriptProps[meta.name] = e.target.value)}
                                         style={inputStyle}
                                     />
-                                {/if}
-                            </div>
-                        {/each}
-                    </div>
-                {:else}
-                    <div class="nvjs-indicator-settings-section" style={sectionStyle}>
-                        <span
-                            style="color: {props.colors.scale}; font-size: {parseInt(
-                                props.config.FONT
-                            )}px;"
-                        >
-                            No configurable properties
-                        </span>
-                    </div>
-                {/if}
-
-                <!-- Buttons -->
-                <div class="nvjs-indicator-settings-buttons" style={buttonsStyle}>
-                    <button
-                        class="nvjs-indicator-settings-btn-secondary"
-                        style={btnSecondaryStyle}
-                        onclick={onClose}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        class="nvjs-indicator-settings-btn-primary"
-                        style={btnPrimaryStyle}
-                        onclick={onApply}
-                    >
-                        Apply
-                    </button>
+                                </div>
+                            {:else if meta.type === 'integer' || meta.type === 'number'}
+                                <input
+                                    type="number"
+                                    value={scriptProps[meta.name] ?? meta.def}
+                                    oninput={e =>
+                                        (scriptProps[meta.name] =
+                                            meta.type === 'integer'
+                                                ? parseInt(e.target.value)
+                                                : parseFloat(e.target.value))}
+                                    style={inputStyle}
+                                />
+                            {:else}
+                                <input
+                                    type="text"
+                                    value={scriptProps[meta.name] ?? meta.def}
+                                    oninput={e => (scriptProps[meta.name] = e.target.value)}
+                                    style={inputStyle}
+                                />
+                            {/if}
+                        </div>
+                    {/each}
                 </div>
             {:else}
-                <div
-                    style="color: {props.colors.scale}; font-size: {parseInt(
-                        props.config.FONT
-                    )}px; text-align: center; padding: 20px;"
-                >
-                    No script found for this indicator
+                <div class="nvjs-indicator-settings-section" style={sectionStyle}>
+                    <span
+                        style="color: {props.colors.scale}; font-size: {parseInt(
+                            props.config.FONT
+                        )}px;"
+                    >
+                        No configurable properties
+                    </span>
                 </div>
             {/if}
-        </div>
+
+            <!-- Buttons -->
+            <div class="nvjs-indicator-settings-buttons" style={buttonsStyle}>
+                <button
+                    class="nvjs-indicator-settings-btn-secondary"
+                    style={btnSecondaryStyle}
+                    onclick={onCloseClick}
+                >
+                    Cancel
+                </button>
+                <button
+                    class="nvjs-indicator-settings-btn-primary"
+                    style={btnPrimaryStyle}
+                    onclick={onApply}
+                >
+                    Apply
+                </button>
+            </div>
+        {:else}
+            <div
+                style="color: {props.colors.scale}; font-size: {parseInt(
+                    props.config.FONT
+                )}px; text-align: center; padding: 20px;"
+            >
+                No script found for this indicator
+            </div>
+        {/if}
     </div>
-{/if}
+</div>
 
 <style>
     .nvjs-indicator-settings-backdrop {

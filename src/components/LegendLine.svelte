@@ -238,8 +238,13 @@
     </div>
 
     <!-- Settings Panel for Indicators -->
-    {#if isIndicator}
-        <IndicatorSettings {props} bind:isOpen={showSettings} overlay={ov} paneId={gridId} />
+    {#if isIndicator && showSettings}
+        <IndicatorSettings
+            {props}
+            overlay={ov}
+            paneId={gridId}
+            onClose={() => (showSettings = false)}
+        />
     {/if}
 {/if}
 
