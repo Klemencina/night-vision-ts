@@ -68,7 +68,9 @@ export default function layoutCnv(
 
     let maxv = 0
     let vs = 0
-    if ($v) {
+    let hasVolume = data.length > 0 && data[0].length > volIndex
+    let showVolume = $v && hasVolume
+    if (showVolume) {
         maxv = maxVolume(core.data, volIndex)
         vs = config.VOLSCALE * layout.height / maxv
     }
@@ -100,7 +102,7 @@ export default function layoutCnv(
             src: p
         })
 
-        if ($v) {
+        if (showVolume) {
             x1 = prev || Math.floor(mid - pxStep * 0.5)
             x2 = Math.floor(mid + pxStep * 0.5) + HPX
             volume.push({

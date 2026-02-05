@@ -91,7 +91,9 @@ export default function layoutCnvFast(
 
     let maxv = 0
     let vs = 0
-    if ($v) {
+    let hasVolume = core.dataSubset.length > 0 && core.dataSubset[0].length > vIndex
+    let showVolume = $v && hasVolume
+    if (showVolume) {
         let volScale = vScale ?? config.VOLSCALE
         maxv = maxVolume(core.dataSubset, vIndex)
         vs = ((volScale ?? 0) * layout.height) / maxv
@@ -148,7 +150,7 @@ export default function layoutCnvFast(
             }
         }
 
-        if ($v) {
+        if (showVolume) {
             x1 = prev || Math.floor(mid - pxStep * 0.5)
             x2 = Math.floor(mid + pxStep * 0.5) + HPX
             let volbar: VolumeData = {
