@@ -126,7 +126,6 @@
 
     function initCursorValues() {
         if (!layout || !hub.mainOv) return
-        if (cursor.values && cursor.values.length) return
         let data = hub.mainOv.dataSubset || hub.mainOv.data
         if (!data || !data.length) return
         let last = data[data.length - 1]

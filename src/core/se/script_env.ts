@@ -354,9 +354,9 @@ export default class ScriptEnv {
             if (str[i] === ')') c--
             if (str[i] === '[') s++
             if (str[i] === ']') s--
-            if (str[i] === "'") q1 = !q1
-            if (str[i] === '"') q2 = !q2
-            if (str[i] === '`') q3 = !q3
+            if (str[i] === "'" && !q2 && !q3) q1 = !q1
+            if (str[i] === '"' && !q1 && !q3) q2 = !q2
+            if (str[i] === '`' && !q1 && !q2) q3 = !q3
             if (str[i] === ',' && c === 1 && !s && !q1 && !q2 && !q3) {
                 if (part) {
                     part[1] = i
