@@ -179,6 +179,11 @@ class SeClient {
     onEngineState(data: any): void {
         this.state = Object.assign(this.state || {}, data)
     }
+
+    async updateScriptProps(delta: { [uuid: string]: { [key: string]: any } }): Promise<void> {
+        if (!this.ww) return
+        await this.ww.exec('exec-sel', delta)
+    }
 }
 
 let instances: { [id: string]: SeClient } = {}

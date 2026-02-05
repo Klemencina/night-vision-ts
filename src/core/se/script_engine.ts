@@ -119,9 +119,13 @@ class ScriptEngine {
             if (!this.map[id]) continue
 
             let props = this.map[id].src?.props || {}
-            for (var k in props) {
-                if (k in delta[id]) {
-                    props[k].val = delta[id][k]
+            for (var k in delta[id]) {
+                // Support both plain values and { val: ... } objects
+                const value = delta[id][k]
+                if (typeof props[k] === 'object' && props[k] !== null && 'val' in props[k]) {
+                    props[k].val = value
+                } else {
+                    props[k] = value
                 }
             }
 

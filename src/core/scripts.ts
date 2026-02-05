@@ -27,6 +27,7 @@ interface IScript {
         update?: string
         post?: string
     }
+    propsMeta?: { name: string; type: string; def: any }[]
 }
 
 class Scripts {
@@ -85,7 +86,8 @@ class Scripts {
                         init: ind.init,
                         update: ind.update,
                         post: ind.post
-                    }
+                    },
+                    propsMeta: ind.propsMeta
                 }
             }
         }
