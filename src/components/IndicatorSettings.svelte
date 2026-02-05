@@ -23,9 +23,7 @@
 
     // Initialize when panel opens or overlay changes
     $effect(() => {
-        console.log('IndicatorSettings effect - isOpen:', isOpen, 'overlay:', overlay?.name)
         if (isOpen && overlay) {
-            console.log('IndicatorSettings opening for:', overlay.name)
             // Reset state
             script = null
             scriptProps = {}
@@ -50,41 +48,26 @@
         // Find the script that produced this overlay
         const pane = hub.panes()[paneId]
 
-        console.log('=== IndicatorSettings Debug ===')
-        console.log('paneId:', paneId)
-        console.log('pane:', pane)
-        console.log('pane.scripts:', pane?.scripts)
-        console.log('overlay:', overlay)
-        console.log('overlay.prod:', overlay?.prod)
-
         if (!pane || !pane.scripts) {
-            console.log('No pane or scripts found')
             return
         }
 
         // overlay.prod contains the script uuid
         const scriptUuid = overlay.prod
         if (!scriptUuid) {
-            console.log('No overlay.prod (scriptUuid) found')
             return
         }
 
         // Find script in pane
         script = pane.scripts.find(s => s.uuid === scriptUuid)
-        console.log('Found script:', script)
-        console.log('scripts.iScripts:', scripts.iScripts)
 
         if (!script) {
-            console.log('Script not found in pane.scripts by uuid')
             // Try to find by type as fallback
-            console.log('Trying to find by type:', overlay.type)
             script = pane.scripts.find(s => s.type === overlay.type)
 
             if (!script) {
-                console.log('Script not found by type either')
                 // Last resort: try to get metadata from iScripts directly using overlay type
                 if (overlay.type && scripts.iScripts[overlay.type]) {
-                    console.log('Creating virtual script from iScripts metadata')
                     script = {
                         uuid: overlay.prod || 'virtual-' + overlay.type,
                         type: overlay.type,
@@ -95,7 +78,6 @@
                     return
                 }
             }
-            console.log('Found script by type:', script)
         }
 
         // Get props metadata from iScripts
