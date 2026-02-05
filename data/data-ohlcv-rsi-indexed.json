@@ -33611,6 +33611,12 @@
                     "settings": {},
                     "props": {}
                 }
+            ],
+            "scripts": [
+                {
+                    "type": "Ichimoku",
+                    "props": {}
+                }
             ]
         },
         {
@@ -33632,6 +33638,14 @@
                             "precision": 3
                         }
                     }
+                }
+            ]
+        },
+        {
+            "scripts": [
+                {
+                    "type": "MACD",
+                    "props": {}
                 }
             ]
         }

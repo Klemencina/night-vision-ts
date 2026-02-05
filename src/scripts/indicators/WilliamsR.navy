@@ -10,17 +10,21 @@ prop('lowerBand', { type: 'number', def: -80 })
 prop('color', { type: 'color', def: '#0980e8' })
 prop('backColor', { type: 'color', def: '#9b9ba316' })
 prop('bandColor', { type: 'color', def: '#535559' })
+prop('fixedMin', { type: 'number', def: -100 })
+prop('fixedMax', { type: 'number', def: 0 })
 prop('prec', { type: 'integer', def: autoPrec() })
 prop('zIndex', { type: 'integer', def: 0 })
 
 this.specs = {
-    name: `%R ${$props.length}`,
+    name: '%R',
     props: {
         color: $props.color,
         backColor: $props.backColor,
         bandColor: $props.bandColor,
         upperBand: $props.upperBand,
         lowerBand: $props.lowerBand,
+        fixedMin: $props.fixedMin,
+        fixedMax: $props.fixedMax
     },
     settings: {
         precision: $props.prec,

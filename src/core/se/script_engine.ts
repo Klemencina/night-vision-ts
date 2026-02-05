@@ -118,10 +118,17 @@ class ScriptEngine {
         for (var id in delta) {
             if (!this.map[id]) continue
 
-            let props = this.map[id].src?.props || {}
-            for (var k in props) {
-                if (k in delta[id]) {
-                    props[k].val = delta[id][k]
+            this.clear_script_overlays(id)
+
+            if (!this.map[id].props) this.map[id].props = {}
+            let props = this.map[id].props
+            for (var k in delta[id]) {
+                // Support both plain values and { val: ... } objects
+                const value = delta[id][k]
+                if (typeof props[k] === 'object' && props[k] !== null && 'val' in props[k]) {
+                    props[k].val = value
+                } else {
+                    props[k] = value
                 }
             }
 
@@ -131,6 +138,14 @@ class ScriptEngine {
         await this.run(sel)
         this.drain_queues()
         this.send_state()
+    }
+
+    clear_script_overlays(scriptId: string): void {
+        const paneStruct = (self as any).paneStruct || []
+        for (var pane of paneStruct) {
+            if (!pane.overlays) continue
+            pane.overlays = pane.overlays.filter((ov: any) => ov.prod !== scriptId)
+        }
     }
 
     add_script(s: any): void {

@@ -33608,6 +33608,10 @@
             ],
             "settings": {},
             "props": {}
+        }],
+        "scripts": [{
+            "type": "Ichimoku",
+            "props": {}
         }]
     }, {
         "scripts": [{
@@ -33627,6 +33631,11 @@
                     "precision": 3
                 }
             }
+        }]
+    }, {
+        "scripts": [{
+            "type": "MACD",
+            "props": {}
         }]
     }]
 }

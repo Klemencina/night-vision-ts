@@ -13,7 +13,7 @@ prop('prec', { type: 'integer', def: autoPrec() })
 prop('zIndex', { type: 'integer', def: 0 })
 
 this.specs = {
-    name: `KC ${$props.length} ${$props.mult}`,
+    name: 'KC',
     props: {
         color: $props.color,
         backColor: $props.backColor,

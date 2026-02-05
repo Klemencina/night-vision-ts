@@ -10,6 +10,8 @@
 prop('color', { type: 'color', def: '#31ce31' })
 prop('lineWidth', { type: 'number', def: 1 })
 prop('dataIndex', { type: 'integer', def: 1 })
+prop('fixedMin', { type: 'number' })
+prop('fixedMax', { type: 'number' })
 
 
 draw(ctx) {
@@ -46,6 +48,9 @@ preSampler(x) => [x[$props.dataIndex]]
 ohlc(x) => Array(4).fill(x[$props.dataIndex])
 
 yRange(data) {
+    if ($props.fixedMin != null && $props.fixedMax != null) {
+        return [$props.fixedMax, $props.fixedMin]
+    }
     let di = $props.dataIndex
     let len = data.length
     var h, l, high = -Infinity, low = Infinity

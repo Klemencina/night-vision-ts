@@ -10,6 +10,8 @@ prop('bandColor', { type: 'color', def: '#535559' })
 prop('backColor', { type: 'color', def: '#381e9c16' })
 prop('upperBand', { type: 'number', def: 80 })
 prop('lowerBand', { type: 'number', def: 20 })
+prop('fixedMin', { type: 'number' })
+prop('fixedMax', { type: 'number' })
 
 draw(ctx) {
     const layout = $core.layout
@@ -56,10 +58,23 @@ draw(ctx) {
     ctx.stroke()
 }
 
-yRange(data, hi, lo) => [
-    Math.max(hi, $props.upperBand),
-    Math.min(lo, $props.lowerBand)
-]
+yRange(data, hi, lo) {
+    if ($props.fixedMin != null && $props.fixedMax != null) {
+        return [$props.fixedMax, $props.fixedMin]
+    }
+    if (
+        $props.upperBand >= 0 &&
+        $props.lowerBand >= 0 &&
+        $props.upperBand <= 100 &&
+        $props.lowerBand <= 100
+    ) {
+        return [100, 0]
+    }
+    return [
+        Math.max(hi, $props.upperBand),
+        Math.min(lo, $props.lowerBand)
+    ]
+}
 
 // Legend, defined as pairs [value, color]
 legend(x) => [[x[1], $props.kColor], [x[1], $props.dColor]]
@@ -72,15 +87,19 @@ prop('paramD', { def: 3 })
 prop('smooth', { def: 3 })
 prop('kColor', { type: 'color', def: '#3782f2' })
 prop('dColor', { type: 'color', def: '#f48709' })
+prop('fixedMin', { type: 'number', def: 0 })
+prop('fixedMax', { type: 'number', def: 100 })
 prop('prec', { type: 'integer', def: 2 })
 prop('zIndex', { type: 'integer', def: 0 })
 
 let $ = $props
 this.specs = {
-    name: `Stoch ${$.paramK} ${$.paramD} ${$.smooth}`,
+    name: 'Stoch',
     props: {
         kColor: $props.kColor,
-        dColor: $props.dColor
+        dColor: $props.dColor,
+        fixedMin: $props.fixedMin,
+        fixedMax: $props.fixedMax
     },
     settings: {
         precision: $props.prec,

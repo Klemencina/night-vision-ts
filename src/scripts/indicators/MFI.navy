@@ -10,17 +10,21 @@ prop('lowerBand', { type: 'number', def: 20 })
 prop('color', { type: 'color', def: '#85c427ee' })
 prop('backColor', { type: 'color', def: '#85c42711' })
 prop('bandColor', { type: 'color', def: '#999999' })
+prop('fixedMin', { type: 'number', def: 0 })
+prop('fixedMax', { type: 'number', def: 100 })
 prop('prec', { type: 'integer', def: 2 })
 prop('zIndex', { type: 'integer', def: 0 })
 
 this.specs = {
-    name: 'MFI ' + $props.length,
+    name: 'MFI',
     props: {
         color: $props.color,
         backColor: $props.backColor,
         bandColor: $props.bandColor,
         upperBand: $props.upperBand,
         lowerBand: $props.lowerBand,
+        fixedMin: $props.fixedMin,
+        fixedMax: $props.fixedMax
     },
     settings: {
         precision: $props.prec,

@@ -70,6 +70,10 @@ self.onmessage = async (e: WorkerMessage) => {
                 se.update(e.data.data.ohlcv, e)
             }
             break
+        case 'exec-sel':
+            await se.exec_sel(e.data.data)
+            self.postMessage({ type: 'exec-sel-done', id: e.data.id, data: {} })
+            break
     }
 }
 

@@ -6,13 +6,17 @@
 
 prop('length', { type: 'integer', def: 14 })
 prop('color', { type: 'color', def: '#3399ff' })
+prop('fixedMin', { type: 'number', def: 0 })
+prop('fixedMax', { type: 'number', def: 100 })
 prop('prec', { type: 'integer', def: 2 })
 prop('zIndex', { type: 'integer', def: 0 })
 
 this.specs = {
-    name: 'RSI ' + $props.length,
+    name: 'RSI',
     props: {
-        color: $props.color
+        color: $props.color,
+        fixedMin: $props.fixedMin,
+        fixedMax: $props.fixedMax
     },
     settings: {
         precision: $props.prec,

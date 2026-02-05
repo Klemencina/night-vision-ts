@@ -61,6 +61,18 @@ If you don't see the overlay, try to call `chart.se.uploadAndExec()`. This will 
 - **Type:** `color`
 - **Default:** `'#f48709'`
 
+## Stoch.fixedMin
+- **Type:** `number`
+- **Default:** `0`
+
+Minimum value for the fixed Y-range. When both `fixedMin` and `fixedMax` are set, the indicator's scale will be locked to this range.
+
+## Stoch.fixedMax
+- **Type:** `number`
+- **Default:** `100`
+
+Maximum value for the fixed Y-range. When both `fixedMin` and `fixedMax` are set, the indicator's scale will be locked to this range.
+
 ## Stoch.prec
 - **Type:** `integer`
 - **Default:** `2`
@@ -68,4 +80,5 @@ If you don't see the overlay, try to call `chart.se.uploadAndExec()`. This will 
 ## Stoch.zIndex
 - **Type:** `integer`
 - **Default:** `0`
+
 

@@ -6,13 +6,17 @@
 
 prop('length', { type: 'integer', def: 10 })
 prop('color', { type: 'color', def: '#559de0' })
+prop('fixedMin', { type: 'number', def: -100 })
+prop('fixedMax', { type: 'number', def: 100 })
 prop('prec', { type: 'integer', def: autoPrec() })
 prop('zIndex', { type: 'integer', def: 0 })
 
 this.specs = {
-    name: `CMO ${$props.length}`,
+    name: 'CMO',
     props: {
-        color: $props.color
+        color: $props.color,
+        fixedMin: $props.fixedMin,
+        fixedMax: $props.fixedMax
     },
     settings: {
         precision: $props.prec,
