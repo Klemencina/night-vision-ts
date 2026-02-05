@@ -37,6 +37,18 @@ If you don't see the overlay, try to call `chart.se.uploadAndExec()`. This will 
 - **Type:** `color`
 - **Default:** `'#559de0'`
 
+## CMO.fixedMin
+- **Type:** `number`
+- **Default:** `-100`
+
+Minimum value for the fixed Y-range. When both `fixedMin` and `fixedMax` are set, the indicator's scale will be locked to this range.
+
+## CMO.fixedMax
+- **Type:** `number`
+- **Default:** `100`
+
+Maximum value for the fixed Y-range. When both `fixedMin` and `fixedMax` are set, the indicator's scale will be locked to this range.
+
 ## CMO.prec
 - **Type:** `integer`
 - **Default:** `autoPrec()`
@@ -44,4 +56,5 @@ If you don't see the overlay, try to call `chart.se.uploadAndExec()`. This will 
 ## CMO.zIndex
 - **Type:** `integer`
 - **Default:** `0`
+
 

@@ -53,6 +53,18 @@ If you don't see the overlay, try to call `chart.se.uploadAndExec()`. This will 
 - **Type:** `color`
 - **Default:** `'#535559'`
 
+## WilliamsR.fixedMin
+- **Type:** `number`
+- **Default:** `-100`
+
+Minimum value for the fixed Y-range. When both `fixedMin` and `fixedMax` are set, the indicator's scale will be locked to this range.
+
+## WilliamsR.fixedMax
+- **Type:** `number`
+- **Default:** `0`
+
+Maximum value for the fixed Y-range. When both `fixedMin` and `fixedMax` are set, the indicator's scale will be locked to this range.
+
 ## WilliamsR.prec
 - **Type:** `integer`
 - **Default:** `autoPrec()`
@@ -60,4 +72,5 @@ If you don't see the overlay, try to call `chart.se.uploadAndExec()`. This will 
 ## WilliamsR.zIndex
 - **Type:** `integer`
 - **Default:** `0`
+
 

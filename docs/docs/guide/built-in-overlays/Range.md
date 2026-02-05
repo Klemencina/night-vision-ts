@@ -32,3 +32,16 @@ Ranging indicator, e.g. RSI
 - **Type:** `number`
 - **Default:** `30`
 
+## Range.fixedMin
+- **Type:** `number`
+- **Default:** `undefined`
+
+Minimum value for the fixed Y-range. When both `fixedMin` and `fixedMax` are set, the overlay's scale will be locked to this range.
+
+## Range.fixedMax
+- **Type:** `number`
+- **Default:** `undefined`
+
+Maximum value for the fixed Y-range. When both `fixedMin` and `fixedMax` are set, the overlay's scale will be locked to this range.
+
+

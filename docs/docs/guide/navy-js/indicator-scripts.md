@@ -135,6 +135,72 @@ Will propduce:
 }
 ```
 
+## Prop Metadata & Settings UI
+
+When you define props using `prop()`, the library automatically extracts metadata about each property. This metadata is used to generate an interactive settings panel that users can access by clicking the gear icon in the legend.
+
+### Supported Property Types
+
+| Type | Description | UI Control |
+|------|-------------|------------|
+| `color` | Color value (hex, rgb, named) | Color picker + text input |
+| `number` | Floating-point number | Number input |
+| `integer` | Whole number | Number input (integers only) |
+| `string` | Text value | Text input (default) |
+
+### Example with Prop Metadata
+
+```js
+[INDICATOR name=MyIndicator]
+
+// Define props with type and default value
+prop('length', { type: 'integer', def: 14 })
+prop('color', { type: 'color', def: '#3782f2' })
+prop('showBands', { type: 'boolean', def: true })
+prop('multiplier', { type: 'number', def: 2.0 })
+
+// Access props with $props
+this.specs = {
+    name: 'My Indicator',
+    props: {
+        color: $props.color,
+    },
+    settings: {
+        precision: 2
+    }
+}
+
+[UPDATE]
+
+// Use props in calculations
+Spline(sma(close, $props.length), this.specs)
+```
+
+### Fixed Y-Range
+
+For indicators that should display within a fixed range (e.g., RSI 0-100), you can use the special `fixedMin` and `fixedMax` props:
+
+```js
+[INDICATOR name=RangeIndicator]
+
+prop('fixedMin', { type: 'number', def: 0 })
+prop('fixedMax', { type: 'number', def: 100 })
+
+this.specs = {
+    name: 'Range',
+    props: {
+        fixedMin: $props.fixedMin,
+        fixedMax: $props.fixedMax
+    }
+}
+```
+
+When both `fixedMin` and `fixedMax` are set, the chart will lock the Y-axis to this range, preventing auto-scaling.
+
+### Persisting Settings
+
+When users modify indicator settings through the UI, the changes are automatically saved to `script.settings.indicatorProps`. These settings persist across chart updates and can be serialized with the chart data.
+
 ## Multiple overlays
 
 Yes, this is possible:

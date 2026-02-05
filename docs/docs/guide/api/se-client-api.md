@@ -51,3 +51,24 @@ If you updated the main dataset and also have indicator scripts in your data str
 chart.hub.mainOv.data.unshift(newChunk)
 chart.se.uploadAndExec()
 ```
+
+## se.updateScriptProps()
+
+- **Type:** `async` `function`
+- **Returns:** `Promise`
+- **Parameters:** `delta: { [scriptUuid: string]: { [key: string]: any } }`
+
+Updates the properties of one or more indicator scripts dynamically. This method allows you to programmatically change indicator settings (e.g., from your own UI controls) and trigger a recalculation.
+
+```js
+// Update props for a specific script
+await chart.se.updateScriptProps({
+    'script-uuid-here': {
+        length: 20,
+        color: '#ff0000'
+    }
+})
+```
+
+This method is also used internally by the indicator settings panel when users modify props through the UI.
+
