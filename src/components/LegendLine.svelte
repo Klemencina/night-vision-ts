@@ -115,6 +115,20 @@
     // Check if this overlay is from a script (indicator)
     let isIndicator = $derived(!!ov.prod)
 
+    // Debug: log indicator detection
+    $effect(() => {
+        if (ov.name?.includes('RSI') || ov.name?.includes('MACD') || ov.name?.includes('BB')) {
+            console.log(
+                'LegendLine - Indicator detected:',
+                ov.name,
+                'ov.prod:',
+                ov.prod,
+                'isIndicator:',
+                isIndicator
+            )
+        }
+    })
+
     // Disable legend if legend() returns null dynamically
     $effect(() => {
         if (legend && data && !legend(data, prec)) show = false
@@ -151,6 +165,7 @@
     }
 
     function onSettingsClick() {
+        console.log('LegendLine onSettingsClick called, showing settings for:', ov.name)
         showSettings = true
     }
 

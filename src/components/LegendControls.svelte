@@ -44,8 +44,11 @@
 
     function onSettingsBtnClick(e) {
         e.stopPropagation()
+        console.log('Gear icon clicked! onSettingsClick:', onSettingsClick)
         if (onSettingsClick) {
             onSettingsClick()
+        } else {
+            console.log('No onSettingsClick handler provided')
         }
     }
 </script>

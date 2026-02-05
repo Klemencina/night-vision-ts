@@ -23,7 +23,9 @@
 
     // Initialize when panel opens or overlay changes
     $effect(() => {
+        console.log('IndicatorSettings effect - isOpen:', isOpen, 'overlay:', overlay?.name)
         if (isOpen && overlay) {
+            console.log('IndicatorSettings opening for:', overlay.name)
             // Reset state
             script = null
             scriptProps = {}
