@@ -26,7 +26,9 @@ prop('showValueTracker', { type: 'boolean', def: true })
 // Draw call
 draw(ctx) {
 
-    let cnv = $lib.layoutCnv($core, true, $props.showVolume)
+    let hasVolume = $core.data.length && $core.data[0].length > 5
+    let showVolume = $props.showVolume && hasVolume
+    let cnv = $lib.layoutCnv($core, true, showVolume)
     let bodies = cnv.upBodies.length ? cnv.upBodies : cnv.dwBodies
     if (!bodies.length) return
     let w = Math.max(bodies[0].w, 1)
@@ -38,7 +40,7 @@ draw(ctx) {
     drawCvPart(ctx, $lib.volumeBar, cnv.dwVolbars, w, 'colorVolDw')
     drawCvPart(ctx, $lib.volumeBar, cnv.upVolbars, w, 'colorVolUp')
 
-    if ($props.showVolume && $props.showAvgVolume) {
+    if (showVolume && $props.showAvgVolume) {
         $lib.avgVolume(ctx, $core, $props, cnv)
     }
 
@@ -103,7 +105,7 @@ legendHtml(x, prec, f) {
         <span style="color: ${color1}">C</span>
         <span class="nvjs-ll-value">${f(x[4])}</span>
     `
-    + ($props.showVolume ? `
+    + (($props.showVolume && $core.data.length && $core.data[0].length > 5) ? `
         <span style="color: ${color1}">V</span>
         <span class="nvjs-ll-value">${sym+fc(x[5])}</span>` : ``)
     + `</span>`

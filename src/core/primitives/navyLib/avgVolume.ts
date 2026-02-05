@@ -33,6 +33,7 @@ export default function avgVolume(
     cnv: Cnv,
     vIndex: number = 5
 ): void {
+    if (!core.data.length || core.data[0].length <= vIndex) return
 
     let i1 = core.view.i1
     let i2 = core.view.i2
