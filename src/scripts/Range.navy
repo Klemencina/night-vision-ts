@@ -12,6 +12,8 @@ prop('bandColor', { type: 'Color', def: '#535559' })
 prop('lineWidth', { type: 'number', def: 1 })
 prop('upperBand', { type: 'number', def: 70 })
 prop('lowerBand', { type: 'number', def: 30 })
+prop('fixedMin', { type: 'number' })
+prop('fixedMax', { type: 'number' })
 
 // Draw call
 draw(ctx) {
@@ -47,10 +49,31 @@ draw(ctx) {
     ctx.stroke()
 }
 
-yRange(data, hi, lo) => [
-    Math.max(hi, $props.upperBand),
-    Math.min(lo, $props.lowerBand)
-]
+yRange(data, hi, lo) {
+    if ($props.fixedMin != null && $props.fixedMax != null) {
+        return [$props.fixedMax, $props.fixedMin]
+    }
+    if (
+        $props.upperBand >= 0 &&
+        $props.lowerBand >= 0 &&
+        $props.upperBand <= 100 &&
+        $props.lowerBand <= 100
+    ) {
+        return [100, 0]
+    }
+    if (
+        $props.upperBand <= 0 &&
+        $props.lowerBand <= 0 &&
+        $props.upperBand >= -100 &&
+        $props.lowerBand >= -100
+    ) {
+        return [0, -100]
+    }
+    return [
+        Math.max(hi, $props.upperBand),
+        Math.min(lo, $props.lowerBand)
+    ]
+}
 
 // Legend, defined as pairs [value, color]
 legend(x) => [[x[1], $props.color]]

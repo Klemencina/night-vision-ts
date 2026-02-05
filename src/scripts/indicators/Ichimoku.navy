@@ -49,7 +49,7 @@ Cloud([leadLine1, leadLine2], this.specs({
 }))
 
 Splines([conversionLine, baseLine], this.specs({
-    name: `Base Lines ${$.convLength} ${$.baseLength}`,
+    name: 'Base Lines',
     props: {
         colors: [
             $props.convColor,
@@ -59,7 +59,7 @@ Splines([conversionLine, baseLine], this.specs({
 }))
 
 Spline(lagging, this.specs({
-    name: `Lagging Span ${$.laggingLength}`,
+    name: 'Lagging Span',
     props: {
         color: $props.laggingColor
     }

@@ -12,7 +12,7 @@ prop('prec', { type: 'integer', def: autoPrec() })
 prop('zIndex', { type: 'integer', def: 0 })
 
 this.specs = {
-    name: `EMA x ${$props.number}`,
+    name: 'EMA x',
     props: {
         colors: $props.colors,
     },

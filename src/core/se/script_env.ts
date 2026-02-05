@@ -225,6 +225,15 @@ export default class ScriptEnv {
                     let newStr = `pane.self.${fname}(${args}, ${utsid})`
                     src = this.replace(src, newStr, i1, i2)
                     off = i1 + newStr.length
+                } else if (fname.slice(0, 4) === 'pane') {
+                    let last = fname.split('.').pop()
+                    if (last && last in prefabs) {
+                        let utsid = `_pref+"f${++call_id}"`
+                        let args = this.args2(m0)
+                        let newStr = `${fname}(${args}, ${utsid})`
+                        src = this.replace(src, newStr, i1, i2)
+                        off = i1 + newStr.length
+                    }
                 }
 
                 FDEFS2.lastIndex = off
@@ -245,12 +254,12 @@ export default class ScriptEnv {
                 // Regex stops at first ); get full call (including nested parens) from source
                 let rest = src.slice(m.index)
                 let m0 = this.parentheses(rest)
-                let off = m.index + 1
+                let off = m.index + m[0].indexOf('(')
 
                 if ((this.std as unknown as Record<string, unknown>)[fname]) {
-                    let [newSrc, replLen] = this.postfix(src, m, m0, ++call_id)
+                    let [newSrc] = this.postfix(src, m, m0, ++call_id)
                     src = newSrc
-                    off = m.index + replLen
+                    off += 4 // 'std_'
                 }
 
                 FDEFS2.lastIndex = off
@@ -330,8 +339,38 @@ export default class ScriptEnv {
     }
 
     get_args_2(str: string): string[] {
-        let args = this.args2(str)
-        return args ? args.split(',').map(x => x.trim()) : []
+        let parts: [number, number][] = []
+        let c = 0
+        let s = 0
+        let q1 = false
+        let q2 = false
+        let q3 = false
+        let part: [number, number] | null = null
+        for (var i = 0; i < str.length; i++) {
+            if (str[i] === '(') {
+                c++
+                if (!part) part = [i + 1, 0]
+            }
+            if (str[i] === ')') c--
+            if (str[i] === '[') s++
+            if (str[i] === ']') s--
+            if (str[i] === "'") q1 = !q1
+            if (str[i] === '"') q2 = !q2
+            if (str[i] === '`') q3 = !q3
+            if (str[i] === ',' && c === 1 && !s && !q1 && !q2 && !q3) {
+                if (part) {
+                    part[1] = i
+                    parts.push(part)
+                    part = [i + 1, 0]
+                }
+            }
+            if (c === 0 && part) {
+                part[1] = i
+                parts.push(part)
+                part = null
+            }
+        }
+        return parts.map(x => str.slice(...x)).filter(x => /[^\s]+/.exec(x))
     }
 
     regex_clone(reg: RegExp): RegExp {

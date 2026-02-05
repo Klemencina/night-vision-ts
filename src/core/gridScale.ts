@@ -1,4 +1,3 @@
-
 // Grid scale is a part of layout that can vary
 // depending on overlay (values that correspond to y-axis)
 
@@ -20,6 +19,7 @@ interface Overlay {
         precision?: number
         display?: boolean
     }
+    props?: Record<string, any>
     dataSubset?: any[]
     type?: string
 }
@@ -74,7 +74,6 @@ interface ScaleResult {
 }
 
 export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleResult {
-
     let { props, height } = specs
     let { ctx } = props
     let meta = MetaHub.instance(props.id)
@@ -87,8 +86,7 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
     const SAMPLE = props.config.AUTO_PRE_SAMPLE
 
     function calcSidebar(): void {
-
-        let maxlen = Math.max(0, ...ovs.map((x: Overlay) => (x.dataSubset?.length ?? 0)))
+        let maxlen = Math.max(0, ...ovs.map((x: Overlay) => x.dataSubset?.length ?? 0))
 
         if (maxlen < 2) {
             self.prec = 0
@@ -110,9 +108,8 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
                 }
                 if (prec > self.prec) self.prec = prec
             }
-
         }
-        if (!isFinite(self.$hi!) || !isFinite(self.$lo!) ) {
+        if (!isFinite(self.$hi!) || !isFinite(self.$lo!)) {
             self.sb = props.config.SBMIN
             return
         }
@@ -133,26 +130,40 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
     function calc$Range(): void {
         // Need to find minimum & maximum of selected
         // set of overlays (on the same scale)
-        var hi = -Infinity, lo = Infinity
+        var hi = -Infinity,
+            lo = Infinity
         var exp: boolean | undefined
         for (var ov of ovs) {
             if (ov.settings.display === false) continue
             let yfn: YRangeFn | null = ((meta.yRangeFns || [])[gridId] || [])[ov.id] || null
             let yfnStatic = prefabs[ov.type!]?.static?.yRange
             if (yfnStatic) {
-                yfn = { 
+                yfn = {
                     exec: yfnStatic,
                     preCalc: yfnStatic.length > 1 // Do we need h & l
                 }
             }
             let data = ov.dataSubset ?? []
+            let fixedMin = ov.props?.fixedMin
+            let fixedMax = ov.props?.fixedMax
+            if (fixedMin && typeof fixedMin === 'object' && 'val' in fixedMin) {
+                fixedMin = fixedMin.val
+            }
+            if (fixedMax && typeof fixedMax === 'object' && 'val' in fixedMax) {
+                fixedMax = fixedMax.val
+            }
             // Intermediate hi & lo
-            var h = -Infinity, l = Infinity
+            var h = -Infinity,
+                l = Infinity
             // Look for a user-defined y-range f()
             // or calculate through iteration. 'preCalc'
             // flag tells if pre-calculated h&l needed
             // TODO: implement a global auto-precision algo
-            if (!yfn || (yfn && yfn.preCalc)) {
+            if (fixedMin != null && fixedMax != null && isFinite(fixedMin) && isFinite(fixedMax)) {
+                h = Number(fixedMax)
+                l = Number(fixedMin)
+                exp = false
+            } else if (!yfn || (yfn && yfn.preCalc)) {
                 for (var i = 0; i < data.length; i++) {
                     for (var j = 1; j < data[i].length; j++) {
                         let v = data[i][j]
@@ -161,7 +172,7 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
                     }
                 }
             }
-            if (yfn) {
+            if (yfn && !(fixedMin != null && fixedMax != null)) {
                 // Check if result is 'null', then this overlay
                 // should not affect the range at all
                 var yfnResult = yfn.exec(data, h, l)
@@ -194,7 +205,7 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
 
             if (self.$hi === self.$lo) {
                 if (!ls) {
-                    self.$hi! *= 1.05  // Expand if height range === 0
+                    self.$hi! *= 1.05 // Expand if height range === 0
                     self.$lo! *= 0.95
                 } else {
                     logScale.expand(self as any, height)
@@ -205,13 +216,15 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
 
     // Calculate $ precision for the Y-axis of an overlay
     function calcPrecision(ov: Overlay): number {
-
         // Maximum digits after floating point
         let maxR = 0
         let sample: number[] = []
 
         // Sample N random elements from the current subset
-        let f: ((dataPoint: any[]) => number | number[]) | undefined = meta.getPreSampler(gridId, ov.id)
+        let f: ((dataPoint: any[]) => number | number[]) | undefined = meta.getPreSampler(
+            gridId,
+            ov.id
+        )
         f = f || prefabs[ov.type!]?.static?.preSampler
         f = f || Utils.defaultPreSampler
         let subset = ov.dataSubset ?? []
@@ -237,18 +250,16 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
             return maxR
         }
         return aprec
-
     }
 
     function calcTransform(): void {
         // Candle Y-transform: (A = scale, B = shift)
         if (!ls) {
-            self.A = - height / (self.$hi! - self.$lo!)
-            self.B = - self.$hi! * self.A!
+            self.A = -height / (self.$hi! - self.$lo!)
+            self.B = -self.$hi! * self.A!
         } else {
-            self.A = - height / (math.log(self.$hi!) -
-                       math.log(self.$lo!))
-            self.B = - math.log(self.$hi!) * self.A!
+            self.A = -height / (math.log(self.$hi!) - math.log(self.$lo!))
+            self.B = -math.log(self.$hi!) * self.A!
         }
     }
 
@@ -274,7 +285,6 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
 
     // Price step multiplier (for the log-scale mode)
     function dollarMultHi(): number {
-
         let h = Math.min(self.B!, height)
         if (h < props.config.GRIDY) return 1
         let n = h / props.config.GRIDY // target grid N
@@ -285,11 +295,10 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
         } else {
             yratio = self.$hi! / 1 // TODO: small values
         }
-        return Math.pow(yratio, 1/n)
+        return Math.pow(yratio, 1 / n)
     }
 
     function dollarMultLo(): number {
- 
         let h = Math.min(height - self.B!, height)
         if (h < props.config.GRIDY) return 1
         let n = h / props.config.GRIDY // target grid N
@@ -300,30 +309,27 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
         } else {
             yratio = Math.abs(self.$lo!) / 1
         }
-        return Math.pow(yratio, 1/n)
+        return Math.pow(yratio, 1 / n)
     }
 
     // Build the Y-axis grid (non-log mode)
     function gridY(): void {
-
         // Prevent duplicate levels
         let m = Math.pow(10, -self.prec!)
         self.$step = Math.max(m, dollarStep())
         self.ys = []
 
-        let y1 = self.$lo! - self.$lo! % self.$step
+        let y1 = self.$lo! - (self.$lo! % self.$step)
 
         for (var y$ = y1; y$ <= self.$hi!; y$ += self.$step) {
             let y = Math.floor(y$ * self.A! + self.B!)
             if (y > height) continue
             self.ys.push([y, Utils.strip(y$) ?? y$])
         }
-
     }
 
     // Build the Y-axis grid (log mode)
     function gridYLog(): void {
-
         // TODO: Prevent duplicate levels, is this even
         // a problem here ?
         self.$_mult = dollarMult()
@@ -361,14 +367,15 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
         }
 
         // TODO: remove lines near to 0
-
     }
 
     // Search a start for the top grid so that
     // the fixed value always included
     function searchStartPos(value: number): number {
         let N = height / props.config.GRIDY // target grid N
-        var y = Infinity, y$ = value, count = 0
+        var y = Infinity,
+            y$ = value,
+            count = 0
         while (y > 0) {
             y = Math.floor(math.log(y$) * self.A! + self.B!)
             y$ *= self.$_mult!
@@ -379,7 +386,9 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
 
     function searchStartNeg(value: number): number {
         let N = height / props.config.GRIDY // target grid N
-        var y = -Infinity, y$ = value, count = 0
+        var y = -Infinity,
+            y$ = value,
+            count = 0
         while (y < height) {
             y = Math.floor(math.log(y$) * self.A! + self.B!)
             y$ *= self.$_mult!
@@ -395,7 +404,8 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
         if (x > 10) {
             for (var div = 10; div < MAX_INT; div *= 10) {
                 let nice = Math.floor(x / div) * div
-                if (x / nice > quality) {  // More than 10% off
+                if (x / nice > quality) {
+                    // More than 10% off
                     break
                 }
             }
@@ -404,7 +414,8 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
         } else if (x < 1) {
             for (var ro = 10; ro >= 1; ro--) {
                 let nice = Utils.round(x, ro)
-                if (x / nice > quality) {  // More than 10% off
+                if (x / nice > quality) {
+                    // More than 10% off
                     break
                 }
             }
@@ -417,8 +428,7 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
     calc$Range()
     calcSidebar()
     calcTransform()
-
-    ;ls ? gridYLog() : gridY()
+    ls ? gridYLog() : gridY()
 
     // Indices of the overlays using this scale (ovIdxs).
     // Needed when the final layout is built
@@ -431,5 +441,4 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
     self.height = height
 
     return self as ScaleResult
-
 }

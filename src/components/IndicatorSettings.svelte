@@ -3,14 +3,12 @@
     // Styled to match project: uses props.colors.* and props.config.FONT
 
     import { onMount } from 'svelte'
-    import Events from '../core/events'
     import DataHub from '../core/dataHub'
     import Scripts from '../core/scripts'
     import SeClient from '../core/se/seClient'
 
     let { props, overlay = null, paneId = null, onClose } = $props()
 
-    let events = Events.instance(props.id)
     let hub = DataHub.instance(props.id)
     let scripts = Scripts.instance(props.id)
     let seClient = SeClient.instance(props.id)
@@ -18,15 +16,14 @@
     // Script reference
     let script = $state(null)
     let scriptProps = $state({})
-    let indicatorUi = $state({ enabled: false, allowedProps: [] })
     let propsMeta = $state([])
+    let showFixedRangeHint = $derived(scriptProps.fixedMin != null && scriptProps.fixedMax != null)
 
     onMount(() => {
         if (!overlay) return
         // Reset state
         script = null
         scriptProps = {}
-        indicatorUi = { enabled: false, allowedProps: [] }
         propsMeta = []
 
         // Try to find script immediately
@@ -89,12 +86,13 @@
         }
 
         // Initialize script props with defaults from metadata if not set
-        const baseProps =
-            script.settings?.indicatorProps ||
-            overlay?.settings?.indicatorProps ||
-            (script.props && Object.keys(script.props).length ? script.props : null) ||
-            overlay?.props ||
-            {}
+        const storedProps =
+            script.settings?.indicatorProps || overlay?.settings?.indicatorProps || {}
+        const baseProps = {
+            ...(overlay?.props || {}),
+            ...(script.props || {}),
+            ...storedProps
+        }
         scriptProps = { ...baseProps }
 
         // Ensure all props from metadata have values
@@ -103,9 +101,6 @@
                 scriptProps[meta.name] = meta.def
             }
         }
-
-        // Get indicator UI settings
-        indicatorUi = script.settings?.indicatorUi || { enabled: false, allowedProps: [] }
 
         return true
     }
@@ -118,31 +113,6 @@
         if (e.target === e.currentTarget) {
             onCloseClick()
         }
-    }
-
-    function onToggleEnabled() {
-        indicatorUi.enabled = !indicatorUi.enabled
-        updateIndicatorUi()
-    }
-
-    function onToggleProp(propName) {
-        const idx = indicatorUi.allowedProps.indexOf(propName)
-        if (idx > -1) {
-            indicatorUi.allowedProps.splice(idx, 1)
-        } else {
-            indicatorUi.allowedProps.push(propName)
-        }
-        indicatorUi.allowedProps = [...indicatorUi.allowedProps] // Trigger reactivity
-        updateIndicatorUi()
-    }
-
-    function updateIndicatorUi() {
-        if (!script) return
-        script.settings = script.settings || {}
-        script.settings.indicatorUi = { ...indicatorUi }
-
-        // Emit event to update legend
-        events.emit('update-legend')
     }
 
     async function onApply() {
@@ -191,7 +161,9 @@
     min-width: 280px;
     max-width: 360px;
     max-height: 80vh;
-    overflow-y: auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     font: ${props.config.FONT};
     color: ${props.colors.textLG};
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -213,6 +185,12 @@
     color: ${props.colors.textLG};
 `)
 
+    let hintStyle = $derived(`
+    font-size: ${parseInt(props.config.FONT) - 1}px;
+    color: ${props.colors.scale};
+    margin-bottom: 10px;
+ `)
+
     let closeBtnStyle = $derived(`
     background: none;
     border: none;
@@ -232,21 +210,20 @@
     margin-bottom: 16px;
 `)
 
+    let bodyStyle = $derived(`
+    overflow-y: auto;
+    padding-right: 4px;
+    margin-right: -4px;
+    flex: 1 1 auto;
+    --nvjs-scroll-track: ${props.colors.back};
+    --nvjs-scroll-thumb: ${props.colors.grid};
+`)
+
     let labelStyle = $derived(`
     display: block;
     font-size: ${parseInt(props.config.FONT)}px;
     color: ${props.colors.textLG};
     margin-bottom: 8px;
-`)
-
-    let checkboxStyle = $derived(`
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    font-size: ${parseInt(props.config.FONT)}px;
-    color: ${props.colors.textLG};
-    cursor: pointer;
 `)
 
     let inputStyle = $derived(`
@@ -328,88 +305,78 @@
         </div>
 
         {#if script}
-            <!-- Enable Chart Editing Toggle -->
-            <div class="nvjs-indicator-settings-section" style={sectionStyle}>
-                <label class="nvjs-indicator-settings-checkbox" style={checkboxStyle}>
-                    <input
-                        type="checkbox"
-                        checked={indicatorUi.enabled}
-                        onchange={onToggleEnabled}
-                    />
-                    <span>Enable chart editing</span>
-                </label>
-            </div>
+            <div class="nvjs-indicator-settings-body" style={bodyStyle}>
+                <!-- Props Configuration -->
+                {#if propsMeta.length > 0}
+                    <div class="nvjs-indicator-settings-section" style={sectionStyle}>
+                        <span class="nvjs-indicator-settings-label" style={labelStyle}>
+                            Properties
+                        </span>
 
-            <!-- Props Configuration -->
-            {#if propsMeta.length > 0}
-                <div class="nvjs-indicator-settings-section" style={sectionStyle}>
-                    <span class="nvjs-indicator-settings-label" style={labelStyle}>
-                        Properties
-                    </span>
+                        {#if showFixedRangeHint}
+                            <div style={hintStyle}>
+                                Scale locked to fixed range (manual zoom overrides)
+                            </div>
+                        {/if}
 
-                    {#each propsMeta as meta (meta.name)}
-                        <div class="nvjs-indicator-settings-prop-row" style={propRowStyle}>
-                            <label
-                                class="nvjs-indicator-settings-prop-label"
-                                style={propLabelStyle}
-                            >
-                                <span>{meta.name}</span>
-                                <input
-                                    type="checkbox"
-                                    checked={indicatorUi.allowedProps.includes(meta.name)}
-                                    onchange={() => onToggleProp(meta.name)}
-                                    title="Allow editing on chart"
-                                />
-                            </label>
+                        {#each propsMeta.filter(meta => meta.name !== 'prec' && meta.name !== 'zIndex' && meta.name !== 'fixedMin' && meta.name !== 'fixedMax') as meta (meta.name)}
+                            <div class="nvjs-indicator-settings-prop-row" style={propRowStyle}>
+                                <div
+                                    class="nvjs-indicator-settings-prop-label"
+                                    style={propLabelStyle}
+                                >
+                                    <span>{meta.name}</span>
+                                </div>
 
-                            {#if meta.type === 'color'}
-                                <div style="display: flex; gap: 8px; align-items: center;">
+                                {#if meta.type === 'color'}
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <input
+                                            type="color"
+                                            value={scriptProps[meta.name] || meta.def}
+                                            oninput={e => (scriptProps[meta.name] = e.target.value)}
+                                            style="width: 40px; height: 28px; padding: 0; border: none; background: none; cursor: pointer;"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={scriptProps[meta.name] || meta.def}
+                                            oninput={e => (scriptProps[meta.name] = e.target.value)}
+                                            style={inputStyle}
+                                        />
+                                    </div>
+                                {:else if meta.type === 'integer' || meta.type === 'number'}
                                     <input
-                                        type="color"
-                                        value={scriptProps[meta.name] || meta.def}
-                                        oninput={e => (scriptProps[meta.name] = e.target.value)}
-                                        style="width: 40px; height: 28px; padding: 0; border: none; background: none; cursor: pointer;"
+                                        type="number"
+                                        value={scriptProps[meta.name] ?? meta.def}
+                                        oninput={e =>
+                                            (scriptProps[meta.name] =
+                                                meta.type === 'integer'
+                                                    ? parseInt(e.target.value)
+                                                    : parseFloat(e.target.value))}
+                                        style={inputStyle}
                                     />
+                                {:else}
                                     <input
                                         type="text"
-                                        value={scriptProps[meta.name] || meta.def}
+                                        value={scriptProps[meta.name] ?? meta.def}
                                         oninput={e => (scriptProps[meta.name] = e.target.value)}
                                         style={inputStyle}
                                     />
-                                </div>
-                            {:else if meta.type === 'integer' || meta.type === 'number'}
-                                <input
-                                    type="number"
-                                    value={scriptProps[meta.name] ?? meta.def}
-                                    oninput={e =>
-                                        (scriptProps[meta.name] =
-                                            meta.type === 'integer'
-                                                ? parseInt(e.target.value)
-                                                : parseFloat(e.target.value))}
-                                    style={inputStyle}
-                                />
-                            {:else}
-                                <input
-                                    type="text"
-                                    value={scriptProps[meta.name] ?? meta.def}
-                                    oninput={e => (scriptProps[meta.name] = e.target.value)}
-                                    style={inputStyle}
-                                />
-                            {/if}
-                        </div>
-                    {/each}
-                </div>
-            {:else}
-                <div class="nvjs-indicator-settings-section" style={sectionStyle}>
-                    <span
-                        style="color: {props.colors.scale}; font-size: {parseInt(
-                            props.config.FONT
-                        )}px;"
-                    >
-                        No configurable properties
-                    </span>
-                </div>
-            {/if}
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
+                {:else}
+                    <div class="nvjs-indicator-settings-section" style={sectionStyle}>
+                        <span
+                            style="color: {props.colors.scale}; font-size: {parseInt(
+                                props.config.FONT
+                            )}px;"
+                        >
+                            No configurable properties
+                        </span>
+                    </div>
+                {/if}
+            </div>
 
             <!-- Buttons -->
             <div class="nvjs-indicator-settings-buttons" style={buttonsStyle}>
@@ -429,12 +396,14 @@
                 </button>
             </div>
         {:else}
-            <div
-                style="color: {props.colors.scale}; font-size: {parseInt(
-                    props.config.FONT
-                )}px; text-align: center; padding: 20px;"
-            >
-                No script found for this indicator
+            <div class="nvjs-indicator-settings-body" style={bodyStyle}>
+                <div
+                    style="color: {props.colors.scale}; font-size: {parseInt(
+                        props.config.FONT
+                    )}px; text-align: center; padding: 20px;"
+                >
+                    No script found for this indicator
+                </div>
             </div>
         {/if}
     </div>
@@ -458,10 +427,6 @@
         opacity: 0.8;
     }
 
-    input[type='checkbox'] {
-        cursor: pointer;
-    }
-
     input[type='color']::-webkit-color-swatch-wrapper {
         padding: 0;
     }
@@ -469,6 +434,26 @@
     input[type='color']::-webkit-color-swatch {
         border: 1px solid #666;
         border-radius: 3px;
+    }
+
+    :global(.nvjs-indicator-settings-body) {
+        scrollbar-color: var(--nvjs-scroll-thumb) var(--nvjs-scroll-track);
+        scrollbar-width: thin;
+    }
+
+    :global(.nvjs-indicator-settings-body::-webkit-scrollbar) {
+        width: 8px;
+    }
+
+    :global(.nvjs-indicator-settings-body::-webkit-scrollbar-track) {
+        background: var(--nvjs-scroll-track);
+        border-radius: 6px;
+    }
+
+    :global(.nvjs-indicator-settings-body::-webkit-scrollbar-thumb) {
+        background: var(--nvjs-scroll-thumb);
+        border-radius: 6px;
+        border: 2px solid var(--nvjs-scroll-track);
     }
 
     @keyframes fadeIn {

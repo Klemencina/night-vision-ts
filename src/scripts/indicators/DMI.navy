@@ -13,7 +13,7 @@ prop('prec', { type: 'integer', def: 2 })
 prop('zIndex', { type: 'integer', def: 0 })
 
 this.specs = {
-    name: `DMI ${$props.length} ${$props.smooth}`,
+    name: 'DMI',
     props: {
         colors: [$props.color1, $props.color2, $props.color3]
     },

@@ -14,7 +14,7 @@ prop('zIndex', { type: 'integer', def: 0 })
 
 let $ = $props
 this.specs = {
-    name: `TSI ${$.long} ${$.short} ${$.signal}`,
+    name: 'TSI',
     props: {
         colors: [$.color1, $.color2]
     },

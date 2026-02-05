@@ -11,13 +11,23 @@
     import LegendControls from './LegendControls.svelte'
     import IndicatorSettings from './IndicatorSettings.svelte'
     import Events from '../core/events'
+    import DataHub from '../core/dataHub'
     import MetaHub from '../core/metaHub'
     import logo from '../assets/logo.json'
     import icons from '../assets/icons.json'
 
-    let { gridId, ov, props, layout } = $props()
+    let {
+        gridId,
+        ov,
+        props,
+        layout,
+        showToggle = false,
+        collapsed = false,
+        onToggleClick = null
+    } = $props()
 
     let meta = MetaHub.instance(props.id)
+    let hub = DataHub.instance(props.id)
     let events = Events.instance(props.id)
 
     let hover = $state(false)
@@ -101,6 +111,16 @@
     margin-left: ${hover || !display || !data.length ? 7 : 3}px;
 `)
 
+    let toggleStyle = $derived(`
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    ${
+        collapsed
+            ? `border-top: 5px solid ${props.colors.textLG};`
+            : `border-bottom: 5px solid ${props.colors.textLG};`
+    }
+`)
+
     let boundary = $derived(ref ? ref.getBoundingClientRect() : {})
     let nBoundary = $derived(nRef ? nRef.getBoundingClientRect() : {})
     let style = $derived(styleBase + (hover ? styleHover : ''))
@@ -108,12 +128,16 @@
     let legend = $derived(legendFns.legend)
     let legendHtml = $derived(legendFns.legendHtml)
     let values = $derived(props.cursor.values || [])
-    let data = $derived((values[gridId] || [])[ov.id] || [])
+    let cursorData = $derived((values[gridId] || [])[ov.id])
+    let fallbackData = $derived(
+        ov.dataSubset && ov.dataSubset.length ? ov.dataSubset[ov.dataSubset.length - 1] : []
+    )
+    let data = $derived(cursorData ?? (ov.main ? fallbackData : []))
+    let hasCursorData = $derived(cursorData != null)
     let scale = $derived(findOverlayScale(layout.scales))
     let prec = $derived(scale.prec)
-
-    // Check if this overlay is from a script (indicator)
     let isIndicator = $derived(!!ov.prod)
+    let hideValues = $derived(collapsed && ov.main)
 
     // Disable legend if legend() returns null dynamically
     $effect(() => {
@@ -154,6 +178,17 @@
         showSettings = true
     }
 
+    function isFirstScriptOverlay() {
+        if (!ov?.prod) return false
+        const panes = hub.panes() || []
+        for (const pane of panes) {
+            const overlays = pane?.overlays || []
+            const first = overlays.find(x => x.prod === ov.prod)
+            if (first) return first.uuid === ov.uuid
+        }
+        return false
+    }
+
     // Format legend value
     function formatter(x, $prec = prec) {
         if (x == undefined) return 'x'
@@ -190,13 +225,26 @@
         {/if}
         <span class="nvjs-ll-name" bind:this={nRef}>
             {@html name}
+            {#if showToggle}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <span
+                    class="nvjs-legend-toggle-inline"
+                    style={toggleStyle}
+                    onclick={e => {
+                        e.stopPropagation()
+                        if (onToggleClick) onToggleClick(e)
+                    }}
+                    onkeypress={null}
+                ></span>
+            {/if}
             {#if ov.main}
                 <span class="king-icon" style={kingStyle}> </span>
             {/if}
         </span>
-        {#if display && !hover}
+        {#if display && !hover && !hideValues}
             <span class="nvjs-ll-data" style={dataStyle}>
-                {#if ov.settings.legendHtml}
+                {#if ov.settings.legendHtml && hasCursorData}
                     {@html ov.settings.legendHtml}
                 {:else if !legend && !legendHtml}
                     {#each data as v, i}
@@ -211,9 +259,9 @@
                             {/if}
                         {/if}
                     {/each}
-                {:else if legendHtml && data.length}
+                {:else if legendHtml && hasCursorData}
                     {@html legendHtml(data, prec, formatter)}
-                {:else if data.length}
+                {:else if legend && data.length}
                     {#each legend(data, prec) || [] as v}
                         <span class="nvjs-ll-value" style={`color: ${v[1]}`}>
                             {formatter(v[0])}
@@ -232,13 +280,12 @@
                 {ov}
                 {props}
                 height={boundary.height}
-                onSettingsClick={isIndicator ? onSettingsClick : null}
+                onSettingsClick={isIndicator && isFirstScriptOverlay() ? onSettingsClick : null}
             />
         {/if}
     </div>
 
-    <!-- Settings Panel for Indicators -->
-    {#if isIndicator && showSettings}
+    {#if isIndicator && isFirstScriptOverlay() && showSettings}
         <IndicatorSettings
             {props}
             overlay={ov}
@@ -269,6 +316,10 @@
     .nvjs-ll-data {
         font-variant-numeric: tabular-nums;
     }
+    .nvjs-ll-name {
+        display: inline-flex;
+        align-items: center;
+    }
     :global(.nvjs-ll-value) {
         margin-left: 3px;
     }
@@ -286,11 +337,24 @@
         filter: brightness(1.25);
     }
     .king-icon {
-        padding-left: 8px;
-        padding-right: 8px;
-        /*padding-top: 3px;*/
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        margin-left: 6px;
         margin-right: 4px;
         filter: grayscale();
+    }
+    .nvjs-legend-toggle-inline {
+        display: inline-block;
+        width: 0;
+        height: 0;
+        margin-left: 6px;
+        margin-right: 2px;
+        cursor: pointer;
+        opacity: 0.85;
+    }
+    .nvjs-legend-toggle-inline:hover {
+        opacity: 1;
     }
     /*.king-icon:hover {
     filter: none;

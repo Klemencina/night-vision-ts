@@ -13,7 +13,7 @@ prop('zIndex', { type: 'integer', def: 0 })
 
 let $ = $props
 this.specs = {
-    name: `SAR ${$.start} ${$.inc} ${$.max}`,
+    name: 'SAR',
     props: {
         color: $props.color,
         shape: 'cross'

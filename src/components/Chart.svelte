@@ -105,6 +105,9 @@
         // Set layout immediately so chart shows even if loadScripts hangs/fails
         scan.updatePanesHash()
         layout = new Layout(chartProps, hub, meta)
+        if (initCursorValues()) {
+            update({ layout: false }, false)
+        }
 
         try {
             if (props.scriptsReady) await props.scriptsReady
@@ -112,11 +115,33 @@
             meta.init(props)
             scan.updatePanesHash()
             layout = new Layout(chartProps, hub, meta)
+            if (initCursorValues()) {
+                update({ layout: false }, false)
+            }
         } catch (e) {
             console.warn('Chart loadScripts failed, showing chart without scripts:', e)
             meta.init(props)
         }
     })
+
+    function initCursorValues() {
+        if (!layout || !hub.mainOv) return
+        if (cursor.values && cursor.values.length) return
+        let data = hub.mainOv.dataSubset || hub.mainOv.data
+        if (!data || !data.length) return
+        let last = data[data.length - 1]
+        if (!last) return
+        if (layout.indexBased) {
+            let off = hub.mainOv.indexOffset ?? 0
+            let src = hub.mainOv.data || data
+            cursor.ti = off + Math.max(0, (src?.length || data.length) - 1)
+        } else {
+            cursor.ti = last[0]
+        }
+        cursor.xValues(hub, layout, chartProps)
+        cursor.yValues(layout)
+        return true
+    }
 
     function onCursorChanged($cursor, emit = true) {
         // Emit a global event (hook)

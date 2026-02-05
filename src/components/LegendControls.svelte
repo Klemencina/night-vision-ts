@@ -21,12 +21,17 @@
 `)
 
     let gearStyle = $derived(`
-    background-image: url(${icons['gear']});
-    background-size: contain;
-    background-repeat: no-repeat;
+    background-color: ${props.colors.textLG};
+    -webkit-mask-image: url(${icons['gear']});
+    mask-image: url(${icons['gear']});
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
     margin-top: ${(height - 18) * 0.5 - 3}px;
     margin-bottom: -2px;
-    filter: brightness(0.8);
 `)
 
     export function update() {
@@ -41,7 +46,6 @@
             flag: ov.settings.display === undefined ? false : !ov.settings.display
         })
     }
-
     function onSettingsBtnClick(e) {
         e.stopPropagation()
         if (onSettingsClick) {
@@ -60,17 +64,20 @@
         onDisplayClick(e)
     }}
 ></div>
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-    class="nvjs-gear"
-    style={gearStyle}
-    onclick={e => {
-        e.stopPropagation()
-        onSettingsBtnClick(e)
-    }}
-    title="Indicator Settings"
-></div>
+
+{#if onSettingsClick}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        class="nvjs-gear"
+        style={gearStyle}
+        onclick={e => {
+            e.stopPropagation()
+            onSettingsBtnClick(e)
+        }}
+        title="Indicator Settings"
+    ></div>
+{/if}
 
 <style>
     .nvjs-eye {
@@ -92,6 +99,6 @@
         cursor: pointer;
     }
     .nvjs-gear:hover {
-        filter: brightness(1.5);
+        filter: brightness(1.25);
     }
 </style>
