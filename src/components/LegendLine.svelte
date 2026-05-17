@@ -13,6 +13,7 @@
     import Events from '../core/events'
     import DataHub from '../core/dataHub'
     import MetaHub from '../core/metaHub'
+    import { sanitizeLegendHtml } from '../stuff/html'
     import logo from '../assets/logo.json'
     import icons from '../assets/icons.json'
 
@@ -138,6 +139,10 @@
     let prec = $derived(scale.prec)
     let isIndicator = $derived(!!ov.prod)
     let hideValues = $derived(collapsed && ov.main)
+    let staticLegendHtml = $derived(sanitizeLegendHtml(ov.settings.legendHtml))
+    let dynamicLegendHtml = $derived(
+        legendHtml && hasCursorData ? sanitizeLegendHtml(legendHtml(data, prec, formatter)) : ''
+    )
 
     // Disable legend if legend() returns null dynamically
     $effect(() => {
@@ -224,7 +229,7 @@
             <div class="nvjs-logo" style={logoStyle}></div>
         {/if}
         <span class="nvjs-ll-name" bind:this={nRef}>
-            {@html name}
+            {name}
             {#if showToggle}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -245,7 +250,7 @@
         {#if display && !hover && !hideValues}
             <span class="nvjs-ll-data" style={dataStyle}>
                 {#if ov.settings.legendHtml && hasCursorData}
-                    {@html ov.settings.legendHtml}
+                    {@html staticLegendHtml}
                 {:else if !legend && !legendHtml}
                     {#each data as v, i}
                         {#if i > 0}
@@ -260,7 +265,7 @@
                         {/if}
                     {/each}
                 {:else if legendHtml && hasCursorData}
-                    {@html legendHtml(data, prec, formatter)}
+                    {@html dynamicLegendHtml}
                 {:else if legend && data.length}
                     {#each legend(data, prec) || [] as v}
                         <span class="nvjs-ll-value" style={`color: ${v[1]}`}>
