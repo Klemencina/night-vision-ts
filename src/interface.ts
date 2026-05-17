@@ -68,6 +68,7 @@ class NightVision {
     private _scripts: Script[]
     private _props: Props
     private _scriptsReady: Promise<unknown>
+    private _resizeCleanup: (() => void) | null = null
     public ww: WebWorkType
     public se: SeClientType
     public hub: ReturnType<typeof DataHub.instance>
@@ -118,9 +119,10 @@ class NightVision {
             props: this._props
         })
 
-        // TODO: remove the observer on chart destroy
         if (props.autoResize && this.root) {
-            resizeTracker(this as unknown as { root: HTMLElement; width: number; height: number })
+            this._resizeCleanup = resizeTracker(
+                this as unknown as { root: HTMLElement; width: number; height: number }
+            )
         }
 
         this.se.setRefs(this.hub, this.scan)
@@ -361,6 +363,10 @@ class NightVision {
 
     // Should call this to clean-up memory / events
     destroy(): void {
+        if (this._resizeCleanup) {
+            this._resizeCleanup()
+            this._resizeCleanup = null
+        }
         if (this.comp) {
             unmount(this.comp)
             this.comp = null

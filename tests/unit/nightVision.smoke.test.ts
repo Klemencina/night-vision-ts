@@ -38,6 +38,17 @@ const workerMock = vi.hoisted(() => {
     }
 })
 
+const resizeMock = vi.hoisted(() => {
+    return {
+        cleanup: vi.fn(),
+        tracker: vi.fn(() => resizeMock.cleanup),
+        reset() {
+            this.cleanup.mockClear()
+            this.tracker.mockClear()
+        }
+    }
+})
+
 vi.mock('svelte', () => {
     return {
         mount: () => ({ getChart: () => ({ getLayout: () => ({}) }) }),
@@ -72,11 +83,18 @@ vi.mock('../../src/core/se/webWork', () => {
     }
 })
 
+vi.mock('../../src/stuff/resizeTracker', () => {
+    return {
+        default: resizeMock.tracker
+    }
+})
+
 import { NightVision } from '../../src/interface'
 
 describe('NightVision integration smoke', () => {
     beforeEach(() => {
         workerMock.reset()
+        resizeMock.reset()
         document.body.innerHTML = ''
     })
 
@@ -130,5 +148,17 @@ describe('NightVision integration smoke', () => {
         expect(workerMock.stops).toEqual([(firstWorker as unknown as MockWorker).id])
         expect(second.ww).not.toBe(firstWorker)
         expect((second.ww as unknown as MockWorker).id).toBe(2)
+    })
+
+    it('cleans up autoResize tracking on destroy', () => {
+        const root = document.createElement('div')
+        root.id = 'nv-resize'
+        document.body.appendChild(root)
+
+        const chart = new NightVision('nv-resize', { autoResize: true })
+
+        expect(resizeMock.tracker).toHaveBeenCalledTimes(1)
+        chart.destroy()
+        expect(resizeMock.cleanup).toHaveBeenCalledTimes(1)
     })
 })
