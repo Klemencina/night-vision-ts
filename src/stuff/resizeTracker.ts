@@ -6,6 +6,7 @@ interface ChartWithResize {
     root: Element
     width: number
     height: number
+    resize?: (width: number, height: number) => void
 }
 
 export default function resizeTracker(chart: ChartWithResize): () => void {
@@ -15,8 +16,12 @@ export default function resizeTracker(chart: ChartWithResize): () => void {
         rafId = requestAnimationFrame(() => {
             rafId = null
             const rect = chart.root.getBoundingClientRect()
-            chart.width = rect.width
-            chart.height = rect.height
+            if (chart.resize) {
+                chart.resize(rect.width, rect.height)
+            } else {
+                chart.width = rect.width
+                chart.height = rect.height
+            }
         })
     }
 

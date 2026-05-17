@@ -78,6 +78,7 @@ class NightVision {
     public scriptHub: ScriptsType
     public root: HTMLElement | null
     public comp: ReturnType<typeof mount> | null = null
+    private _pendingRemountRange: [number, number] | null = null
 
     constructor(target: string | HTMLElement, props: Props = {}) {
         this._data = props.data || {}
@@ -114,6 +115,9 @@ class NightVision {
             )
             return
         }
+        if (props.autoResize) {
+            this._syncSizeFromRoot()
+        }
         this.comp = mount(NightVisionComp, {
             target: this.root,
             props: this._props
@@ -121,7 +125,12 @@ class NightVision {
 
         if (props.autoResize && this.root) {
             this._resizeCleanup = resizeTracker(
-                this as unknown as { root: HTMLElement; width: number; height: number }
+                this as unknown as {
+                    root: HTMLElement
+                    width: number
+                    height: number
+                    resize: (width: number, height: number) => void
+                }
             )
         }
 
@@ -145,9 +154,10 @@ class NightVision {
         return this._props.width
     }
     set width(val: number) {
+        if (this._sameSize(this._props.width, val)) return
+        const range = this._rangeForWidth(val)
         this._props.width = val
-        this._remount()
-        setTimeout(() => this.update())
+        this._resizeMounted(range)
     }
 
     // Height of the chart
@@ -155,9 +165,10 @@ class NightVision {
         return this._props.height
     }
     set height(val: number) {
+        if (this._sameSize(this._props.height, val)) return
+        const range = this._pendingRemountRange || this._copyRange()
         this._props.height = val
-        this._remount()
-        setTimeout(() => this.update())
+        this._resizeMounted(range)
     }
 
     // Colors (modify specific colors)
@@ -231,8 +242,9 @@ class NightVision {
     }
 
     // Remount component with new props (Svelte 5 way to update props from outside)
-    _remount(): void {
+    _remount(range?: [number, number] | null): void {
         if (!this.root) return
+        if (range) this._pendingRemountRange = range
         if (this.comp) {
             unmount(this.comp)
             this.comp = null
@@ -241,6 +253,83 @@ class NightVision {
             target: this.root,
             props: this._props
         })
+        setTimeout(() => {
+            if (range) this._setRange(range, true)
+            if (this._pendingRemountRange === range) this._pendingRemountRange = null
+            this.update()
+        })
+    }
+
+    _resizeMounted(range?: [number, number] | null): void {
+        const comp = this.comp as any
+        if (!comp || typeof comp.resize !== 'function') {
+            this._remount(range)
+            return
+        }
+        if (range) this._pendingRemountRange = range
+        comp.resize(this._props.width ?? 750, this._props.height ?? 420)
+        setTimeout(() => {
+            if (range) this._setRange(range, true)
+            if (this._pendingRemountRange === range) this._pendingRemountRange = null
+            this.update()
+        })
+    }
+
+    _setRange(range: [number, number], emit: boolean = false): void {
+        const next = [range[0], range[1]] as [number, number] & { preventDefault?: boolean }
+        next.preventDefault = !emit
+        this.range = next
+    }
+
+    _copyRange(): [number, number] | null {
+        const range = this.range
+        if (!range?.length) return null
+        return [range[0], range[1]]
+    }
+
+    _syncSizeFromRoot(): void {
+        if (!this.root || typeof this.root.getBoundingClientRect !== 'function') return
+        const rect = this.root.getBoundingClientRect()
+        if (Number.isFinite(rect.width) && rect.width > 0) {
+            this._props.width = rect.width
+        }
+        if (Number.isFinite(rect.height) && rect.height > 0) {
+            this._props.height = rect.height
+        }
+    }
+
+    _sameSize(a: number | undefined, b: number): boolean {
+        return a !== undefined && Math.round(a) === Math.round(b)
+    }
+
+    _rangeForWidth(nextWidth: number): [number, number] | null {
+        const range = this._copyRange()
+        if (!range) return null
+
+        const layout = this.layout as any
+        const prevWidth = this._props.width ?? layout?.botbar?.width
+        if (!prevWidth || !Number.isFinite(prevWidth) || prevWidth <= 0) return range
+
+        const span = range[1] - range[0]
+        if (!Number.isFinite(span) || span <= 0) return range
+
+        const prevSpace = layout?.main?.spacex
+        const nextSpace =
+            prevSpace && Number.isFinite(prevSpace) && prevSpace > 0
+                ? Math.max(1, prevSpace + (nextWidth - prevWidth))
+                : nextWidth
+        if (!Number.isFinite(nextSpace) || nextSpace <= 0) return range
+
+        const nextSpan = span * (nextSpace / (prevSpace || prevWidth))
+        const nextRange: [number, number] = [range[1] - nextSpan, range[1]]
+        const main = this.hub.mainOv?.data
+        const first = main?.[0]
+        if (first) {
+            const firstTi = this.hub.indexBased ? 0 : first[0]
+            const interval = this.scan.interval || 1
+            nextRange[0] = Math.max(nextRange[0], firstTi - interval * 0.5)
+        }
+        return nextRange
     }
 
     // *** Internal variables ***
@@ -288,6 +377,17 @@ class NightVision {
     }
 
     // *** METHODS ***
+
+    resize(width: number, height: number): void {
+        const widthChanged = !this._sameSize(this._props.width, width)
+        const heightChanged = !this._sameSize(this._props.height, height)
+        if (!widthChanged && !heightChanged) return
+
+        const range = widthChanged ? this._rangeForWidth(width) : this._copyRange()
+        this._props.width = width
+        this._props.height = height
+        this._resizeMounted(range)
+    }
 
     // Various updates of the chart
     update(type: string = 'layout', opt: Record<string, any> = {}): void {

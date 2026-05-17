@@ -8,6 +8,11 @@
         return chart
     }
 
+    export function resize(nextWidth, nextHeight) {
+        width = nextWidth
+        height = nextHeight
+    }
+
     // Title text
     let {
         showLogo = false,
