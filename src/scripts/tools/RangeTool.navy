@@ -1,133 +1,251 @@
 // Navy ~ 0.2-lite
-// <ds>Time & value measurment tool [Shift+Click]</ds>
+// <ds>Time & value measurement tool [Shift+Click]</ds>
 
-[OVERLAY name=RangeTool, ctx=Canvas, verion=1.0.1, author=GPT4]
+[OVERLAY name=RangeTool, ctx=Canvas, verion=1.1.0, author=GPT4]
 
-let pin1 = null 
-let pin2 = null 
+prop('colorUp', { type: 'color', def: '#3355ff' })
+prop('colorDown', { type: 'color', def: '#ff3333' })
+prop('fillOpacity', { type: 'number', def: 0.2 })
+prop('labelOpacity', { type: 'number', def: 0.85 })
+
+let pin1 = null
+let pin2 = null
 let shift = false
 let state = 'idle'
 
-// TODO: fix for index-based
 draw(ctx) {
-    const layout = $core.layout 
+    if (!pin1 || !pin2) return
 
-    if (pin1 && pin2) {
-        const x1 = layout.time2x(pin1.t) // time to x coordinate
-        const x2 = layout.time2x(pin2.t) // time to x coordinate
-        const y1 = layout.value2y(pin1.v) // value to y coordinate
-        const y2 = layout.value2y(pin2.v) // value to y coordinate
+    let bounds = normalizePins()
+    let color = pin2.v >= pin1.v ? $props.colorUp : $props.colorDown
+    let text1 = `${formatNumber(priceDelta())} (${formatNumber(percent())}%)`
+    let text2 = `${bars()} bars, ${timeText()}`
 
-         // change fill color based on percentage
-        let color = percent() >= 0 ? '#3355ff' : '#ff3333';
-        ctx.fillStyle = color + '33';
-        ctx.fillRect(x1, y1, x2 - x1, y2 - y1)
+    drawRect(ctx, bounds, color)
+    drawLabel(ctx, bounds, [text1, text2], color)
+}
 
-        // draw arrows in the middle of rectangle
-        let midX = (x1 + x2) / 2;
-        let midY = (y1 + y2) / 2;
-        $lib.drawArrow(ctx, midX, y1, midX, y2, color, Math.abs(y2 - y1) > 42); 
-        $lib.drawArrow(ctx, x1, midY, x2, midY, color, Math.abs(x2 - x1) > 42);  
+startMeasure(event) {
+    pin1 = pinFromEvent(event)
+    pin2 = { ...pin1 }
+    state = 'drawing'
+    event.preventDefault()
+    $events.emitSpec('chart', 'update-layout')
+}
 
-        // draw rounded rectangle with text
-        const text1 = `${deltaValue().toFixed(2)} (${percent().toFixed(2)}%)`;
-        const text2 = `${bars()} bars, ${timeText()}`;
-        const text = `${text1}\n${text2}`;
-        const textWidth = ctx.measureText(text).width;
-        
-        const padding = 10;
-        const mainRectCenterX = (x1 + x2) / 2; // calculate center of the main rectangle
-        const roundRectX = mainRectCenterX - textWidth / 2 - padding; // center the text rectangle relative to the main rectangle
-        const roundRectWidth = textWidth + 2 * padding;
-        const roundRectHeight = 50;  // adjust as needed
-        const roundRectY = percent() > 0 ? Math.min(y1, y2) - roundRectHeight - padding : Math.max(y1, y2) + padding;
-        const roundRectRadius = 5;   // adjust as needed
-        ctx.fillStyle = color + 'cc';
-        $lib.roundRect(ctx, roundRectX, roundRectY, roundRectWidth, roundRectHeight, roundRectRadius);
+updateMeasure(event) {
+    pin2 = pinFromEvent(event)
+    $events.emitSpec('chart', 'update-layout')
+}
 
-        // draw text
-        ctx.fillStyle = '#ffffffcc' // color;
-        ctx.font = $lib.rescaleFont($core.props.config.FONT, 14);
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(text1, roundRectX + roundRectWidth / 2, roundRectY + roundRectHeight / 4);
-        ctx.fillText(text2, roundRectX + roundRectWidth / 2, roundRectY + 3 * roundRectHeight / 4);
-      
+finishMeasure(event) {
+    updateMeasure(event)
+    state = 'finished'
+    event.preventDefault()
+    $events.emitSpec('chart', 'update-layout')
+}
+
+clearMeasure(event) {
+    pin1 = null
+    pin2 = null
+    state = 'idle'
+    if (event) event.preventDefault()
+    $events.emitSpec('chart', 'update-layout')
+}
+
+pinFromEvent(event) {
+    let layout = $core.layout
+    let ti = $core.cursor.ti
+    if (ti === undefined || ti === null) {
+        ti = layout.x2ti(event.layerX)
+    }
+
+    let t = $core.cursor.time
+    let i = nearestMainIndex(ti, t)
+    let bar = mainBar(i)
+
+    if (bar) t = bar[0]
+    if (t === undefined || t === null) t = ti
+
+    return {
+        t: t,
+        i: i,
+        v: layout.y2value(event.layerY)
     }
 }
 
-// Calculate the percentage of the are between pins v-values
-// assuming that pin2 is above pin1 equals positive value
-// and negative otherwise
+nearestMainIndex(ti, t) {
+    let main = $core.hub.mainOv
+    let data = (main || {}).data || []
+    if (!data.length) return 0
+
+    if ($core.layout.indexBased) {
+        let off = main.indexOffset ?? 0
+        let i = Math.round(ti - off)
+        return clamp(i, 0, data.length - 1)
+    }
+
+    let nearest = $lib.Utils.nearestTs(t ?? ti, data)
+    return clamp(nearest[0], 0, data.length - 1)
+}
+
+mainBar(i) {
+    let main = $core.hub.mainOv
+    let data = (main || {}).data || []
+    return data[i]
+}
+
+normalizePins() {
+    let x1 = pinX(pin1)
+    let x2 = pinX(pin2)
+    let y1 = $core.layout.value2y(pin1.v)
+    let y2 = $core.layout.value2y(pin2.v)
+
+    return {
+        x1: x1,
+        x2: x2,
+        y1: y1,
+        y2: y2,
+        left: Math.min(x1, x2),
+        right: Math.max(x1, x2),
+        top: Math.min(y1, y2),
+        bottom: Math.max(y1, y2)
+    }
+}
+
+pinX(pin) {
+    let layout = $core.layout
+    if (layout.indexBased) {
+        return layout.ti2x(pin.t, pin.i)
+    }
+    return layout.time2x(pin.t)
+}
+
+drawRect(ctx, bounds, color) {
+    ctx.fillStyle = $lib.Utils.applyOpacity(color, $props.fillOpacity)
+    ctx.fillRect(
+        bounds.left,
+        bounds.top,
+        bounds.right - bounds.left,
+        bounds.bottom - bounds.top
+    )
+
+    let midX = (bounds.left + bounds.right) / 2
+    let midY = (bounds.top + bounds.bottom) / 2
+    $lib.drawArrow(ctx, midX, bounds.bottom, midX, bounds.top, color, bounds.bottom - bounds.top > 42)
+    $lib.drawArrow(ctx, bounds.left, midY, bounds.right, midY, color, bounds.right - bounds.left > 42)
+}
+
+drawLabel(ctx, bounds, lines, color) {
+    let paddingX = 10
+    let paddingY = 8
+    let lineH = 18
+
+    ctx.font = $lib.rescaleFont($core.props.config.FONT, 14)
+
+    let textWidth = 0
+    for (var line of lines) {
+        textWidth = Math.max(textWidth, ctx.measureText(line).width)
+    }
+
+    let w = textWidth + paddingX * 2
+    let h = lines.length * lineH + paddingY * 2
+    let x = (bounds.left + bounds.right) / 2 - w / 2
+    let y = pin2.v >= pin1.v ? bounds.top - h - 10 : bounds.bottom + 10
+
+    x = clamp(x, 4, $core.layout.width - w - 4)
+    y = clamp(y, 4, $core.layout.height - h - 4)
+
+    ctx.fillStyle = $lib.Utils.applyOpacity(color, $props.labelOpacity)
+    $lib.roundRect(ctx, x, y, w, h, 5)
+
+    ctx.fillStyle = '#ffffff'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+
+    for (var i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], x + w / 2, y + paddingY + lineH * i + lineH / 2)
+    }
+}
+
+priceDelta() {
+    if (!pin1 || !pin2) return 0
+    return Math.max(pin1.v, pin2.v) - Math.min(pin1.v, pin2.v)
+}
+
 percent() {
-    if (pin1 && pin2) {
-        let delta = pin2.v - pin1.v;
-        return (delta / pin1.v) * 100;
-    }
-    return 0;
+    if (!pin1 || !pin2) return 0
+    let low = Math.min(pin1.v, pin2.v)
+    if (!low) return 0
+    return (priceDelta() / low) * 100
 }
 
-// Calculate delta time between pins t-values
-// assuming that pin2 on the right of pin1 equals positive value
-// and negative otherwise
-deltaTime() {
-    if (pin1 && pin2) {
-        return pin2.t - pin1.t
-    }
-    return 0
-}
-
-// Calculate delta value between pins v-values
-// assuming that pin2 is above pin1 equals positive value
-// and negative otherwise
-deltaValue() {
-    if (pin1 && pin2) {
-        return pin2.v - pin1.v
-    }
-    return 0
-}
-
-// Delta time in bars
 bars() {
-    let data = $core.hub.mainOv.dataSubset
-    if (pin1 && pin2) {
-        const layout = $core.layout
-        const bars = data.filter(bar => {
-            return bar[0] >= Math.min(pin1.t, pin2.t) && bar[0] <= Math.max(pin1.t, pin2.t)
-        });
-        let count = bars.length - 1; // reduce the count by 1
-        return pin2.t < pin1.t ? -count : count; // make it negative if pin2.t < pin1.t
+    if (!pin1 || !pin2) return 0
+    let main = $core.hub.mainOv
+    let data = (main || {}).data || []
+    if (!data.length) return 0
+
+    if ($core.layout.indexBased) {
+        return Math.abs(pin2.i - pin1.i) + 1
     }
-    return 0
+
+    let t1 = Math.min(pin1.t, pin2.t)
+    let t2 = Math.max(pin1.t, pin2.t)
+    let count = 0
+
+    for (var bar of data) {
+        if (bar[0] >= t1 && bar[0] <= t2) count++
+    }
+
+    return count
 }
 
-// Delta time in text format
+deltaTime() {
+    if (!pin1 || !pin2) return 0
+
+    let b1 = mainBar(pin1.i)
+    let b2 = mainBar(pin2.i)
+    if (b1 && b2) return Math.abs(b2[0] - b1[0])
+
+    if ($core.layout.indexBased) {
+        return Math.abs(pin2.i - pin1.i) * $core.props.timeFrame
+    }
+
+    return Math.abs(pin2.t - pin1.t)
+}
+
 timeText() {
-    let deltaTimeMs = deltaTime();  // returns delta time in milliseconds
-    let timeFrameMs = $core.props.timeFrame;  // returns current chart timeframe in milliseconds
+    let deltaTimeMs = deltaTime()
+    let timeFrameMs = $core.props.timeFrame
 
-    let negative = deltaTimeMs < 0;
-    deltaTimeMs = Math.abs(deltaTimeMs);
+    let seconds = Math.floor((deltaTimeMs / 1000) % 60)
+    let minutes = Math.floor((deltaTimeMs / (1000 * 60)) % 60)
+    let hours = Math.floor((deltaTimeMs / (1000 * 60 * 60)) % 24)
+    let days = Math.floor(deltaTimeMs / (1000 * 60 * 60 * 24))
 
-    let minutes = Math.floor((deltaTimeMs / (1000 * 60)) % 60);
-    let hours = Math.floor((deltaTimeMs / (1000 * 60 * 60)) % 24);
-    let days = Math.floor(deltaTimeMs / (1000 * 60 * 60 * 24));
+    let result = ''
+    if (days > 0) result += days + 'd '
+    if (hours > 0 || days > 0) result += hours + 'h '
+    if (timeFrameMs < 60 * 60 * 1000 && minutes > 0) result += minutes + 'm '
+    if (deltaTimeMs < 60 * 1000 && seconds > 0) result += seconds + 's'
 
-    let result = "";
-    if (days > 0) {
-        result += days + "d ";
-    }
-    if ((hours > 0 || days > 0) && hours !== 0) {
-        result += hours + "h ";
-    }
-    if (minutes > 0 && timeFrameMs < 60 * 60 * 1000 && minutes !== 0) {
-        result += minutes + "m";
-    }
-
-    return (negative ? '-' : '') + result.trim();
+    result = result.trim()
+    return result || '0m'
 }
 
+formatNumber(value) {
+    let x = Math.abs(value)
+    if (x >= 1000) return value.toFixed(2)
+    if (x >= 1) return value.toFixed(4)
+    if (x >= 0.0001) return value.toFixed(6)
+    return value.toFixed(8)
+}
 
+clamp(x, min, max) {
+    if (max < min) return min
+    return Math.max(min, Math.min(max, x))
+}
 
 keydown(event) {
     if (event.key === 'Shift') {
@@ -142,35 +260,19 @@ keyup(event) {
 }
 
 mousedown(event) {
-    const layout = $core.layout 
-    if (state === 'idle' && shift) {
-        // Create the first pin 
-        pin1 = {
-            t: $core.cursor.time,
-            v: layout.y2value(event.layerY)
-        }
-        pin2 = { ...pin1 }
-        state = 'drawing'
+    if (state === 'idle' && (shift || event.shiftKey)) {
+        startMeasure(event)
     } else if (state === 'drawing') {
-        state = 'finished'
+        finishMeasure(event)
     } else if (state === 'finished') {
-        state = 'idle'
-        pin1 = null 
-        pin2 = null 
+        clearMeasure(event)
     }
-    $events.emitSpec('chart', 'update-layout')
 }
 
 mousemove(event) {
     if (state === 'drawing') {
-        const layout = $core.layout 
-        // Create the second pin 
-        pin2 = {
-            t: $core.cursor.time,
-            v: layout.y2value(event.layerY)
-        }
+        updateMeasure(event)
     }
 }
 
-// Disable legend by returning null
 legend() => null

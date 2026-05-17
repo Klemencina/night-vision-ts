@@ -28,7 +28,8 @@ export default function test(stack, chart) {
         chart.update()
     })
 
-    stack.add('Press SHIFT+click', () => {})
+    stack.add('Hold SHIFT, click to start, then move the mouse', () => {})
+    stack.add('Click again to finish, then click once more to clear', () => {})
 
     stack.endTest()
 

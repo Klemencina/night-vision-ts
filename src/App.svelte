@@ -71,14 +71,14 @@ $effect(() => {
     // Time-based chart (top)
     chart = new NightVision('chart-container', {
         id: 'chart-time',
-        data: data,
+        data: withRangeTool(data),
         autoResize: true,
     })
     
     // Index-based chart (bottom)
     chart2 = new NightVision('chart-container2', {
         id: 'chart-index',
-        data: dataIndexed,
+        data: withRangeTool(dataIndexed),
         autoResize: true,
         indexBased: true
     })
@@ -142,6 +142,25 @@ function setupTests(testStack, chartInstance) {
     testStack.setGroup('memory-test')
 
     memoryTest(testStack, chartInstance)
+}
+
+function withRangeTool(source) {
+    let next = JSON.parse(JSON.stringify(source))
+
+    for (let pane of next.panes || []) {
+        pane.overlays = pane.overlays || []
+        pane.overlays.push({
+            name: 'RangeTool',
+            type: 'RangeTool',
+            data: [],
+            props: {},
+            settings: {
+                zIndex: 1000
+            }
+        })
+    }
+
+    return next
 }
 
 </script>
