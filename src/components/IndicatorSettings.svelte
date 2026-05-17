@@ -2,16 +2,17 @@
     // Floating panel for indicator settings
     // Styled to match project: uses props.colors.* and props.config.FONT
 
-    import { onMount } from 'svelte'
+    import { onMount, untrack } from 'svelte'
     import DataHub from '../core/dataHub'
     import Scripts from '../core/scripts'
     import SeClient from '../core/se/seClient'
 
     let { props, overlay = null, paneId = null, onClose } = $props()
+    let chartId = untrack(() => props.id)
 
-    let hub = DataHub.instance(props.id)
-    let scripts = Scripts.instance(props.id)
-    let seClient = SeClient.instance(props.id)
+    let hub = DataHub.instance(chartId)
+    let scripts = Scripts.instance(chartId)
+    let seClient = SeClient.instance(chartId)
 
     // Script reference
     let script = $state(null)

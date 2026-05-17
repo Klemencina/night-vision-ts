@@ -6,7 +6,7 @@
     // TODO: add support of overlays with
     // drawBotbar() function
 
-    import { onMount, onDestroy } from 'svelte'
+    import { onMount, onDestroy, untrack } from 'svelte'
     import Events from '../core/events'
     import DataHub from '../core/dataHub'
     import dpr from '../stuff/dprCanvas'
@@ -14,12 +14,13 @@
     import bb from '../core/primitives/botbar'
 
     let { props = {}, layout = {} } = $props()
+    let chartId = untrack(() => props.id)
 
     let bbUpdId = `botbar`
     let bbId = $derived(`${props.id}-botbar`)
     let canvasId = $derived(`${props.id}-botbar-canvas`)
 
-    let events = Events.instance(props.id)
+    let events = Events.instance(chartId)
 
     let showPanel = $state(true)
 

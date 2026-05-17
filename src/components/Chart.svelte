@@ -2,7 +2,7 @@
     // Main component combining all grids, scales, etc.
     // Also, main event router, root of 'update' events
 
-    import { onMount } from 'svelte'
+    import { onMount, untrack } from 'svelte'
     import Cursor from '../core/cursor'
     import DataHub from '../core/dataHub'
     import MetaHub from '../core/metaHub'
@@ -16,6 +16,8 @@
     import NoDataStub from './NoDataStub.svelte'
 
     let { props = {} } = $props()
+    let chartId = untrack(() => props.id)
+    let initialProps = untrack(() => props)
 
     // Getters
     export function getLayout() {
@@ -44,19 +46,19 @@
     }
 
     // Singleton instances
-    let hub = DataHub.instance(props.id)
-    let meta = MetaHub.instance(props.id)
-    let events = Events.instance(props.id)
-    let scan = Scan.instance(props.id)
+    let hub = DataHub.instance(chartId)
+    let meta = MetaHub.instance(chartId)
+    let events = Events.instance(chartId)
+    let scan = Scan.instance(chartId)
 
-    scan.init(props)
+    scan.init(initialProps)
 
     let interval = $state(scan.detectInterval())
     let timeFrame = $state(scan.getTimeframe())
     let range = $state(scan.defaultRange())
     let cursor = $state(new Cursor(meta))
     let storage = {} // Storage for helper variables
-    let ctx = new Context(props) // For measuring text
+    let ctx = new Context(initialProps) // For measuring text
     let chartRR = $state(0)
     let layout = $state(null)
 

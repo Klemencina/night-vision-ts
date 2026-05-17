@@ -4,14 +4,15 @@
     // Input: props, layout, layers (data+overlay), Input object
     // Output: Graphix
 
-    import { onMount } from 'svelte'
+    import { onMount, untrack } from 'svelte'
     import Events from '../../core/events'
     import dpr from '../../stuff/dprCanvas'
 
     let { id, props = {}, rr = {}, layout: initialLayout = {} } = $props()
 
-    let events = Events.instance(props.id)
-    let layout = $state(initialLayout)
+    let chartId = untrack(() => props.id)
+    let events = Events.instance(chartId)
+    let layout = $state(untrack(() => initialLayout))
 
     let rrUpdId = $derived(`rr-${id}-${rr.id}`)
     let gridUpdId = $derived(`grid-${id}`)

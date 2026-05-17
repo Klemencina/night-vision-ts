@@ -7,7 +7,7 @@
     // TODO: combining (& linking) several overlays. Will allow to
     // collapse several lines into one. Need to add 'group' field
 
-    import { onMount, onDestroy } from 'svelte'
+    import { onMount, onDestroy, untrack } from 'svelte'
     import LegendControls from './LegendControls.svelte'
     import IndicatorSettings from './IndicatorSettings.svelte'
     import Events from '../core/events'
@@ -26,10 +26,11 @@
         collapsed = false,
         onToggleClick = null
     } = $props()
+    let chartId = untrack(() => props.id)
 
-    let meta = MetaHub.instance(props.id)
-    let hub = DataHub.instance(props.id)
-    let events = Events.instance(props.id)
+    let meta = MetaHub.instance(chartId)
+    let hub = DataHub.instance(chartId)
+    let events = Events.instance(chartId)
 
     let hover = $state(false)
     let ref = $state(null) // Reference to the legend-line div
@@ -37,7 +38,7 @@
     let ctrlRef = $state(null) // Reference to the legend controls
     let selected = $state(false)
     let show = $state(true)
-    let display = $state(ov.settings.display !== false)
+    let display = $state(untrack(() => ov.settings.display !== false))
     let showSettings = $state(false)
 
     let updId = $derived(`ll-${gridId}-${ov.id}`)

@@ -2,7 +2,7 @@
 
 // Pane component: combines grid, sidebars & legend
 
-import { onMount } from 'svelte'
+import { onMount, untrack } from 'svelte'
 import Grid from './Grid.svelte'
 import Sidebar from './Sidebar.svelte'
 import SidebarStub from './SidebarStub.svelte'
@@ -12,11 +12,12 @@ import Utils from '../stuff/utils'
 
 let { id, props, main, layout: initialLayout } = $props()
 
-let events = Events.instance(props.id)
+let chartId = untrack(() => props.id)
+let events = Events.instance(chartId)
 let lsb = $state(null)  // left sidebar ref
 let rsb = $state(null)  // right sidebar ref
 let grid = $state(null) // grid ref
-let layout = $state(initialLayout)
+let layout = $state(untrack(() => initialLayout))
 
 let leftSb = $derived(Utils.getScalesBySide(0, layout))
 let rightSb = $derived(Utils.getScalesBySide(1, layout))

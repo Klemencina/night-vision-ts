@@ -1,6 +1,7 @@
 <script>
 
 // Switching between scale on the same side
+import { untrack } from 'svelte'
 import { fade } from 'svelte/transition'
 import Events from '../core/events'
 
@@ -9,8 +10,9 @@ import Events from '../core/events'
 //TODO: Highlight an overlay on scale btn hover
 
 let { id, props, layout, scales, side } = $props()
+let chartId = untrack(() => props.id)
 
-let events = Events.instance(props.id)
+let events = Events.instance(chartId)
 
 let S = $derived(side === 'right' ? 1 : 0)
 let ssId = $derived(`${props.id}-ss-${id}-${side}`)

@@ -13,7 +13,7 @@
 
     // TODO: hiver hint component (e.g. for sidebar errors)
 
-    import { onMount, onDestroy } from 'svelte'
+    import { onMount, onDestroy, untrack } from 'svelte'
     import ScaleSelector from './ScaleSelector.svelte'
     import Events from '../core/events'
     import Utils from '../stuff/utils'
@@ -24,14 +24,15 @@
     import MetaHub from '../core/metaHub'
 
     let { id, props = {}, layout = {}, side, scales = [] } = $props()
+    let chartId = untrack(() => props.id)
 
     let layers = $state([])
     export function setLayers($layers) {
         layers = $layers
     }
 
-    let meta = MetaHub.instance(props.id)
-    let events = Events.instance(props.id)
+    let meta = MetaHub.instance(chartId)
+    let events = Events.instance(chartId)
 
     let S = $derived(side === 'right' ? 1 : 0)
 

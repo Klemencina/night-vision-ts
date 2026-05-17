@@ -1,14 +1,16 @@
 <script>
     // Legend block (collection of LegendLines)
 
+    import { untrack } from 'svelte'
     import Events from '../core/events'
     import DataHub from '../core/dataHub'
     import LegendLine from './LegendLine.svelte'
 
     let { id, props, layout, main } = $props()
+    let chartId = untrack(() => props.id)
 
-    let hub = DataHub.instance(props.id)
-    let events = Events.instance(props.id)
+    let hub = DataHub.instance(chartId)
+    let events = Events.instance(chartId)
 
     let legendRR = $state(0) // Re-render key
     let collapsed = $state(!!hub.legendCollapsed)

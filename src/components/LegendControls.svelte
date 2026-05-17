@@ -1,14 +1,16 @@
 <script>
     // Legend control buttons
 
+    import { untrack } from 'svelte'
     import Events from '../core/events'
     import icons from '../assets/icons.json'
 
     let { gridId, ov, props, height, onSettingsClick } = $props()
+    let chartId = untrack(() => props.id)
 
-    let events = Events.instance(props.id)
+    let events = Events.instance(chartId)
 
-    let display = $state(ov.settings.display !== false)
+    let display = $state(untrack(() => ov.settings.display !== false))
     let state = $derived(display ? 'open' : 'closed')
 
     let eyeStyle = $derived(`

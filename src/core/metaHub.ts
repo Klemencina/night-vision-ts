@@ -71,6 +71,8 @@ class MetaHub {
     ohlcMap: Record<number, OhlcMapEntry> = {}
     ohlcFn: ((ref: any[]) => [number, number, number, number]) | undefined = undefined
     scrollLock: boolean = false
+    private refreshToken: number = 0
+    private refreshTimer: ReturnType<typeof setTimeout> | null = null
 
     constructor(nvId: string) {
         let events = Events.instance(nvId)
@@ -88,6 +90,11 @@ class MetaHub {
     }
 
     init(props: Props): void {
+        this.refreshToken++
+        if (this.refreshTimer) {
+            clearTimeout(this.refreshTimer)
+            this.refreshTimer = null
+        }
         this.panes = 0 // Panes processed
         this.ready = false
         // [API] read-only
@@ -157,7 +164,8 @@ class MetaHub {
     // TODO: should add support for indexBased?
     calcOhlcMap(): void {
         this.ohlcMap = {}
-        let data = this.hub.mainOv.data
+        let data = this.hub.mainOv?.data
+        if (!data) return
         for (var i = 0; i < data.length; i++) {
             this.ohlcMap[data[i][0]] = {
                 ref: data[i],
@@ -184,7 +192,10 @@ class MetaHub {
         //this.restore()
         this.calcOhlcMap()
         this.ready = true
-        setTimeout(() => {
+        const token = this.refreshToken
+        this.refreshTimer = setTimeout(() => {
+            this.refreshTimer = null
+            if (!this.ready || token !== this.refreshToken) return
             this.events.emitSpec('chart', 'update-layout')
             this.events.emit('update-legend')
         })

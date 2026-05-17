@@ -4,7 +4,7 @@
     // Input: props (tf, range, ...), overlay scripts, data
     // Output: bunch of renderers, each for different context
 
-    import { onMount } from 'svelte'
+    import { onMount, untrack } from 'svelte'
     import Scripts from '../core/scripts'
     import DataHub from '../core/dataHub'
     import MetaHub from '../core/metaHub'
@@ -21,15 +21,16 @@
     import Canvas from '../components/renderers/Canvas.svelte'
 
     let { id, props, layout } = $props()
+    let chartId = untrack(() => props.id)
 
     export function getLayers() {
         return layers
     }
 
-    let hub = DataHub.instance(props.id)
-    let meta = MetaHub.instance(props.id)
-    let events = Events.instance(props.id)
-    let scripts = Scripts.instance(props.id)
+    let hub = DataHub.instance(chartId)
+    let meta = MetaHub.instance(chartId)
+    let events = Events.instance(chartId)
+    let scripts = Scripts.instance(chartId)
 
     let layers = $state([])
     let renderers = $state([])
