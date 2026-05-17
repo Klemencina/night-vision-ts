@@ -6,7 +6,7 @@
 When you call `new NightVision()`, you create the main component written in Svelte and get its pure-js wrapper:
 
 ```js
-import NightVision from 'night-vision'
+import { NightVision } from 'night-vision-ts'
 
 let chart = new NightVision('<root-element-id>', {
     /* Main component props */
@@ -23,7 +23,7 @@ let chart = new NightVision('root', {
     height: 420,
     colors: { back: 'navy' },
     scripts: [], // Overlay / indicator scripts
-    chartConfig: {}, // Rewrites chart constants
+    config: {}, // Rewrites chart constants
     data: {}, // Main data object
     // ... (more options)
 })

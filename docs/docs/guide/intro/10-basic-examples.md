@@ -104,8 +104,8 @@ All candles are green, isn't that cool? Let's enjoy some night vision vibes befo
 colors: {
     back: "#1b1b1c",
     grid: "#2e2f3099",
-    candleDw: "#0c5b3bff",
-    candleUp: "#41a35bff",
+    down: "#0c5b3bff",
+    up: "#41a35bff",
     // ...
   }
 ```
@@ -204,7 +204,25 @@ The high-level API ([Data API](/guide/api/data-api)), that bundles data updates 
 
 ## 5. Displaying Stock data
 
-To be released, see the [Roadmap](#)
+Stock data (also known as Index-Based mode) is supported when the data contains gaps (e.g. weekends, holidays for stocks). Set `indexBased: true` in the chart props:
+
+```js
+let chart = new NightVision('chart-container', {
+    indexBased: true,
+    data: {
+        panes: [{
+            overlays: [{
+                name: 'AAPL',
+                type: 'Candles',
+                data: aaplData,
+                main: true
+            }]
+        }]
+    }
+})
+```
+
+See the full description in [Layout - The Problem & Solution](/guide/main-comp/layout.html#the-problem-and-solution).
 
 ## 6. Multiple Scales
 
@@ -351,8 +369,8 @@ The chart are not synced perfectly, but we are working on this.
 
 ```js
 // The full code is in 'main.js'
-let chart1 = new NightVision({ id: 'nvjs-1'})
-let chart2 = new NightVision({ id: 'nvjs-2'})
+let chart1 = new NightVision('nvjs-1')
+let chart2 = new NightVision('nvjs-2')
 // ...
 ```
 ::: warning
@@ -468,7 +486,7 @@ The app consists of three important parts:
 
 ```js
 import "./style.css";
-import { NightVision } from "./night-vision.js";
+import { NightVision } from "night-vision-ts";
 import { DataLoader } from "./dataLoader.js";
 import wsx from "./wsx.js";
 import sampler from "./ohlcvSampler.js";

@@ -89,47 +89,42 @@ Crosshair color
 - **Type:** `Color`
 - **Default:** `#41a376` <div class="color-box" style="background: #41a376;"></div>
 
-"Green" candle color
-
+"Green" candle color. Also accessible as `up`.
 
 ## color.candleDw
 
 - **Type:** `Color`
 - **Default:** `#de4646` <div class="color-box" style="background: #de4646;"></div>
 
-"Red" candle color
-
+"Red" candle color. Also accessible as `down`.
 
 ## color.wickUp
 
 - **Type:** `Color`
 - **Default:** `#23a77688` <div class="color-box" style="background: #23a77688;"></div>
 
-"Green" wick color
-
+"Green" wick color. Also accessible as `upWick`.
 
 ## color.wickDw
 
 - **Type:** `Color`
 - **Default:** `#e5415088` <div class="color-box" style="background: #e5415088;"></div>
 
-"Red" wick color
-
+"Red" wick color. Also accessible as `downWick`.
 
 ## color.volUp
 
 - **Type:** `Color`
 - **Default:** `#41a37682` <div class="color-box" style="background: #41a37682;"></div>
 
-"Green" volume color
-
+"Green" volume color. Also accessible as `upVol`.
 
 ## color.volDw
 
 - **Type:** `Color`
 - **Default:** `#de464682` <div class="color-box" style="background: #de464682;"></div>
 
-"Red" volume color
+"Red" volume color. Also accessible as `downVol`.
 
 
 ## color.panel
@@ -138,6 +133,28 @@ Crosshair color
 - **Default:** `#2a2f38` <div class="color-box" style="background: #2a2f38;"></div>
 
 Scale panel color
+
+
+## color.llSelect
+
+- **Type:** `Color`
+- **Default:** `#2d7b2f` <div class="color-box" style="background: #2d7b2f;"></div>
+
+Legend select border color
+
+
+## color.cursor
+
+- **Type:** `Color`
+
+Cursor/crosshair accent color
+
+
+## color.line
+
+- **Type:** `Color`
+
+Line drawing color
 
 
 ## color.tbBack

@@ -18,7 +18,7 @@ The framework called **NavyJS**, the file extension is `.navy`. It's basically a
 A script can define several building blocks of the chart:
 
 - **Overlay**
-- Indicator script (*In The Future*)
+- **Indicator script**
 - Overlay primitive (*In The Future*)
 - Indicator library (*In The Future*)
 - Extension (*In The Future*)

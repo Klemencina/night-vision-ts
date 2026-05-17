@@ -208,6 +208,10 @@ export default {
                         "link": "/guide/built-in-overlays/Histogram"
                     },
                     {
+                        "text": "LineTool",
+                        "link": "/guide/built-in-overlays/LineTool"
+                    },
+                    {
                         "text": "PriceLabels",
                         "link": "/guide/built-in-overlays/PriceLabels"
                     },

@@ -64,7 +64,7 @@ events.on('compo-2:update', handler2)
 And finally, if you are planning to add new modules or want to access another **NightVision** chart, you can get a singleton instance with a simple call:
 
 ```js
-import { Events } from 'night-vision'
+import { Events } from 'night-vision-ts'
 
 // Event of another NVJS instance
 const events = Events.instance('<nvjs-id>')

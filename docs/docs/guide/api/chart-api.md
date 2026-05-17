@@ -105,7 +105,7 @@ console.log(chart.layout)
 A reference to the [DataHub](/guide/main-comp/data-hub.html) instance of this chart. Alternatively, can be accessed through the singleton class:
 
  ```js
- import { DataHub } from 'night-vision'
+ import { NightVision, DataHub } from 'night-vision-ts'
  let chart = new NightVision()
  let hub = DataHub.instance(chart.id)
  ```

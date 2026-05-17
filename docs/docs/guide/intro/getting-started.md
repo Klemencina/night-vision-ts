@@ -36,7 +36,7 @@ npm install
 ## Step 2: Install NightVision package
 
 ```sh
-npm i night-vision
+npm i night-vision-ts
 ```
 
 ## Step 3: Make your first chart
@@ -45,7 +45,7 @@ Replace the content of `main.js` in the root folder with:
 
 ```js
 import './style.css'
-import { NightVision } from 'night-vision'
+import { NightVision } from 'night-vision-ts'
 
 document.querySelector('#app').innerHTML = `
 <style>

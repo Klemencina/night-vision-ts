@@ -64,7 +64,7 @@ legend() => null
 
 An `Y-transform` is created when you make a mouse drag on the sidebar. This means you requested a custom Y-range range for a particular scale. Double-clicking will reset the y-range to the default `auto` state and set the corresponding transform to `null`.
 
-You'll find all current y-transforms in `chart.mata.yTransforms`:
+You'll find all current y-transforms in `chart.meta.yTransforms`:
 
 ```js
 // Example of yTransforms: Array(gridId => yTransform)

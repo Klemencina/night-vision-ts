@@ -4,6 +4,8 @@
 Various constants. You can overwrite this values by providing `config` object in the props:
 
 ```js
+import { NightVision } from 'night-vision-ts'
+
 let chart = new NightVision('<root>', {
     config: {
         MAX_ZOOM: 10000,
@@ -95,7 +97,7 @@ Minimal starting range, candles
 ## config.MIN_ZOOM
 
 - **Type:** `number`
-- **Default:** `2`
+- **Default:** `5`
 
 Minimal zoom, candles
 
@@ -146,3 +148,123 @@ Sample size for auto-precision
 - **Default:** `false`
 
 Collapse indicator legend lines by default
+
+
+## config.TOOLBAR
+
+- **Type:** `number`
+- **Default:** `57`
+
+Toolbar width, px
+
+
+## config.TB_ICON
+
+- **Type:** `number`
+- **Default:** `25`
+
+Toolbar icon size, px
+
+
+## config.TB_ITEM_M
+
+- **Type:** `number`
+- **Default:** `6`
+
+Toolbar item margin, px
+
+
+## config.TB_ICON_BRI
+
+- **Type:** `number`
+- **Default:** `1`
+
+Toolbar icon brightness
+
+
+## config.TB_ICON_HOLD
+
+- **Type:** `number`
+- **Default:** `420`
+
+Wait to expand, ms
+
+
+## config.TB_BORDER
+
+- **Type:** `number`
+- **Default:** `1`
+
+Toolbar border, px
+
+
+## config.TB_B_STYLE
+
+- **Type:** `string`
+- **Default:** `'dotted'`
+
+Toolbar border style
+
+
+## config.TOOL_COLL
+
+- **Type:** `number`
+- **Default:** `7`
+
+Tool collision threshold
+
+
+## config.PIN_RADIUS
+
+- **Type:** `number`
+- **Default:** `5.5`
+
+Tool pin radius
+
+
+## config.UX_OPACITY
+
+- **Type:** `number`
+- **Default:** `0.9`
+
+Ux background opacity
+
+
+## config.SCROLL_WHEEL
+
+- **Type:** `string`
+- **Default:** `'prevent'`
+
+Scroll wheel mode: `'prevent'`, `'pass'`, or `'click'`
+
+
+## config.L_BTN_SIZE
+
+- **Type:** `number`
+- **Default:** `21`
+
+Legend button size, px
+
+
+## config.L_BTN_MARGIN
+
+- **Type:** `string`
+- **Default:** `'-6px 0 -6px 0'`
+
+CSS margin for legend buttons
+
+
+## config.CANDLE_TIME
+
+- **Type:** `boolean`
+- **Default:** `true`
+
+Show remaining candle time
+
+
+## config.FONT
+
+- **Type:** `string`
+- **Default:** _(see source)_
+
+Font string for chart text elements

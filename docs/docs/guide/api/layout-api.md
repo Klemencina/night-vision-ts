@@ -15,13 +15,13 @@ console.log($core.layout)
 
 ## layout.main
 
-- **Type:** `undefined`
+- **Type:** `Grid`
 
 A reference to the main grid
 
 ## layout.grid.scales
 
-- **Type:** `undefined`
+- **Type:** `Record<string, Scale>`
 
 Associative array of scales: { A => {...}, ...}
 
@@ -33,13 +33,13 @@ Current main scale index
 
 ## layout.grid.sb
 
-- **Type:** `object`
+- **Type:** `[number, number]`
 
 Sidebar widths of this pane `[<left>, <right>]`
 
 ## layout.grid.sbMax
 
-- **Type:** `object`
+- **Type:** `[number, number]`
 
 Max sidebar widths over all panes `[<left>, <right>]`
 
@@ -69,7 +69,7 @@ Time-step
 
 ## layout.grid.xs
 
-- **Type:** `object`
+- **Type:** `Array`
 
 x-axis marks (coordinates, values)
 
@@ -87,7 +87,7 @@ Height of the grid, px
 
 ## layout.grid.settings
 
-- **Type:** `undefined`
+- **Type:** `PaneSettings`
 
 Grid settings, see [pane.settings](/guide/data-struct/pane-object.html#pane-settings)
 
@@ -107,7 +107,7 @@ Grid id
 
 - **Type:** `number`
 
-The higest point of y-range
+The highest point of y-range
 
 ## layout.grid.$lo
 
@@ -141,13 +141,13 @@ Value-step (e.g. price)
 
 ## layout.grid.ys
 
-- **Type:** `object`
+- **Type:** `Array`
 
 y-axis marks (coordinates, values)
 
 ## layout.grid.scaleSpecs
 
-- **Type:** `undefined`
+- **Type:** `ScaleSpecs`
 
 Specs of the current main scale
 

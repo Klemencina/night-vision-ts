@@ -81,10 +81,10 @@ chart.data = {
 - ~~Add keyboard & mouse events~~
 - ~~Port the script system from TVJS~~
 - ~~Create a built-in indicator collection~~
+- ~~Add tool overlays (LineTool, RangeTool)~~
 - NavyJS tutorial
 - Data API (the high-level API)
-- *Add tool overlays* ???
-- *Toolbar* ??? 
+- *Toolbar* ???
 - Mobile support
 
 
