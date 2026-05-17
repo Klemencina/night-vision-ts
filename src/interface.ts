@@ -63,6 +63,7 @@ interface Props {
 }
 
 class NightVision {
+    private _id: string
     private _data: Data
     private _scripts: Script[]
     private _props: Props
@@ -87,6 +88,7 @@ class NightVision {
         }
 
         let id = props.id || 'nvjs'
+        this._id = id
 
         // Script engine & web-worker interfaces
         this.ww = WebWork.instance(id, this)
@@ -363,7 +365,8 @@ class NightVision {
             unmount(this.comp)
             this.comp = null
         }
-        this.ww.stop()
+        WebWork.release(this._id)
+        SeClient.release(this._id)
     }
 }
 

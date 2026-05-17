@@ -77,6 +77,9 @@ class WebWork {
     }
 
     async exec(type: string, data: unknown, txKeys?: string[]): Promise<unknown> {
+        if (!this.worker) {
+            return Promise.reject(new Error(`Worker is not running; cannot execute "${type}"`))
+        }
         return new Promise(rs => {
             let id = Utils.uuid()
             this.send({ type, id, data }, txKeys)
@@ -104,6 +107,9 @@ class WebWork {
 
     stop(): void {
         if (this.worker) this.worker.terminate()
+        this.worker = null
+        this.tasks = {}
+        this.onevent = () => {}
     }
 }
 
@@ -116,5 +122,12 @@ function instance(id: string, chart: unknown): WebWork {
     return instances[id]
 }
 
-export { WebWork, instance }
-export default { instance }
+function release(id: string): void {
+    const worker = instances[id]
+    if (!worker) return
+    worker.stop()
+    delete instances[id]
+}
+
+export { WebWork, instance, release }
+export default { instance, release }

@@ -201,7 +201,7 @@ let instances: { [id: string]: SeClient } = {}
 function instance(id: string, chart?: Chart): SeClient {
     if (!instances[id]) {
         instances[id] = new SeClient(id, chart!)
-    } else if (chart && !instances[id].chart) {
+    } else if (chart) {
         instances[id].chart = chart
         instances[id].ww = chart.ww
         if (instances[id].ww) {
@@ -211,5 +211,9 @@ function instance(id: string, chart?: Chart): SeClient {
     return instances[id]
 }
 
-export { SeClient }
-export default { instance }
+function release(id: string): void {
+    delete instances[id]
+}
+
+export { SeClient, instance, release }
+export default { instance, release }

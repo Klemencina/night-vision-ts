@@ -1,4 +1,42 @@
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
+
+type MockWorker = {
+    id: number
+    chartId: string
+    onevent: () => void
+    exec: () => Promise<null>
+    just: () => void
+    send: () => void
+    stop: () => void
+}
+
+const workerMock = vi.hoisted(() => {
+    let seq = 0
+    const instances = new Map<string, MockWorker>()
+    return {
+        instances,
+        stops: [] as number[],
+        reset() {
+            seq = 0
+            instances.clear()
+            this.stops.length = 0
+        },
+        make(id: string) {
+            const worker = {
+                id: ++seq,
+                chartId: id,
+                onevent: () => {},
+                exec: () => Promise.resolve(null),
+                just: () => {},
+                send: () => {},
+                stop: vi.fn(() => {
+                    this.stops.push(worker.id)
+                })
+            }
+            return worker
+        }
+    }
+})
 
 vi.mock('svelte', () => {
     return {
@@ -14,23 +52,34 @@ vi.mock('../../src/NightVision.svelte', () => {
 })
 
 vi.mock('../../src/core/se/webWork', () => {
-    const instance = () => ({
-        onevent: () => {},
-        exec: () => Promise.resolve(null),
-        just: () => {},
-        send: () => {},
-        stop: () => {}
-    })
+    const instance = (id: string) => {
+        if (!workerMock.instances.has(id)) {
+            workerMock.instances.set(id, workerMock.make(id))
+        }
+        return workerMock.instances.get(id)
+    }
+    const release = (id: string) => {
+        const worker = workerMock.instances.get(id)
+        if (!worker) return
+        worker.stop()
+        workerMock.instances.delete(id)
+    }
     return {
         instance,
+        release,
         WebWork: function () {},
-        default: { instance }
+        default: { instance, release }
     }
 })
 
 import { NightVision } from '../../src/interface'
 
 describe('NightVision integration smoke', () => {
+    beforeEach(() => {
+        workerMock.reset()
+        document.body.innerHTML = ''
+    })
+
     it('should initialize with multiple overlays and indicator scripts', () => {
         const root = document.createElement('div')
         root.id = 'nv-smoke'
@@ -64,5 +113,22 @@ describe('NightVision integration smoke', () => {
         expect(panes[0].scripts?.length).toBe(2)
         expect(panes[1].scripts?.length).toBe(1)
         expect(chart.hub.allOverlays().length).toBe(3)
+    })
+
+    it('releases worker singletons on destroy so the same id can be reused', () => {
+        const root = document.createElement('div')
+        root.id = 'nv-reuse'
+        document.body.appendChild(root)
+
+        const first = new NightVision('nv-reuse', { id: 'same-id' })
+        const firstWorker = first.ww
+
+        first.destroy()
+
+        const second = new NightVision('nv-reuse', { id: 'same-id' })
+
+        expect(workerMock.stops).toEqual([(firstWorker as unknown as MockWorker).id])
+        expect(second.ww).not.toBe(firstWorker)
+        expect((second.ww as unknown as MockWorker).id).toBe(2)
     })
 })
