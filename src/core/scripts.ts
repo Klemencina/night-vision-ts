@@ -103,5 +103,9 @@ function instance(id: string): Scripts {
     return instances[id]
 }
 
-export { Scripts, instance }
-export default { instance }
+function release(id: string): void {
+    delete instances[id]
+}
+
+export { Scripts, instance, release }
+export default { instance, release }

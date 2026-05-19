@@ -473,6 +473,7 @@ class NightVision {
         }
         WebWork.release(this._id)
         SeClient.release(this._id)
+        Scripts.release(this._id)
     }
 }
 

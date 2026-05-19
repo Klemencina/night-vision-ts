@@ -140,6 +140,7 @@ describe('NightVision integration smoke', () => {
 
         const first = new NightVision('nv-reuse', { id: 'same-id' })
         const firstWorker = first.ww
+        const firstScriptHub = first.scriptHub
 
         first.destroy()
 
@@ -147,6 +148,8 @@ describe('NightVision integration smoke', () => {
 
         expect(workerMock.stops).toEqual([(firstWorker as unknown as MockWorker).id])
         expect(second.ww).not.toBe(firstWorker)
+        expect(second.scriptHub).not.toBe(firstScriptHub)
+        expect(second.scriptHub.ww).toBe(second.ww)
         expect((second.ww as unknown as MockWorker).id).toBe(2)
     })
 
