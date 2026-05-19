@@ -37,7 +37,7 @@
     }
   },
   "author": "ChartMaster",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@freecodecamp/strip-comments": "^3.0.1",
     "arrayslicer": "^1.2.3",
