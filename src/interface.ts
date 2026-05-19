@@ -196,8 +196,18 @@ class NightVision {
     }
     set scripts(val: Script[]) {
         this._scripts = val
-        this.scriptHub.init(this._scripts.map(s => s.code))
-        this.update('full')
+        const scriptsReady = this.scriptHub.init(this._scripts.map(s => s.code))
+        this._scriptsReady = scriptsReady
+        this._props.scriptsReady = scriptsReady
+        scriptsReady
+            .then(() => {
+                if (this._scriptsReady === scriptsReady) {
+                    this.update('full')
+                }
+            })
+            .catch(e => {
+                console.warn('[NightVision] Script upload failed:', e)
+            })
     }
 
     // The data (auto-updated on reset)

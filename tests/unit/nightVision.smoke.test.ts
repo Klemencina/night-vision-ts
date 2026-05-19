@@ -164,4 +164,29 @@ describe('NightVision integration smoke', () => {
         chart.destroy()
         expect(resizeMock.cleanup).toHaveBeenCalledTimes(1)
     })
+
+    it('waits for script upload before full update from scripts setter', async () => {
+        const root = document.createElement('div')
+        root.id = 'nv-scripts'
+        document.body.appendChild(root)
+
+        const chart = new NightVision('nv-scripts', { id: 'scripts-id' })
+        const update = vi.spyOn(chart, 'update')
+
+        chart.scripts = [
+            {
+                name: 'Custom',
+                code: `// NavyScript~0.1-lite
+[INDICATOR name=Custom]
+calc(src) => src.close
+[EOF]
+`
+            }
+        ]
+
+        expect(update).not.toHaveBeenCalledWith('full')
+        await (chart as any)._scriptsReady
+        await Promise.resolve()
+        expect(update).toHaveBeenCalledWith('full')
+    })
 })
