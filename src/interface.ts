@@ -69,13 +69,13 @@ class NightVision {
     private _props: Props
     private _scriptsReady: Promise<unknown>
     private _resizeCleanup: (() => void) | null = null
-    public ww: WebWorkType
-    public se: SeClientType
-    public hub: ReturnType<typeof DataHub.instance>
-    public meta: MetaHubType
-    public scan: DataScanType
-    public events: EventsType
-    public scriptHub: ScriptsType
+    public ww!: WebWorkType
+    public se!: SeClientType
+    public hub!: ReturnType<typeof DataHub.instance>
+    public meta!: MetaHubType
+    public scan!: DataScanType
+    public events!: EventsType
+    public scriptHub!: ScriptsType
     public root: HTMLElement | null
     public comp: ReturnType<typeof mount> | null = null
     private _pendingRemountRange: [number, number] | null = null
@@ -91,6 +91,16 @@ class NightVision {
 
         let id = props.id || 'nvjs'
         this._id = id
+        this._scriptsReady = Promise.resolve()
+        this.root = typeof target === 'string' ? document.getElementById(target) : target
+        if (!this.root) {
+            console.warn(
+                '[NightVision] Container not found:',
+                target,
+                '- ensure element exists when creating chart'
+            )
+            return
+        }
 
         // Script engine & web-worker interfaces
         this.ww = WebWork.instance(id, this)
@@ -106,15 +116,6 @@ class NightVision {
         this._scriptsReady = this.scriptHub.init(this._scripts.map(s => s.code))
         this._props.scriptsReady = this._scriptsReady
 
-        this.root = typeof target === 'string' ? document.getElementById(target) : target
-        if (!this.root) {
-            console.warn(
-                '[NightVision] Container not found:',
-                target,
-                '- ensure element exists when creating chart'
-            )
-            return
-        }
         if (props.autoResize) {
             this._syncSizeFromRoot()
         }

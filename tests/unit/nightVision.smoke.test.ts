@@ -165,6 +165,20 @@ describe('NightVision integration smoke', () => {
         expect(resizeMock.cleanup).toHaveBeenCalledTimes(1)
     })
 
+    it('does not allocate a worker when the target container is missing', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        new NightVision('missing-root', { id: 'missing-target' })
+
+        expect(workerMock.instances.size).toBe(0)
+        expect(warn).toHaveBeenCalledWith(
+            '[NightVision] Container not found:',
+            'missing-root',
+            '- ensure element exists when creating chart'
+        )
+        warn.mockRestore()
+    })
+
     it('waits for script upload before full update from scripts setter', async () => {
         const root = document.createElement('div')
         root.id = 'nv-scripts'
