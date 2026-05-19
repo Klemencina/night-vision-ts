@@ -31,7 +31,7 @@
     } = $props()
 
     let configMerge = $derived({ ...Const.ChartConfig, ...config })
-    let offset = $derived(toolbar ? config.TOOLBAR : 0)
+    let offset = $derived(toolbar ? configMerge.TOOLBAR : 0)
     let colorsUser = $derived({ ...Const.COLORS, ...colors })
     let props = $derived({
         showLogo,
