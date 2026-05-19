@@ -30,9 +30,9 @@
         // autoResize = false // Currently unused
     } = $props()
 
-    let configMerge = $derived(Object.assign(Const.ChartConfig, config))
+    let configMerge = $derived({ ...Const.ChartConfig, ...config })
     let offset = $derived(toolbar ? config.TOOLBAR : 0)
-    let colorsUser = $derived(Object.assign(Const.COLORS, colors))
+    let colorsUser = $derived({ ...Const.COLORS, ...colors })
     let props = $derived({
         showLogo,
         id,
