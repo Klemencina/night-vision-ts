@@ -18,12 +18,41 @@ function setup(id: string) {
 
     const events = Events.instance(id)
     const meta = MetaHub.instance(id)
-    return { events, meta }
+    return { events, meta, hub }
 }
 
 describe('MetaHub lifecycle refresh', () => {
     afterEach(() => {
         vi.useRealTimers()
+    })
+
+    it('resolves OHLC after revisions, prepends, and replacement while preserving map snapshots', () => {
+        const { meta, hub } = setup('meta-ohlc')
+        const rows = [[0, 1, 2, 0, 1], [10, 2, 3, 1, 2], [10, 3, 4, 2, 3]]
+        hub.mainOv!.data = rows
+        meta.ohlcFn = row => row.slice(1, 5) as [number, number, number, number]
+        meta.calcOhlcMap()
+        const snapshot = meta.ohlcMap
+        expect(meta.ohlc(0)).toEqual([1, 2, 0, 1])
+        expect(meta.ohlc(10)).toEqual([3, 4, 2, 3])
+        expect(meta.ohlc(5)).toBeUndefined()
+        expect(snapshot[10]).toEqual({ ref: rows[2], index: 2 })
+
+        rows[1] = [5, 8, 9, 7, 8]
+        rows.unshift([-10, 4, 5, 3, 4])
+        meta.calcOhlcMap()
+        expect(meta.ohlc(5)).toEqual([8, 9, 7, 8])
+        expect(meta.ohlcMap[10].index).toBe(3)
+        expect(snapshot[10].index).toBe(2)
+
+        hub.mainOv!.data = [[20, 5, 6, 4, 5]]
+        meta.calcOhlcMap()
+        expect(meta.ohlc(10)).toBeUndefined()
+        expect(meta.ohlc(20)).toEqual([5, 6, 4, 5])
+        expect(Object.keys(meta.ohlcMap)).toEqual(['20'])
+        MetaHub.release('meta-ohlc')
+        DataHub.release('meta-ohlc')
+        Events.release('meta-ohlc')
     })
 
     it('emits one deferred refresh after current metadata extraction finishes', () => {

@@ -3,6 +3,7 @@
 
 import Events from './events'
 import DataHub from './dataHub'
+import { upperBound } from '../stuff/utils'
 
 interface YRangeFn {
     exec: (data: any[], h: number, l: number) => [number, number, boolean?] | null
@@ -68,7 +69,7 @@ class MetaHub {
     autoPrecisions: (number | undefined)[][] = []
     valueTrackers: (ValueTracker | undefined)[][] = []
     selectedOverlay: [number, number] | undefined = undefined
-    ohlcMap: Record<number, OhlcMapEntry> = {}
+    private _ohlcMap: Record<number, OhlcMapEntry> | null = null
     ohlcFn: ((ref: any[]) => [number, number, number, number]) | undefined = undefined
     scrollLock: boolean = false
     private refreshToken: number = 0
@@ -113,7 +114,7 @@ class MetaHub {
                 index: n // Item global index
             }, ...
         }*/
-        this.ohlcMap = {} // time => OHLC map of the main ov
+        this.calcOhlcMap()
         this.ohlcFn = undefined // OHLC mapper function
         this.scrollLock = false // Scroll lock state
     }
@@ -163,15 +164,20 @@ class MetaHub {
     // Maps timestamp => ohlc, index
     // TODO: should add support for indexBased?
     calcOhlcMap(): void {
-        this.ohlcMap = {}
+        this._ohlcMap = null
+    }
+
+    get ohlcMap(): Record<number, OhlcMapEntry> {
+        if (this._ohlcMap) return this._ohlcMap
+        const map: Record<number, OhlcMapEntry> = {}
         let data = this.hub.mainOv?.data
-        if (!data) return
-        for (var i = 0; i < data.length; i++) {
-            this.ohlcMap[data[i][0]] = {
+        for (let i = 0; i < (data?.length ?? 0); i++) {
+            map[data[i][0]] = {
                 ref: data[i],
                 index: i
             }
         }
+        return this._ohlcMap = map
     }
 
     // Store auto precision for a specific overlay
@@ -261,9 +267,11 @@ class MetaHub {
 
     // [API] Get OHLC values to use as "magnet" values
     ohlc(t: number): [number, number, number, number] | undefined {
-        let el = this.ohlcMap[t]
-        if (!el || !this.ohlcFn) return
-        return this.ohlcFn(el.ref)
+        const data = this.hub.mainOv?.data
+        if (!data?.length || !this.ohlcFn) return
+        const index = upperBound(data, t) - 1
+        const row = data[index]
+        if (row?.[0] === t) return this.ohlcFn(row)
     }
 
     // EVENT HANDLERS
