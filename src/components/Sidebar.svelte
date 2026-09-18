@@ -17,7 +17,7 @@
     import ScaleSelector from './ScaleSelector.svelte'
     import Events from '../core/events'
     import Utils from '../stuff/utils'
-    import Const from '../stuff/constants'
+    import subscribeCandleClock from '../stuff/candleClock'
     import math from '../stuff/math'
     import dpr from '../stuff/dprCanvas'
     import sb from '../core/primitives/sidebar'
@@ -35,6 +35,7 @@
     let events = Events.instance(chartId)
     let disposed = false
     let setupFrame = null
+    let unsubscribeCountdown = null
 
     let S = $derived(side === 'right' ? 1 : 0)
 
@@ -69,7 +70,6 @@
     let zoom = $state(1)
     let yRange = $state(null)
     let drug = $state(null)
-    let updId = $state(null)
 
     let width = $derived(layout.width)
     let height = $derived(layout.height)
@@ -90,8 +90,7 @@
         setupFrame = null
         if (mc) mc.destroy()
         mc = null
-        clearInterval(updId)
-        updId = null
+        stopCountdown()
     })
 
     function scheduleSetup() {
@@ -120,12 +119,6 @@
         update()
         if (scale) await listeners()
         if (disposed) return
-
-        // Start updates to show fresh candle time
-        if (props.config.CANDLE_TIME && props.timeFrame >= Const.MINUTE) {
-            let dt = Const.SECOND / 5
-            updId = setInterval(update, dt)
-        }
     }
 
     // TODO: add mouse wheel/touchpad zoom
@@ -254,9 +247,13 @@
     }
 
     function update($layout = layout) {
-        if (disposed || !$layout || !ctx) return
+        if (disposed || !$layout || !ctx) {
+            stopCountdown()
+            return
+        }
 
         scale = getCurrentScale()
+        syncCountdown()
 
         if (!scale) {
             return sb.error(props, layout, side, ctx)
@@ -283,11 +280,34 @@
     // Draw stuff from overlay scripts
     function ovDrawCalls() {
         for (var l of layers) {
+            if (!l.display) continue
             let ov = l.overlay
             if (ov.drawSidebar) {
                 ov.drawSidebar(ctx, side, scale)
             }
         }
+    }
+
+    function syncCountdown() {
+        const eligible = !disposed && ctx && scale && layers.some(layer =>
+            layer.display && layer.hasVisibleCountdown?.(side, scale)
+        )
+        if (eligible && !unsubscribeCountdown) {
+            unsubscribeCountdown = subscribeCandleClock(events, onCountdownTick)
+        } else if (!eligible) {
+            stopCountdown()
+        }
+        return eligible
+    }
+
+    function onCountdownTick() {
+        scale = getCurrentScale()
+        if (syncCountdown()) update()
+    }
+
+    function stopCountdown() {
+        unsubscribeCountdown?.()
+        unsubscribeCountdown = null
     }
 
     function resizeWatch() {

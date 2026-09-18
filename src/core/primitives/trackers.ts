@@ -76,14 +76,16 @@ export default class Trackers extends Layer {
         for (var i = 0; i < trackers.length; i++) {
             let vt = trackers[i] as ValueTracker | undefined
             if (!vt) continue
+            const source = this.hub.overlay(gridIdNum, i)
+            if (!source || source.settings?.display === false) continue
             let data = this.hub.ovData(gridIdNum, i) || []
             let last = data[data.length - 1] || []
             let tracker = vt(last)
+            if (!tracker?.show || !Number.isFinite(tracker.value)) continue
             tracker.ovId = i
 
-            if (!tracker.show || tracker.value === undefined) continue
-
             tracker.y = this.layout.value2y(tracker.value)
+            if (!Number.isFinite(tracker.y)) continue
             tracker.color = tracker.color || this.props.colors.scale
             if (tracker.line){
                 priceLine(this.layout, ctx, tracker)
@@ -100,13 +102,26 @@ export default class Trackers extends Layer {
         if (!this.layout) return
 
         for (var tracker of this.trackers || []) {
-            let scaleId = this.getScaleId(tracker.ovId)
-            if (scaleId !== scale.scaleSpecs.id) continue
+            if (!this.trackerIsVisible(tracker, scale)) continue
             ;(sidebar as any).tracker(
                 this.props, this.layout, scale, side, ctx, tracker
             )
         }
 
+    }
+
+    hasVisibleCountdown(side: 'left' | 'right', scale: any): boolean {
+        if (!this.layout || !this.display) return false
+        return this.trackers.some(tracker =>
+            this.trackerIsVisible(tracker, scale) &&
+            sidebar.hasVisibleCountdown(this.props, this.layout, side, tracker)
+        )
+    }
+
+    private trackerIsVisible(tracker: Tracker, scale: any): boolean {
+        const source = this.hub.overlay(parseInt(this.gridId), tracker.ovId)
+        return !!source && source.settings?.display !== false &&
+            this.getScaleId(tracker.ovId) === scale.scaleSpecs.id
     }
 
     envEpdate(ovSrc: any, layout: any, props: any) {

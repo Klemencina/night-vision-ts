@@ -132,7 +132,6 @@
             if (disposed) return
             await hub.loadScripts(true)
             if (disposed) return
-            meta.init(props)
             scan.updatePanesHash()
             layout = new Layout(chartProps, hub, meta)
             if (initCursorValues()) {
@@ -141,7 +140,6 @@
         } catch (e) {
             if (disposed) return
             console.warn('Chart loadScripts failed, showing chart without scripts:', e)
-            meta.init(props)
         }
     }
 
@@ -307,16 +305,18 @@
         hub.calcSubset(range)
         hub.init(hub.data)
         hub.detectMain()
+        // Script results can remake grids before loadScripts resolves.
+        meta.init(props)
+        meta.restore()
         // TODO: exec only if scripts changed
         try {
             await hub.loadScripts(true)
         } catch (error) {
             if (disposed) return
+            events.emit('remake-grid')
             throw error
         }
         if (disposed) return
-        meta.init(props)
-        meta.restore()
         scan.updatePanesHash()
         update({ immediate: true })
         events.emit('remake-grid')

@@ -140,19 +140,32 @@ function panel(props: Props, layout: Layout, scale: Scale, side: 'left' | 'right
 
 }
 
-function tracker(props: Props, layout: Layout, scale: Scale, side: 'left' | 'right', ctx: CanvasRenderingContext2D, tracker: Tracker) {
-    if (!ctx) return // Guard against null context
+function trackerGeometry(props: Props, tracker: Tracker) {
     const panHeight = Math.floor(props.config.PANHEIGHT * 0.8)
     const ct = props.config.CANDLE_TIME && props.timeFrame >= Const.MINUTE
+    const y = tracker.y - panHeight * 0.5 + HPX
+    const h = ct ? Math.floor(panHeight * 1.75) + 2 + HPX : panHeight
+    return { panHeight, ct, y, h, countdownY: y + panHeight + 9 }
+}
+
+function hasVisibleCountdown(props: Props, layout: Layout, side: 'left' | 'right', tracker: Tracker): boolean {
+    const { ct, countdownY } = trackerGeometry(props, tracker)
+    const fontHeight = parseFloat(props.config.FONT) || 11
+    return !!ct && Number.isFinite(tracker.value) && Number.isFinite(countdownY) &&
+        layout.sbMax[side === 'right' ? 1 : 0] > 5 && layout.height > 0 &&
+        countdownY > 0 && countdownY - fontHeight < layout.height
+}
+
+function tracker(props: Props, layout: Layout, scale: Scale, side: 'left' | 'right', ctx: CanvasRenderingContext2D, tracker: Tracker) {
+    if (!ctx) return // Guard against null context
+    const { panHeight, ct, y, h, countdownY } = trackerGeometry(props, tracker)
     let $ = tracker.value
     let lbl = $.toFixed(scale.prec)
     ctx.fillStyle = tracker.color
     var S = side === 'right' ? 1 : 0
     let panWidth = layout.sbMax[S] - 5
     let x = S ? 1 : 4
-    let y = tracker.y - panHeight * 0.5 + HPX
     let a = S ? 7 : panWidth - 3
-    let h = ct ? Math.floor(panHeight * 1.75) + 2 + HPX : panHeight
     roundRect(ctx, x , y, panWidth, h, 3, S ? 1 : 0)
     ctx.fillStyle = props.colors.back
     ctx.textAlign = S ? 'left' : 'right'
@@ -160,7 +173,7 @@ function tracker(props: Props, layout: Layout, scale: Scale, side: 'left' | 'rig
     if (ct) {
         let rt = Utils.getCandleTime(props.timeFrame)
         ctx.textAlign = S ? 'left' : 'right'
-        ctx.fillText(rt, a, y + panHeight + 9) // TODO: remove hardcode
+        ctx.fillText(rt, a, countdownY)
     }
 
 }
@@ -215,5 +228,6 @@ export default {
     panel,
     upperBorder,
     error,
-    tracker
+    tracker,
+    hasVisibleCountdown
 }
