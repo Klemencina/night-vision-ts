@@ -205,8 +205,9 @@ export default function Scale(id: string, src: ScaleSrc, specs: Specs): ScaleRes
 
             if (self.$hi === self.$lo) {
                 if (!ls) {
-                    self.$hi! *= 1.05 // Expand if height range === 0
-                    self.$lo! *= 0.95
+                    const padding = Math.abs(self.$hi!) * 0.05 || 1
+                    self.$hi! += padding
+                    self.$lo! -= padding
                 } else {
                     logScale.expand(self as any, height)
                 }
