@@ -110,7 +110,8 @@ class ScriptEngine {
 
         let sel = Object.keys(delta).filter(x => x in this.map)
 
-        if (!this.init_state(sel)) {
+        if (!sel.length) return
+        if (!this.init_state(sel, true)) {
             this.delta_queue.push(delta)
             return
         }
@@ -269,25 +270,29 @@ class ScriptEngine {
         }
     }
 
-    init_state(sel?: string[]): boolean {
+    init_state(sel?: string[], preserveShared = false): boolean {
         sel = sel ?? Object.keys(this.map)
         let task = sel.join(',')
 
-        if (this.running) {
-            // Only restart when task changed (new scripts); same task = duplicate message, let current run() finish
-            this._restart = task !== this.task
-            return false
+        if (this.running) return false
+
+        if (preserveShared && this.shared) {
+            // Existing indicator environments hold these arrays directly.
+            for (const ts of [this.open, this.high, this.low, this.close, this.vol,
+                ...Object.values(this.tss)]) {
+                ts.length = 0
+                delete ts.__t0__
+            }
+        } else {
+            this.open = TS('open', [])
+            this.high = TS('high', [])
+            this.low = TS('low', [])
+            this.close = TS('close', [])
+            this.vol = TS('vol', [])
+            this.tss = {}
+            this.std_plus = {}
+            this.shared = {} as SharedData
         }
-
-        this.open = TS('open', [])
-        this.high = TS('high', [])
-        this.low = TS('low', [])
-        this.close = TS('close', [])
-        this.vol = TS('vol', [])
-
-        this.tss = {}
-        this.std_plus = {}
-        this.shared = {} as SharedData
 
         this.iter = 0
         this.t = 0
