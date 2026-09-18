@@ -1,6 +1,6 @@
 // Vanilla JS interface
 
-import { mount, unmount, Component } from 'svelte'
+import { mount, unmount } from 'svelte'
 import NightVisionComp from './NightVision.svelte'
 import DataHub, { Data, Pane, Overlay } from './core/dataHub'
 import MetaHub, { MetaHub as MetaHubType } from './core/metaHub'
@@ -62,7 +62,11 @@ interface Props {
     [key: string]: unknown
 }
 
+const activeChartIds = new Set<string>()
+let nextChartId = 0
+
 class NightVision {
+    private _registered = false
     private _id: string
     private _data: Data
     private _scripts: Script[]
@@ -89,8 +93,14 @@ class NightVision {
             this._data.indexBased = props.indexBased
         }
 
-        let id = props.id || 'nvjs'
+        let id = props.id
+        if (!id) {
+            do {
+                id = `nvjs-${++nextChartId}`
+            } while (activeChartIds.has(id))
+        }
         this._id = id
+        this._props.id = id
         this._scriptsReady = Promise.resolve()
         this.root = typeof target === 'string' ? document.getElementById(target) : target
         if (!this.root) {
@@ -102,52 +112,64 @@ class NightVision {
             return
         }
 
-        // Script engine & web-worker interfaces
-        this.ww = WebWork.instance(id, this)
-        this.se = SeClient.instance(id, this)
-
-        // Singleton stores for data & scripts
-        this.hub = DataHub.instance(id)
-        this.meta = MetaHub.instance(id)
-        this.scan = DataScan.instance(id)
-        this.events = Events.instance(id)
-        this.scriptHub = Scripts.instance(id)
-        this.hub.init(this._data)
-        this._scriptsReady = this.scriptHub.init(this._scripts.map(s => s.code))
-        this._props.scriptsReady = this._scriptsReady
-
-        if (props.autoResize) {
-            this._syncSizeFromRoot()
+        if (activeChartIds.has(id)) {
+            throw new Error(`[NightVision] Chart ID is already in use: ${id}`)
         }
-        this.comp = mount(NightVisionComp, {
-            target: this.root,
-            props: this._props
-        })
+        activeChartIds.add(id)
+        this._registered = true
 
-        if (props.autoResize && this.root) {
-            this._resizeCleanup = resizeTracker(
-                this as unknown as {
-                    root: HTMLElement
-                    width: number
-                    height: number
-                    resize: (width: number, height: number) => void
-                }
-            )
+        try {
+            // Script engine & web-worker interfaces
+            this.ww = WebWork.instance(id, this)
+            this.se = SeClient.instance(id, this)
+
+            // Singleton stores for data & scripts
+            this.hub = DataHub.instance(id)
+            this.meta = MetaHub.instance(id)
+            this.scan = DataScan.instance(id)
+            this.events = Events.instance(id)
+            this.scriptHub = Scripts.instance(id)
+            this.hub.init(this._data)
+            this._scriptsReady = this.scriptHub.init(this._scripts.map(s => s.code))
+            this._props.scriptsReady = this._scriptsReady
+
+            if (props.autoResize) {
+                this._syncSizeFromRoot()
+            }
+            this.comp = mount(NightVisionComp, {
+                target: this.root,
+                props: this._props
+            })
+
+            if (props.autoResize && this.root) {
+                this._resizeCleanup = resizeTracker(
+                    this as unknown as {
+                        root: HTMLElement
+                        width: number
+                        height: number
+                        resize: (width: number, height: number) => void
+                    }
+                )
+            }
+
+            this.se.setRefs(this.hub, this.scan)
+        } catch (error) {
+            this.destroy()
+            throw error
         }
-
-        this.se.setRefs(this.hub, this.scan)
     }
 
     // *** PROPS ***
     // (see the default values in NightVision.svelte)
 
     // Chart container id (should be unique)
-    get id(): string | undefined {
-        return this._props.id
+    get id(): string {
+        return this._id
     }
     set id(val: string) {
-        this._props.id = val
-        this._remount()
+        if (val !== this._id) {
+            throw new Error('[NightVision] Chart ID cannot change after construction')
+        }
     }
 
     // Width of the chart
@@ -474,6 +496,9 @@ class NightVision {
 
     // Should call this to clean-up memory / events
     destroy(): void {
+        if (!this._registered) return
+        this._registered = false
+        activeChartIds.delete(this._id)
         if (this._resizeCleanup) {
             this._resizeCleanup()
             this._resizeCleanup = null

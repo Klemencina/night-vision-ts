@@ -131,6 +131,24 @@ describe('NightVision integration smoke', () => {
         expect(panes[0].scripts?.length).toBe(2)
         expect(panes[1].scripts?.length).toBe(1)
         expect(chart.hub.allOverlays().length).toBe(3)
+        chart.destroy()
+    })
+
+    it('isolates default chart IDs and rejects conflicting IDs', () => {
+        const first = new NightVision(document.createElement('div'))
+        const second = new NightVision(document.createElement('div'))
+
+        expect(first.id).not.toBe(second.id)
+        expect(first.hub).not.toBe(second.hub)
+        expect(first.events).not.toBe(second.events)
+        expect(first.ww).not.toBe(second.ww)
+        expect(() => new NightVision(document.createElement('div'), { id: first.id }))
+            .toThrow('already in use')
+        expect(() => { first.id = second.id }).toThrow('cannot change')
+
+        first.destroy()
+        expect((second.ww as unknown as MockWorker).stop).not.toHaveBeenCalled()
+        second.destroy()
     })
 
     it('releases worker singletons on destroy so the same id can be reused', () => {
@@ -151,6 +169,9 @@ describe('NightVision integration smoke', () => {
         expect(second.scriptHub).not.toBe(firstScriptHub)
         expect(second.scriptHub.ww).toBe(second.ww)
         expect((second.ww as unknown as MockWorker).id).toBe(2)
+        first.destroy()
+        expect((second.ww as unknown as MockWorker).stop).not.toHaveBeenCalled()
+        second.destroy()
     })
 
     it('cleans up autoResize tracking on destroy', () => {
@@ -202,5 +223,6 @@ calc(src) => src.close
         await (chart as any)._scriptsReady
         await Promise.resolve()
         expect(update).toHaveBeenCalledWith('full')
+        chart.destroy()
     })
 })
