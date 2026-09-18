@@ -196,7 +196,7 @@ class SeClient {
     }
 }
 
-let instances: { [id: string]: SeClient } = {}
+let instances: { [id: string]: SeClient } = Object.create(null)
 
 function instance(id: string, chart?: Chart): SeClient {
     if (!instances[id]) {

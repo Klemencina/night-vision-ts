@@ -57,6 +57,10 @@ class Events {
         this.handlers[type][comp] = f
     }
 
+    clear(): void {
+        this.handlers = {}
+    }
+
     // Remove event listeners / one listener
     off(comp: string, type?: string | null): void {
         // Remove one listener
@@ -72,7 +76,7 @@ class Events {
     }
 }
 
-const instances: { [id: string]: Events } = {}
+const instances: { [id: string]: Events } = Object.create(null)
 
 function instance(id: string): Events {
     if (!instances[id]) {
@@ -81,5 +85,10 @@ function instance(id: string): Events {
     return instances[id]
 }
 
-export default { instance }
+function release(id: string): void {
+    instances[id]?.clear()
+    delete instances[id]
+}
+
+export default { instance, release }
 export { Events, EventHandler, EventHandlers }

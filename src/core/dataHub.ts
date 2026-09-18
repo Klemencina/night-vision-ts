@@ -253,7 +253,7 @@ class DataHub {
     }
 }
 
-let instances: Record<string, DataHub> = {}
+let instances: Record<string, DataHub> = Object.create(null)
 
 function instance(id: string): DataHub {
     if (!instances[id]) {
@@ -263,5 +263,9 @@ function instance(id: string): DataHub {
 }
 
 export type { Overlay, Script, Pane, Data }
-export { DataHub, instance }
-export default { instance }
+function release(id: string): void {
+    delete instances[id]
+}
+
+export { DataHub, instance, release }
+export default { instance, release }

@@ -113,7 +113,7 @@ class WebWork {
     }
 }
 
-let instances: { [id: string]: WebWork } = {}
+let instances: { [id: string]: WebWork } = Object.create(null)
 
 function instance(id: string, chart: unknown): WebWork {
     if (!instances[id]) {

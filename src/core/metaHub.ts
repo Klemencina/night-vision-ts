@@ -304,7 +304,7 @@ class MetaHub {
     }
 }
 
-let instances: Record<string, MetaHub> = {}
+let instances: Record<string, MetaHub> = Object.create(null)
 
 function instance(id: string): MetaHub {
     if (!instances[id]) {
@@ -313,5 +313,13 @@ function instance(id: string): MetaHub {
     return instances[id]
 }
 
-export { MetaHub, instance }
-export default { instance }
+function release(id: string): void {
+    const meta = instances[id]
+    if (!meta) return
+    meta.init({})
+    meta.storage = {}
+    delete instances[id]
+}
+
+export { MetaHub, instance, release }
+export default { instance, release }

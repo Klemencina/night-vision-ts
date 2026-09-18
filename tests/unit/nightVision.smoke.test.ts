@@ -151,7 +151,7 @@ describe('NightVision integration smoke', () => {
         second.destroy()
     })
 
-    it('releases worker singletons on destroy so the same id can be reused', () => {
+    it('releases chart registries and subscriptions so the same id can be reused', () => {
         const root = document.createElement('div')
         root.id = 'nv-reuse'
         document.body.appendChild(root)
@@ -159,12 +159,22 @@ describe('NightVision integration smoke', () => {
         const first = new NightVision('nv-reuse', { id: 'same-id' })
         const firstWorker = first.ww
         const firstScriptHub = first.scriptHub
+        const listener = vi.fn()
+        first.events.on('consumer:change', listener)
 
         first.destroy()
 
         const second = new NightVision('nv-reuse', { id: 'same-id' })
 
         expect(workerMock.stops).toEqual([(firstWorker as unknown as MockWorker).id])
+        first.events.emit('change')
+        second.events.emit('change')
+        expect(listener).not.toHaveBeenCalled()
+        expect(second.hub).not.toBe(first.hub)
+        expect(second.meta).not.toBe(first.meta)
+        expect(second.scan).not.toBe(first.scan)
+        expect(second.events).not.toBe(first.events)
+        expect(second.hub.se).toBe(second.se)
         expect(second.ww).not.toBe(firstWorker)
         expect(second.scriptHub).not.toBe(firstScriptHub)
         expect(second.scriptHub.ww).toBe(second.ww)

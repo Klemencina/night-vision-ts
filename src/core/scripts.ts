@@ -94,7 +94,7 @@ class Scripts {
     }
 }
 
-let instances: { [id: string]: Scripts } = {}
+let instances: { [id: string]: Scripts } = Object.create(null)
 
 function instance(id: string): Scripts {
     if (!instances[id]) {

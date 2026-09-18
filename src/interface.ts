@@ -510,6 +510,11 @@ class NightVision {
         WebWork.release(this._id)
         SeClient.release(this._id)
         Scripts.release(this._id)
+        MetaHub.release(this._id)
+        DataScan.release(this._id)
+        DataHub.release(this._id)
+        Events.release(this._id)
+        this.root = null
     }
 }
 

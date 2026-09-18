@@ -120,7 +120,7 @@ class DataScanner {
     }
 }
 
-let instances: { [id: string]: DataScanner } = {}
+let instances: { [id: string]: DataScanner } = Object.create(null)
 
 function instance(id: string): DataScanner {
     if (!instances[id]) {
@@ -129,5 +129,9 @@ function instance(id: string): DataScanner {
     return instances[id]
 }
 
-export { DataScanner, instance }
-export default { instance }
+function release(id: string): void {
+    delete instances[id]
+}
+
+export { DataScanner, instance, release }
+export default { instance, release }
