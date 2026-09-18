@@ -64,4 +64,35 @@ describe('indicator streaming', () => {
         expect(overlays.find((ov: any) => ov.prod === 'b').data.at(-1))
             .toEqual([1500000, 20, 11, 21])
     })
+
+    it('bounds derived history while preserving lookbacks through recalculation and streaming', async () => {
+        se.data.ohlcv.data = Array.from({ length: 200 }, (_, i) => candle(i))
+        ;(self as any).scriptLib.iScripts.Derived = { code: {
+            init: 'buffsize(ohlc4, 65)',
+            update: `
+                let lookback = iter < 100 ? 2 : 60
+                Spline([hl2[0], sma(hlc3, $props.length)[0], ohlc4[lookback], close5m[6]])
+            `
+        } }
+        ;(self as any).paneStruct[0].scripts = [{ uuid: 'a', type: 'Derived', props: { length: 12 } }]
+        const output = () => (self as any).paneStruct[0].overlays[0].data
+        const lengths = () => Object.fromEntries(Object.entries(se.tss).map(([id, ts]) => [id, ts.length]))
+
+        await se.exec_all()
+        expect(output().at(-1)).toEqual([12240000, 200, 194.5, 140, 170])
+        expect(output()[100][3]).toBe(41)
+        expect(lengths()).toEqual({ hl2: 5, hlc3: 15, ohlc4: 65, close5m: 11 })
+        const derived = se.tss.hlc3
+        const sampled = se.tss.close5m
+
+        await se.exec_sel({ a: { length: 40 } })
+        expect(output().at(-1)).toEqual([12240000, 200, 180.5, 140, 170])
+        expect(lengths()).toEqual({ hl2: 5, hlc3: 40, ohlc4: 65, close5m: 11 })
+        expect(se.tss.hlc3).toBe(derived)
+        expect(se.tss.close5m).toBe(sampled)
+
+        se.update([candle(200)], { data: { id: 'derived-tick' } })
+        expect(output().at(-1)).toEqual([12300000, 201, 181.5, 141, 175])
+        expect(lengths()).toEqual({ hl2: 5, hlc3: 40, ohlc4: 65, close5m: 11 })
+    })
 })

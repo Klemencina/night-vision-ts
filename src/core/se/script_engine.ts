@@ -445,6 +445,10 @@ class ScriptEngine {
         this.low.length = this.low.__len__ || DEF_LIMIT
         this.close.length = this.close.__len__ || DEF_LIMIT
         this.vol.length = this.vol.__len__ || DEF_LIMIT
+        for (const id in this.tss) {
+            const ts = this.tss[id]
+            ts.length = ts.__len__ || DEF_LIMIT
+        }
     }
 
     start(ohlcv: number[][]): number {
