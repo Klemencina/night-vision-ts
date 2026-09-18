@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { resolve } from "path";
 import viteRawPlugin from "./vite/vite-raw-plugin";
-import cleanDistCdn from './vite/clean-dist-cdn';
+import preserveWorkerParameters from "./vite/preserve-worker-parameters";
 import banner from "vite-plugin-banner";
 import pkg from "./package.json";
 
@@ -14,7 +14,7 @@ export default defineConfig({
       content:
         `/* NightVisionCharts v${pkg.version} | License: MIT\n` +
         ` © 2022 ChartMaster. All rights reserved */`,
-      outDir: "../dist/cdn"  
+      outDir: "../dist/cdn",
     }),
     svelte({
       emitCss: false,
@@ -23,30 +23,19 @@ export default defineConfig({
       fileRegex: /\.navy$/,
     }),
   ],
+  worker: {
+    plugins: () => [preserveWorkerParameters()],
+  },
   build: {
     target: "es2022",
     outDir: "../dist/cdn",
     emptyOutDir: true,
-    inlineDynamicImports: true,
     lib: {
       entry: resolve(__dirname, "src/index.ts"),
       name: "NightVision",
-      fileName: (format) => `night-vision.${format}.js`
+      formats: ["umd"],
+      fileName: () => "night-vision.min.js",
     },
-    rollupOptions: {
-      output: {
-        entryFileNames: "night-vision.min.js",
-        format: 'umd'
-      },
-      plugins: [
-        {
-          name: 'cleanup-dist',
-          writeBundle() {
-            cleanDistCdn();
-          }
-        }
-      ]
-    },
-    minify: true,
+    minify: "esbuild",
   },
 });

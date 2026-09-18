@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { resolve } from "path";
 import viteRawPlugin from "./vite/vite-raw-plugin";
+import preserveWorkerParameters from "./vite/preserve-worker-parameters";
 import banner from "vite-plugin-banner";
 import pkg from "./package.json";
 
@@ -25,6 +26,9 @@ export default defineConfig({
   server: {
     port: 4888,
   },
+  worker: {
+    plugins: () => [preserveWorkerParameters()],
+  },
   build: {
     target: "es2022",
     outDir: "../dist",
@@ -41,6 +45,6 @@ export default defineConfig({
         manualChunks: undefined,
       }
     },
-    minify: false,
+    minify: "esbuild",
   },
 });
