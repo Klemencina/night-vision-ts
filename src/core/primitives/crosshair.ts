@@ -8,8 +8,10 @@ import Const from '../../stuff/constants'
 import Events from '../events'
 
 const HPX = Const.HPX
+let nextEventId = 0
 
 export default class Crosshair extends Layer {
+    private eventId = `crosshair-${++nextEventId}`
     events: ReturnType<typeof Events.instance>
     zIndex: number
     ctxType: string
@@ -30,7 +32,7 @@ export default class Crosshair extends Layer {
         super(id as any, '__$Crosshair__', nvId)
 
         this.events = Events.instance(this.nvId)
-        this.events.on(`crosshair:show-crosshair`, this.onShowHide.bind(this) as any)
+        this.events.on(`${this.eventId}:show-crosshair`, this.onShowHide.bind(this) as any)
         
         this.crosshairId = id
         this.zIndex = 1000000
@@ -91,6 +93,6 @@ export default class Crosshair extends Layer {
     }
 
     destroy() {
-        this.events.off('crosshair')
+        this.events.off(this.eventId)
     }
 }

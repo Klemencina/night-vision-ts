@@ -7,8 +7,10 @@ import Const from '../../stuff/constants'
 import Events from '../events'
 
 const HPX = Const.HPX
+let nextEventId = 0
 
 export default class Grid extends Layer {
+    private eventId = `grid-layer-${++nextEventId}`
     events: ReturnType<typeof Events.instance>
     zIndex: number
     ctxType: string
@@ -29,7 +31,7 @@ export default class Grid extends Layer {
         super(id as any, '__$Grid__', nvId)
 
         this.events = Events.instance(this.nvId)
-        this.events.on(`grid-layer:show-grid`, this.onShowHide.bind(this) as any)
+        this.events.on(`${this.eventId}:show-grid`, this.onShowHide.bind(this) as any)
 
         this.gridId = id
         this.zIndex = -1000000 // Deep down in the abyss
@@ -86,6 +88,6 @@ export default class Grid extends Layer {
     }
 
     destroy() {
-        this.events.off('grid-layer')
+        this.events.off(this.eventId)
     }
 }
