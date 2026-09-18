@@ -169,16 +169,8 @@ export default class ScriptEnv {
             )
             return fn
         } catch (e) {
-            console.error('[ScriptEnv] build failed for', this.src.type, e)
-            return Function(
-                'self,shared',
-                `
-                'use strict';
-                this.init = () => {}
-                this.update = () => {}
-                this.post = () => {}
-            `
-            )
+            const message = e instanceof Error ? e.message : String(e)
+            throw new Error(`Cannot compile indicator "${this.src.type}": ${message}`, { cause: e })
         }
     }
 

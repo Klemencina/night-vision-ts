@@ -132,6 +132,12 @@ class NightVision {
             this.hub.init(this._data)
             this._scriptsReady = this.scriptHub.init(this._scripts.map(s => s.code))
             this._props.scriptsReady = this._scriptsReady
+            // Mount may not run before destruction rejects the worker request.
+            void this._scriptsReady.catch(error => {
+                if (this._registered && (error as Error)?.name !== 'AbortError') {
+                    console.warn('[NightVision] Script upload failed:', error)
+                }
+            })
 
             if (props.autoResize) {
                 this._syncSizeFromRoot()
@@ -224,12 +230,14 @@ class NightVision {
         this._props.scriptsReady = scriptsReady
         scriptsReady
             .then(() => {
-                if (this._scriptsReady === scriptsReady) {
+                if (this._registered && this._scriptsReady === scriptsReady) {
                     this.update('full')
                 }
             })
             .catch(e => {
-                console.warn('[NightVision] Script upload failed:', e)
+                if (this._registered && e?.name !== 'AbortError') {
+                    console.warn('[NightVision] Script upload failed:', e)
+                }
             })
     }
 
@@ -424,6 +432,7 @@ class NightVision {
 
     // Various updates of the chart
     update(type: string = 'layout', opt: Record<string, any> = {}): void {
+        if (!this._registered) return
         var [t, id] = type.split('-')
         const ev = this.events
         switch (t) {

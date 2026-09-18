@@ -9,7 +9,7 @@ declare module 'hamsterjs' {
     }
 }
 
-declare module './worker.js?worker&inline' {
+declare module '*?worker&inline' {
     export default class WebWorker extends Worker {
         constructor()
     }

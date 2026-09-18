@@ -9,7 +9,7 @@ import { DatasetWW } from './dataset'
 ;(self as any).scriptLib = {}
 
 // Pane structure
-;(self as any).paneStruct = {}
+;(self as any).paneStruct = []
 
 interface WorkerMessage {
     ids?: string[]
@@ -48,7 +48,12 @@ async function drain(): Promise<void> {
             try {
                 await handleMessage(command)
             } catch (error) {
-                console.error('[Worker] Command failed:', command.data.type, error)
+                const details = error instanceof Error
+                    ? { name: error.name, message: error.message, stack: error.stack }
+                    : { name: 'Error', message: String(error) }
+                for (const id of command.ids || []) {
+                    self.postMessage({ type: 'command-error', id, error: details })
+                }
             }
         }
     } finally {
@@ -69,6 +74,7 @@ async function handleMessage(e: WorkerMessage): Promise<void> {
         case 'send-meta-info':
             se.tf = u.tf_from_str(e.data.data.tf)
             se.range = e.data.data.range
+            complete(e, 'send-meta-info-done')
             break
         case 'upload-data':
             se.tf = u.tf_from_str(e.data.data.meta.tf)
@@ -89,12 +95,16 @@ async function handleMessage(e: WorkerMessage): Promise<void> {
             DatasetWW.update_all(se, e.data.data)
             if (e.data.data.ohlcv) {
                 se.update(e.data.data.ohlcv, e)
+            } else {
+                complete(e, 'update-data-done')
             }
             break
         case 'exec-sel':
             await se.exec_sel(e.data.data)
             complete(e, 'exec-sel-done')
             break
+        default:
+            throw new Error(`Unknown worker command: ${e.data.type}`)
     }
 }
 

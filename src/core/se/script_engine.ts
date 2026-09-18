@@ -210,9 +210,8 @@ class ScriptEngine {
 
             s.env.build()
         } catch (err) {
-            console.error('[ScriptEngine] add_script failed for', s.type, err)
-            // Remove from map so run() skips this script; overlay-data still sent
             delete this.map[s.uuid]
+            throw err
         }
     }
 
@@ -226,7 +225,7 @@ class ScriptEngine {
             return
         }
 
-        if (!this.shared) return
+        if (!this.shared) return this.send_update(e.data.id)
 
         let mfs1 = this.make_mods_hooks('pre_step')
         let mfs2 = this.make_mods_hooks('post_step')
@@ -272,7 +271,8 @@ class ScriptEngine {
             this.send_update(e.data.id)
             this.send_state()
         } catch (err) {
-            // Swallow update errors to avoid console spam
+            this.send_state()
+            throw err
         }
     }
 
@@ -354,18 +354,16 @@ class ScriptEngine {
     }
 
     async run(sel?: string[]): Promise<void> {
-        this.send('engine-state', { running: true })
-
         var t1 = Utils.now()
         sel = sel || Object.keys(this.map)
-
-        this.pre_run_mods(sel)
-        let mfs1 = this.make_mods_hooks('pre_step')
-        let mfs2 = this.make_mods_hooks('post_step')
-
         this.running = true
 
         try {
+            this.send('engine-state', { running: true })
+            this.pre_run_mods(sel)
+            let mfs1 = this.make_mods_hooks('pre_step')
+            let mfs2 = this.make_mods_hooks('post_step')
+
             for (var id of sel) {
                 this.map[id].env.init()
             }
@@ -401,14 +399,12 @@ class ScriptEngine {
             for (var id of sel) {
                 this.map[id].env?.output?.post?.()
             }
-        } catch (err) {
-            console.error('[ScriptEngine] run failed:', err)
+            this.post_run_mods(sel)
+        } finally {
+            this.perf = Utils.now() - t1
+            this.running = false
+            this.send_state()
         }
-
-        this.post_run_mods(sel)
-
-        this.perf = Utils.now() - t1
-        this.running = false
 
         this.send('overlay-data', this.format_data())
     }
