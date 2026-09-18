@@ -16,6 +16,13 @@
     let disposed = false
     let setupFrame = null
     let attachFrame = null
+    // Limit the extra bitmap to 32 MiB of RGBA pixels per renderer.
+    const maxCachePixels = 8 * 1024 * 1024
+    let cacheCanvas = null
+    let cacheContext = null
+    let cachedLayers = null
+    let cachedLayout = null
+    let cachedStates = []
 
     let rrUpdId = $derived(`rr-${id}-${rr.id}`)
     let gridUpdId = $derived(`grid-${id}`)
@@ -28,6 +35,7 @@
     $effect(() => {
         const subscriptionId = rrUpdId
         events.on(`${subscriptionId}:update-rr`, update)
+        events.on(`${subscriptionId}:update-cursor-rr`, updateCursor)
         events.on(`${subscriptionId}:run-rr-task`, onTask)
         return () => {
             events.off(subscriptionId)
@@ -55,6 +63,7 @@
     let input = $state(null) // Input attacher to the renderer
 
     onMount(() => {
+        document.addEventListener('visibilitychange', invalidateCache)
         scheduleSetup()
     })
 
@@ -62,6 +71,8 @@
         disposed = true
         if (setupFrame !== null) cancelAnimationFrame(setupFrame)
         setupFrame = null
+        document.removeEventListener('visibilitychange', invalidateCache)
+        releaseCache()
         detach()
     })
 
@@ -133,38 +144,139 @@
         //update()
     }
 
-    function update($layout = layout) {
+    function updateCursor($layout = layout) {
+        update($layout, true)
+    }
+
+    function update($layout = layout, cursorOnly = false) {
         if (disposed) return
         layout = $layout
 
         if (!ctx || !layout) return
+        const resized = dpr.resize(canvas, ctx, layout.width, layout.height)
+        if (!cursorOnly || resized) invalidateCache()
+        const prefix = cacheablePrefix()
+        if (!prefix) releaseCache()
 
         ctx.clearRect(0, 0, layout.width, layout.height)
-        //if (this.$p.shaders.length) this.apply_shaders()
-        rr.layers.forEach(l => {
-            if (!l.display) return
+        let start = 0
+        if (prefix && cursorOnly && cacheMatches(prefix)) {
             ctx.save()
-            let r = l.overlay
-            //if (r.preDraw) r.preDraw(ctx)
-            if (l.opacity) ctx.globalAlpha = l.opacity
-            try {
-                r.draw(ctx)
-            } catch (e) {
-                console.warn(`Layer ${id}.${l.id} draw error:`, e)
-            }
-            ctx.globalAlpha = 1
-            //if (r.postDraw) r.postDraw(ctx)
+            ctx.setTransform(1, 0, 0, 1, 0, 0)
+            ctx.drawImage(cacheCanvas, 0, 0)
             ctx.restore()
-        })
+            start = prefix
+        }
+        let cacheable = true
+        for (let i = start; i < rr.layers.length; i++) {
+            cacheable = drawLayer(rr.layers[i]) && cacheable
+            if (prefix && i + 1 === prefix) {
+                if (cacheable) captureCache(prefix)
+                else invalidateCache()
+            }
+        }
 
         // TODO: css thing didn't work, coz canvas draws
         // through the border somehow. See Pane.svelte
         if (id > 0) upperBorder()
     }
 
+    function drawLayer(layer) {
+        if (!layer.display) return true
+        ctx.save()
+        if (layer.opacity) ctx.globalAlpha = layer.opacity
+        try {
+            layer.overlay.draw(ctx)
+            return true
+        } catch (error) {
+            console.warn(`Layer ${id}.${layer.id} draw error:`, error)
+            return false
+        } finally {
+            ctx.globalAlpha = 1
+            ctx.restore()
+        }
+    }
+
+    function cacheablePrefix() {
+        if (!canvas.width || !canvas.height || canvas.width * canvas.height > maxCachePixels) {
+            return 0
+        }
+        let prefix = 0
+        let dynamic = false
+        let visibleData = false
+        for (const layer of rr.layers) {
+            if (layer.ovSrc) {
+                if (layer.redrawOnCursor !== false) return 0
+                visibleData = visibleData || layer.display
+            }
+            if (layer.redrawOnCursor === false) {
+                if (dynamic) return 0
+                prefix++
+            } else {
+                dynamic = true
+            }
+        }
+        return visibleData ? prefix : 0
+    }
+
+    function cacheMatches(prefix) {
+        if (!cacheCanvas || cachedLayers !== rr.layers || cachedLayout !== layout ||
+            cacheCanvas.width !== canvas.width || cacheCanvas.height !== canvas.height ||
+            cachedStates.length !== prefix) return false
+        for (let i = 0; i < prefix; i++) {
+            const layer = rr.layers[i]
+            const state = cachedStates[i]
+            if (state.layer !== layer || state.draw !== layer.overlay.draw ||
+                state.display !== layer.display || state.opacity !== layer.opacity ||
+                state.show !== layer.show) return false
+        }
+        return true
+    }
+
+    function captureCache(prefix) {
+        if (!cacheCanvas) {
+            cacheCanvas = document.createElement('canvas')
+            cacheContext = cacheCanvas.getContext('2d')
+        }
+        if (!cacheContext) {
+            releaseCache()
+            return
+        }
+        if (cacheCanvas.width !== canvas.width) cacheCanvas.width = canvas.width
+        if (cacheCanvas.height !== canvas.height) cacheCanvas.height = canvas.height
+        cacheContext.clearRect(0, 0, cacheCanvas.width, cacheCanvas.height)
+        cacheContext.drawImage(canvas, 0, 0)
+        cachedLayers = rr.layers
+        cachedLayout = layout
+        cachedStates = rr.layers.slice(0, prefix).map(layer => ({
+            layer,
+            draw: layer.overlay.draw,
+            display: layer.display,
+            opacity: layer.opacity,
+            show: layer.show
+        }))
+    }
+
+    function invalidateCache() {
+        cachedLayers = null
+        cachedLayout = null
+        cachedStates = []
+    }
+
+    function releaseCache() {
+        invalidateCache()
+        if (cacheCanvas) {
+            cacheCanvas.width = 0
+            cacheCanvas.height = 0
+        }
+        cacheCanvas = null
+        cacheContext = null
+    }
+
     // Perform various tasks
     function onTask(event) {
         if (disposed) return
+        invalidateCache()
         event.handler(canvas, ctx, input)
     }
 

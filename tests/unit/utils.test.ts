@@ -60,6 +60,20 @@ describe('Utils TypeScript Migration', () => {
     })
 
     describe('time-series searches', () => {
+        it('finds the nearest timestamp while keeping the first row for duplicates and ties', () => {
+            const data = [[0, 0], [10, 1], [10, 2], [20, 3], [20, 4], [30, 5]]
+            const cases = [[-20, 0], [0, 0], [5, 0], [10, 1], [15, 1], [20, 3], [25, 3], [30, 5], [100, 5]]
+
+            for (const [time, index] of cases) {
+                expect(Utils.nearestTs(time, data)).toEqual([index, data[index]])
+            }
+            expect(Utils.nearestTs(0, [])).toEqual([-1, null])
+            for (const time of [NaN, -Infinity, Infinity]) {
+                expect(Utils.nearestTs(time, data)).toEqual([-1, null])
+            }
+            expect(Utils.nearestTs(0, [[-Infinity], [Infinity]])).toEqual([-1, null])
+        })
+
         it('includes exact bounds and duplicate timestamps with the correct source index', () => {
             const data = [[0, 1], [10, 2], [10, 3], [20, 4]]
 

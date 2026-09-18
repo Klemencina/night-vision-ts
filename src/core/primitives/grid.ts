@@ -34,6 +34,7 @@ export default class Grid extends Layer {
         this.gridId = id
         this.zIndex = -1000000 // Deep down in the abyss
         this.ctxType = 'Canvas'
+        this.redrawOnCursor = false
         this.show = true
 
         this.overlay = {

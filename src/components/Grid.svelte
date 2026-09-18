@@ -44,6 +44,7 @@
     $effect(() => {
         const subscriptionId = `grid-${id}`
         events.on(`${subscriptionId}:update-grid`, update)
+        events.on(`${subscriptionId}:update-cursor-grid`, updateCursor)
         events.on(`${subscriptionId}:remake-grid`, make)
         events.on(`${subscriptionId}:propagate`, propagate)
         events.on(`${subscriptionId}:run-grid-task`, onTask)
@@ -151,6 +152,7 @@
             l.env = env
             l.ovSrc = ov
             l.ctxType = prefab.ctx
+            l.redrawOnCursor = prefab.redrawOnCursor !== false
             env.overlay = l.overlay // make a reference
             meta.exctractFrom(l.overlay)
             newLayers.push(l)
@@ -197,7 +199,11 @@
     }
 
     // Update all renderers
-    function update($layout = layout) {
+    function updateCursor($layout = layout) {
+        update($layout, true)
+    }
+
+    function update($layout = layout, cursorOnly = false) {
         if (disposed) return
         if (input) input.layout = $layout
         for (var l of layers) {
@@ -210,7 +216,7 @@
         // if (!meta.ready) return
         // Now draw
         for (var rr of renderers) {
-            events.emitSpec(`rr-${id}-${rr.id}`, 'update-rr', $layout)
+            events.emitSpec(`rr-${id}-${rr.id}`, cursorOnly ? 'update-cursor-rr' : 'update-rr', $layout)
         }
     }
 

@@ -14,6 +14,7 @@ interface Prefab {
     author: string
     version: string
     ctx: string
+    redrawOnCursor: boolean
     make: Function
     static: any
 }
@@ -73,6 +74,7 @@ class Scripts {
                     author: ov.tagProps.author,
                     version: ov.tagProps.version,
                     ctx: ov.tagProps.ctx || 'Canvas',
+                    redrawOnCursor: ov.tagProps.redrawOnCursor !== 'false',
                     make: ov.prefab,
                     static: ov.static
                 }

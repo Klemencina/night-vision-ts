@@ -20,6 +20,7 @@ export default class Layer {
     ctxType: string | null
     display: boolean
     opacity: number | undefined
+    redrawOnCursor = true
 
     constructor(id: number, name: string, nvId: string) {
 

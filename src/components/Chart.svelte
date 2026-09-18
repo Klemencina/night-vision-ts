@@ -68,7 +68,8 @@
     let pendingUpdate = {
         layout: false,
         emit: false,
-        updateHash: false
+        updateHash: false,
+        content: false
     }
 
     scan.calcIndexOffsets()
@@ -173,13 +174,13 @@
                 clearTimeout(cursorHideTimer)
                 cursorHideTimer = setTimeout(() => {
                     cursorHideTimer = null
-                    update({ layout: false })
+                    update({ layout: false, cursorOnly: true })
                 })
             }
         }
         if (emit) events.emit('$cursor-update', Utils.makeCursorEvent($cursor, cursor, layout))
         //if (cursor.locked) return // filter double updates (*)
-        update({ layout: false }, emit)
+        update({ layout: false, cursorOnly: true }, emit)
     }
 
     function onCursorLocked(state) {
@@ -223,7 +224,7 @@
     function quantizeCursor() {
         if (disposed) return
         cursor.xSync(hub, layout, chartProps, cursor)
-        update({ layout: false })
+        update({ layout: false, cursorOnly: true })
     }
 
     function update(opt = {}, emit = true) {
@@ -233,6 +234,7 @@
         pendingUpdate.layout = pendingUpdate.layout || needsLayout
         pendingUpdate.emit = pendingUpdate.emit || emit
         pendingUpdate.updateHash = pendingUpdate.updateHash || !!opt.updateHash
+        pendingUpdate.content = pendingUpdate.content || opt.cursorOnly !== true
 
         if (opt.immediate) {
             if (updateRaf != null) {
@@ -251,8 +253,8 @@
     function flushUpdate() {
         updateRaf = null
         if (disposed) return
-        let { layout: needsLayout, emit, updateHash } = pendingUpdate
-        pendingUpdate = { layout: false, emit: false, updateHash: false }
+        let { layout: needsLayout, emit, updateHash, content } = pendingUpdate
+        pendingUpdate = { layout: false, emit: false, updateHash: false, content: false }
 
         // Emit a global event (hook)
         if (emit) events.emit('$chart-pre-update')
@@ -283,7 +285,7 @@
 
         if (!layout) return
         cursor = cursor // Trigger Svelte update
-        events.emit('update-pane', layout) // Update all panes
+        events.emit(content ? 'update-pane' : 'update-cursor-pane', layout)
         events.emitSpec('botbar', 'update-bb', layout)
         if (emit) events.emit('$chart-update')
     }

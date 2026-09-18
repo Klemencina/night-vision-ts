@@ -33,9 +33,11 @@ let style = $derived(`
 
 // EVENT INTEFACE
 $effect(() => {
-    events.on(`pane-${id}:update-pane`, update)
+    const subscriptionId = `pane-${id}`
+    events.on(`${subscriptionId}:update-pane`, update)
+    events.on(`${subscriptionId}:update-cursor-pane`, updateCursor)
     return () => {
-        events.off(`pane-${id}`)
+        events.off(subscriptionId)
     }
 })
 
@@ -45,10 +47,14 @@ onMount(() => {
 
 // Send updates to all child components
 // Update layout ref to get faster updates
-function update($layout) {
+function updateCursor($layout) {
+    update($layout, true)
+}
+
+function update($layout, cursorOnly = false) {
     if (!$layout.grids) return
     layout = $layout.grids[id]
-    events.emitSpec(`grid-${id}`, 'update-grid', layout)
+    events.emitSpec(`grid-${id}`, cursorOnly ? 'update-cursor-grid' : 'update-grid', layout)
     let layers = (grid && grid.getLayers) ?
         grid.getLayers() : []
     if (lsb) lsb.setLayers(layers)

@@ -106,18 +106,17 @@ export default {
 
     // Nearest value by time (in timeseries)
     nearestTs(t: number, ts: TimeSeries): [number, number[] | null] {
-        let dist = Infinity
-        let val: number[] | null = null
-        let index = -1
-        for (var i = 0; i < ts.length; i++) {
-            var ti = ts[i][0]
-            if (Math.abs(ti - t) < dist) {
-                dist = Math.abs(ti - t)
-                val = ts[i]
-                index = i
-            }
+        if (!ts.length || !Number.isFinite(t)) return [-1, null]
+        const next = lowerBound(ts, t)
+        const before = next > 0 ? Math.abs(t - ts[next - 1][0]) : Infinity
+        const after = next < ts.length ? Math.abs(ts[next][0] - t) : Infinity
+        if (!Number.isFinite(Math.min(before, after))) return [-1, null]
+        if (before <= after) {
+            // Keep the first row when timestamps repeat or distances tie.
+            const index = lowerBound(ts, ts[next - 1][0])
+            return [index, ts[index]]
         }
-        return [index, val]
+        return [next, ts[next]]
     },
 
     // Nearest value by index (in timeseries)
