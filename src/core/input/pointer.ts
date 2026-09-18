@@ -99,6 +99,9 @@ export default class Input {
     touchRafId: number | null
     pendingPan?: { x: number; y: number }
     pendingPinchScale?: number
+    private disposed = false
+    private setupGeneration = 0
+    private timers = new Set<ReturnType<typeof setTimeout>>()
 
     // Event handler references
     private _mousemove?: (e: MouseEvent) => void
@@ -121,6 +124,8 @@ export default class Input {
     }
 
     async setup(comp: Comp): Promise<void> {
+        if (this.disposed) return
+        const generation = ++this.setupGeneration
         this.MIN_ZOOM = comp.props.config.MIN_ZOOM
         this.MAX_ZOOM = comp.props.config.MAX_ZOOM
 
@@ -152,7 +157,8 @@ export default class Input {
             return
         }
 
-        await this.listeners()
+        await this.listeners(generation)
+        if (this.disposed || generation !== this.setupGeneration) return
         this.mouseEvents('addEventListener')
     }
 
@@ -163,13 +169,17 @@ export default class Input {
                 // Save the handler to remove it later
                 ;(this as any)['_' + e] = (this as any)[e].bind(this)
             }
-            ;(this.canvas as any)[cmd](e, (this as any)['_' + e])
+            const handler = (this as any)['_' + e]
+            if (handler) (this.canvas as any)[cmd](e, handler)
+            if (cmd === 'removeEventListener') (this as any)['_' + e] = undefined
         })
     }
 
-    async listeners(): Promise<void> {
+    async listeners(generation = this.setupGeneration): Promise<void> {
         const Hamster = await import('hamsterjs')
+        if (this.disposed || generation !== this.setupGeneration) return
         const Hammer = await import('hammerjs')
+        if (this.disposed || generation !== this.setupGeneration) return
 
         this.hm = Hamster.default(this.canvas)
         this.hm.wheel((event: any, delta: number) => this.mousezoom(-delta * 50, event))
@@ -291,7 +301,7 @@ export default class Input {
             if (this.fade) this.fade.stop()
             this.calcOffset()
             this.emitCursorCoord(event, { mode: 'aim' })
-            setTimeout(() => this.events.emitSpec(this.rrId, 'update-rr'))
+            this.defer(() => this.events.emitSpec(this.rrId, 'update-rr'))
             this.simMousedown(event)
         })
 
@@ -356,7 +366,7 @@ export default class Input {
         this.propagate('mousemove', this.touch2mouse(event))
         this.events.emitSpec(this.rrId, 'update-rr')
         this.propagate('mousedown', this.touch2mouse(event))
-        setTimeout(() => {
+        this.defer(() => {
             this.propagate('click', this.touch2mouse(event))
         })
     }
@@ -422,9 +432,11 @@ export default class Input {
     }
 
     scheduleTouchRangeUpdate(): void {
+        if (this.disposed) return
         if (this.touchRafId !== null) return
         this.touchRafId = requestAnimationFrame(() => {
             this.touchRafId = null
+            if (this.disposed) return
             this.flushTouchRangeUpdate()
         })
     }
@@ -606,25 +618,48 @@ export default class Input {
 
     // Propagate mouse event to overlays
     propagate(name: string, event: any): void {
+        if (this.disposed) return
         this.events.emitSpec(this.gridUpdId, 'propagate', {
             name,
             event
         })
     }
 
+    private defer(callback: () => void): void {
+        if (this.disposed) return
+        const timer = setTimeout(() => {
+            this.timers.delete(timer)
+            if (!this.disposed) callback()
+        })
+        this.timers.add(timer)
+    }
+
     destroy(): void {
-        if (!this.canvas) return
-        if (typeof this.canvas.removeEventListener !== 'function') return
-        let rm = this.canvas.removeEventListener.bind(this.canvas)
-        rm('gesturestart', this.gesturestart as any)
-        rm('gesturechange', this.gesturechange as any)
-        rm('gestureend', this.gestureend as any)
-        if (this.mc) this.mc.destroy()
-        if (this.hm) this.hm.unwheel()
+        if (this.disposed) return
+        this.disposed = true
+        this.setupGeneration++
+        this.fade?.stop()
+        this.fade = undefined
+        for (const timer of this.timers) clearTimeout(timer)
+        this.timers.clear()
         if (this.touchRafId !== null) {
             cancelAnimationFrame(this.touchRafId)
             this.touchRafId = null
         }
-        this.mouseEvents('removeEventListener')
+        this.pendingPan = undefined
+        this.pendingPinchScale = undefined
+        this.drug = null
+        this.pinch = null
+        if (this.mc) this.mc.destroy()
+        if (this.hm) this.hm.unwheel()
+        this.mc = undefined
+        this.hm = undefined
+        if (typeof this.canvas?.removeEventListener === 'function') {
+            const rm = this.canvas.removeEventListener.bind(this.canvas)
+            rm('gesturestart', this.gesturestart)
+            rm('gesturechange', this.gesturechange)
+            rm('gestureend', this.gestureend)
+            this.mouseEvents('removeEventListener')
+        }
     }
 }

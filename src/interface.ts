@@ -73,6 +73,7 @@ class NightVision {
     private _props: Props
     private _scriptsReady: Promise<unknown>
     private _resizeCleanup: (() => void) | null = null
+    private _timers = new Set<ReturnType<typeof setTimeout>>()
     public ww!: WebWorkType
     public se!: SeClientType
     public hub!: ReturnType<typeof DataHub.instance>
@@ -279,7 +280,7 @@ class NightVision {
     set timezone(val: number) {
         this._props.timezone = val
         this._remount()
-        setTimeout(() => this.update())
+        this._defer(() => this.update())
     }
 
     // Remount component with new props (Svelte 5 way to update props from outside)
@@ -294,7 +295,7 @@ class NightVision {
             target: this.root,
             props: this._props
         })
-        setTimeout(() => {
+        this._defer(() => {
             if (range) this._setRange(range, true)
             if (this._pendingRemountRange === range) this._pendingRemountRange = null
             this.update()
@@ -309,7 +310,7 @@ class NightVision {
         }
         if (range) this._pendingRemountRange = range
         comp.resize(this._props.width ?? 750, this._props.height ?? 420)
-        setTimeout(() => {
+        this._defer(() => {
             if (range) this._setRange(range, true)
             if (this._pendingRemountRange === range) this._pendingRemountRange = null
             this.update()
@@ -320,6 +321,15 @@ class NightVision {
         const next = [range[0], range[1]] as [number, number] & { preventDefault?: boolean }
         next.preventDefault = !emit
         this.range = next
+    }
+
+    private _defer(callback: () => void): void {
+        if (!this._registered) return
+        const timer = setTimeout(() => {
+            this._timers.delete(timer)
+            if (this._registered) callback()
+        })
+        this._timers.add(timer)
     }
 
     _copyRange(): [number, number] | null {
@@ -507,23 +517,39 @@ class NightVision {
     destroy(): void {
         if (!this._registered) return
         this._registered = false
-        activeChartIds.delete(this._id)
-        if (this._resizeCleanup) {
-            this._resizeCleanup()
-            this._resizeCleanup = null
-        }
-        if (this.comp) {
-            unmount(this.comp)
-            this.comp = null
-        }
-        WebWork.release(this._id)
-        SeClient.release(this._id)
-        Scripts.release(this._id)
-        MetaHub.release(this._id)
-        DataScan.release(this._id)
-        DataHub.release(this._id)
-        Events.release(this._id)
+        for (const timer of this._timers) clearTimeout(timer)
+        this._timers.clear()
+        const resizeCleanup = this._resizeCleanup
+        const comp = this.comp
+        this._resizeCleanup = null
+        this.comp = null
+        this._pendingRemountRange = null
         this.root = null
+        const cleanups = [
+            () => resizeCleanup?.(),
+            () => {
+                if (comp) {
+                    Promise.resolve(unmount(comp)).catch(error => {
+                        console.warn('[NightVision] Component cleanup failed:', error)
+                    })
+                }
+            },
+            () => WebWork.release(this._id),
+            () => SeClient.release(this._id),
+            () => Scripts.release(this._id),
+            () => MetaHub.release(this._id),
+            () => DataScan.release(this._id),
+            () => DataHub.release(this._id),
+            () => Events.release(this._id)
+        ]
+        for (const cleanup of cleanups) {
+            try {
+                cleanup()
+            } catch (error) {
+                console.warn('[NightVision] Cleanup failed:', error)
+            }
+        }
+        activeChartIds.delete(this._id)
     }
 }
 

@@ -4,7 +4,7 @@
     // Input: props, layout, layers (data+overlay), Input object
     // Output: Graphix
 
-    import { onMount, untrack } from 'svelte'
+    import { onMount, onDestroy, untrack } from 'svelte'
     import Events from '../../core/events'
     import dpr from '../../stuff/dprCanvas'
 
@@ -13,6 +13,9 @@
     let chartId = untrack(() => props.id)
     let events = Events.instance(chartId)
     let layout = $state(untrack(() => initialLayout))
+    let disposed = false
+    let setupFrame = null
+    let attachFrame = null
 
     let rrUpdId = $derived(`rr-${id}-${rr.id}`)
     let gridUpdId = $derived(`grid-${id}`)
@@ -23,17 +26,11 @@
     // other overlay and can be update separately
     // EVENT INTERFACE
     $effect(() => {
-        events.on(`${rrUpdId}:update-rr`, update)
-        events.on(`${rrUpdId}:run-rr-task`, onTask)
+        const subscriptionId = rrUpdId
+        events.on(`${subscriptionId}:update-rr`, update)
+        events.on(`${subscriptionId}:run-rr-task`, onTask)
         return () => {
-            events.off(`${rrUpdId}`)
-            if (input) {
-                try {
-                    input.destroy()
-                } catch {
-                    // Input may be half-initialized (e.g. no canvas)
-                }
-            }
+            events.off(subscriptionId)
         }
     })
 
@@ -58,20 +55,44 @@
     let input = $state(null) // Input attacher to the renderer
 
     onMount(() => {
-        // Use requestAnimationFrame to ensure DOM is ready
-        requestAnimationFrame(() => setup())
+        scheduleSetup()
     })
+
+    onDestroy(() => {
+        disposed = true
+        if (setupFrame !== null) cancelAnimationFrame(setupFrame)
+        setupFrame = null
+        detach()
+    })
+
+    function scheduleSetup() {
+        if (disposed || setupFrame !== null) return
+        setupFrame = requestAnimationFrame(() => {
+            setupFrame = null
+            if (!disposed) setup()
+        })
+    }
 
     // Attach an input object
     // Remove input listeners on renderer dostroy() event
     export function attach($input) {
-        input = $input
-        if (!canvas) {
-            // Canvas not ready, defer attachment
-            requestAnimationFrame(() => attach($input))
+        if (disposed) {
+            $input.destroy()
             return
         }
-        input.setup({
+        if (input !== $input) detach()
+        input = $input
+        if (!canvas) {
+            if (attachFrame !== null) return
+            attachFrame = requestAnimationFrame(() => {
+                attachFrame = null
+                if (!disposed && input === $input) attach($input)
+            })
+            return
+        }
+        if (attachFrame !== null) cancelAnimationFrame(attachFrame)
+        attachFrame = null
+        $input.setup({
             id,
             canvas,
             ctx,
@@ -79,14 +100,20 @@
             layout,
             rrUpdId,
             gridUpdId
+        }).catch(error => {
+            if (!disposed && input === $input) {
+                detach()
+                console.warn('Pointer setup failed:', error)
+            }
         })
     }
 
     export function detach() {
-        if (input) {
-            input.destroy()
-            input = null
-        }
+        if (attachFrame !== null) cancelAnimationFrame(attachFrame)
+        attachFrame = null
+        const previous = input
+        input = null
+        previous?.destroy()
     }
 
     export function getInput() {
@@ -94,11 +121,12 @@
     }
 
     function setup() {
+        if (disposed) return
         if (!layout.width || !layout.height) return
         let result = dpr.setup(canvasId, layout.width, layout.height)
         if (!result[0]) {
             // Canvas not ready, retry
-            requestAnimationFrame(() => setup())
+            scheduleSetup()
             return
         }
         ;[canvas, ctx] = result
@@ -106,6 +134,7 @@
     }
 
     function update($layout = layout) {
+        if (disposed) return
         layout = $layout
 
         if (!ctx || !layout) return
@@ -135,6 +164,7 @@
 
     // Perform various tasks
     function onTask(event) {
+        if (disposed) return
         event.handler(canvas, ctx, input)
     }
 
@@ -149,7 +179,7 @@
 
     // TODO: potential performance improvement
     function resizeWatch() {
-        if (!canvas) return
+        if (disposed || !canvas) return
         if (dpr.resize(canvas, ctx, layout.width, layout.height)) {
             update()
         }

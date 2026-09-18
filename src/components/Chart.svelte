@@ -2,7 +2,7 @@
     // Main component combining all grids, scales, etc.
     // Also, main event router, root of 'update' events
 
-    import { onMount, untrack } from 'svelte'
+    import { onMount, onDestroy, untrack } from 'svelte'
     import Cursor from '../core/cursor'
     import DataHub from '../core/dataHub'
     import MetaHub from '../core/metaHub'
@@ -63,6 +63,8 @@
     let layout = $state(null)
 
     let updateRaf = null
+    let disposed = false
+    let cursorHideTimer = null
     let pendingUpdate = {
         layout: false,
         emit: false,
@@ -86,7 +88,20 @@
         }
     })
 
-    onMount(async () => {
+    onMount(() => {
+        initialize()
+    })
+
+    onDestroy(() => {
+        disposed = true
+        if (updateRaf !== null) cancelAnimationFrame(updateRaf)
+        updateRaf = null
+        clearTimeout(cursorHideTimer)
+        clearTimeout(storage.__afterAllId__)
+        cursorHideTimer = null
+    })
+
+    async function initialize() {
         hub.calcSubset(range)
         hub.detectMain()
         hub.legendCollapsed = !!props.config.LEGEND_COLLAPSED
@@ -113,7 +128,9 @@
 
         try {
             if (props.scriptsReady) await props.scriptsReady
+            if (disposed) return
             await hub.loadScripts(true)
+            if (disposed) return
             meta.init(props)
             scan.updatePanesHash()
             layout = new Layout(chartProps, hub, meta)
@@ -121,10 +138,11 @@
                 update({ layout: false }, false)
             }
         } catch (e) {
+            if (disposed) return
             console.warn('Chart loadScripts failed, showing chart without scripts:', e)
             meta.init(props)
         }
-    })
+    }
 
     function initCursorValues() {
         if (!layout || !hub.mainOv) return
@@ -145,13 +163,18 @@
     }
 
     function onCursorChanged($cursor, emit = true) {
+        if (disposed) return
         // Emit a global event (hook)
         if ($cursor.mode) cursor.mode = $cursor.mode
         if (cursor.mode !== 'explore') {
             cursor.xSync(hub, layout, chartProps, $cursor)
             if ($cursor.visible === false) {
                 // One more update to hide the cursor
-                setTimeout(() => update({ layout: false }))
+                clearTimeout(cursorHideTimer)
+                cursorHideTimer = setTimeout(() => {
+                    cursorHideTimer = null
+                    update({ layout: false })
+                })
             }
         }
         if (emit) events.emit('$cursor-update', Utils.makeCursorEvent($cursor, cursor, layout))
@@ -167,6 +190,7 @@
     // TODO: init cursor when trackpad scrolling
     // is the first input (no mousemove yet)
     function onRangeChanged($range, emit = true) {
+        if (disposed) return
         // Emit a global event (hook)
         if (emit) events.emit('$range-update', $range)
         rangeUpdate($range)
@@ -197,11 +221,13 @@
     }
 
     function quantizeCursor() {
+        if (disposed) return
         cursor.xSync(hub, layout, chartProps, cursor)
         update({ layout: false })
     }
 
     function update(opt = {}, emit = true) {
+        if (disposed) return
         if (!opt || typeof opt !== 'object') opt = {}
         let needsLayout = opt.layout !== false || opt.updateHash
         pendingUpdate.layout = pendingUpdate.layout || needsLayout
@@ -224,6 +250,7 @@
 
     function flushUpdate() {
         updateRaf = null
+        if (disposed) return
         let { layout: needsLayout, emit, updateHash } = pendingUpdate
         pendingUpdate = { layout: false, emit: false, updateHash: false }
 
@@ -266,6 +293,7 @@
     // TODO: we can update only panes with
     // overlay changes. But it requires more work
     async function fullUpdate(opt = {}) {
+        if (disposed) return
         let prevIbMode = scan.ibMode
         interval = scan.detectInterval()
         timeFrame = scan.getTimeframe()
@@ -278,7 +306,13 @@
         hub.init(hub.data)
         hub.detectMain()
         // TODO: exec only if scripts changed
-        await hub.loadScripts(true)
+        try {
+            await hub.loadScripts(true)
+        } catch (error) {
+            if (disposed) return
+            throw error
+        }
+        if (disposed) return
         meta.init(props)
         meta.restore()
         scan.updatePanesHash()

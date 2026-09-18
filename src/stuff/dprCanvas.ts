@@ -46,7 +46,7 @@ function setup(id: string, w: number, h: number): SetupResult {
     if (!ctxWithBackup.measureTextOrg) {
         ctxWithBackup.measureTextOrg = ctx.measureText
     }
-    let nvjsId = id.split('-').shift() || ''
+    let nvjsId = canvas.closest('.night-vision')?.id || ''
     ctx.measureText = text => Utils.measureText(ctx, text, nvjsId) as TextMetrics
 
     return [canvas, ctx]

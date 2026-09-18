@@ -33,6 +33,8 @@
 
     let meta = MetaHub.instance(chartId)
     let events = Events.instance(chartId)
+    let disposed = false
+    let setupFrame = null
 
     let S = $derived(side === 'right' ? 1 : 0)
 
@@ -44,10 +46,11 @@
 
     // EVENT INTERFACE
     $effect(() => {
-        events.on(`${sbUpdId}:update-sb`, update)
-        events.on(`${sbUpdId}:show-sb-panel`, f => (showPanel = f))
+        const subscriptionId = sbUpdId
+        events.on(`${subscriptionId}:update-sb`, update)
+        events.on(`${subscriptionId}:show-sb-panel`, f => (showPanel = f))
         return () => {
-            events.off(`${sbUpdId}`)
+            events.off(subscriptionId)
         }
     })
 
@@ -78,21 +81,37 @@
         }
     })
 
-    onMount(async () => {
-        // Use requestAnimationFrame to ensure DOM is ready
-        requestAnimationFrame(() => setup())
+    onMount(() => {
+        scheduleSetup()
     })
     onDestroy(() => {
+        disposed = true
+        if (setupFrame !== null) cancelAnimationFrame(setupFrame)
+        setupFrame = null
         if (mc) mc.destroy()
+        mc = null
         clearInterval(updId)
+        updId = null
     })
 
+    function scheduleSetup() {
+        if (disposed || setupFrame !== null) return
+        setupFrame = requestAnimationFrame(() => {
+            setupFrame = null
+            if (disposed) return
+            setup().catch(error => {
+                if (!disposed) console.warn('Sidebar setup failed:', error)
+            })
+        })
+    }
+
     async function setup() {
+        if (disposed) return
         if (!layout.sbMax || !layout.height) return
         let result = dpr.setup(canvasId, layout.sbMax[S], layout.height)
         if (!result[0]) {
             // Canvas not ready, retry
-            requestAnimationFrame(() => setup())
+            scheduleSetup()
             return
         }
         ;[canvas, ctx] = result
@@ -100,6 +119,7 @@
         scale = getCurrentScale()
         update()
         if (scale) await listeners()
+        if (disposed) return
 
         // Start updates to show fresh candle time
         if (props.config.CANDLE_TIME && props.timeFrame >= Const.MINUTE) {
@@ -111,6 +131,7 @@
     // TODO: add mouse wheel/touchpad zoom
     async function listeners() {
         const Hammer = await import('hammerjs')
+        if (disposed) return
         mc = new Hammer.Manager(canvas)
         mc.add(
             new Hammer.Pan({
@@ -233,7 +254,7 @@
     }
 
     function update($layout = layout) {
-        if (!$layout || !ctx) return // If not exists or canvas not ready
+        if (disposed || !$layout || !ctx) return
 
         scale = getCurrentScale()
 
@@ -270,7 +291,7 @@
     }
 
     function resizeWatch() {
-        if (!canvas) return
+        if (disposed || !canvas) return
         if (dpr.resize(canvas, ctx, layout.sbMax[S], layout.height)) {
             update()
         }

@@ -13,17 +13,18 @@ export default class FrameAnimation {
 
         this.t0 = this.t = Utils.now()
         this.id = setInterval(() => {
-            // The prev frame took too long
-            if (Utils.now() - this.t > 100) return
-            if (Utils.now() - this.t0 > 1200) {
+            const now = Utils.now()
+            // Stop after a stall instead of leaving an idle timer running.
+            if (now - this.t > 100 || now - this.t0 > 1200) {
                 this.stop()
+                return
             }
-            if (this.id) cb(this)
+            if (this.id !== null) cb(this)
             this.t = Utils.now()
         }, 16)
     }
     stop(): void {
-        if (this.id) {
+        if (this.id !== null) {
             clearInterval(this.id)
         }
         this.id = null

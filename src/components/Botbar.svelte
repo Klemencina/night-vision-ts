@@ -21,6 +21,8 @@
     let canvasId = $derived(`${props.id}-botbar-canvas`)
 
     let events = Events.instance(chartId)
+    let disposed = false
+    let setupFrame = null
 
     let showPanel = $state(true)
 
@@ -55,26 +57,42 @@
     })
 
     onMount(() => {
-        // Use requestAnimationFrame to ensure DOM is ready
-        requestAnimationFrame(() => setup())
+        scheduleSetup()
     })
     onDestroy(() => {
+        disposed = true
+        if (setupFrame !== null) cancelAnimationFrame(setupFrame)
+        setupFrame = null
         if (rafPending != null) cancelAnimationFrame(rafPending)
+        rafPending = null
         if (mc) mc.destroy()
+        mc = null
+        dragState = null
     })
 
+    function scheduleSetup() {
+        if (disposed || setupFrame !== null) return
+        setupFrame = requestAnimationFrame(() => {
+            setupFrame = null
+            if (!disposed) setup()
+        })
+    }
+
     function setup() {
+        if (disposed) return
         let botbar = layout.botbar
         if (!botbar) return
         let result = dpr.setup(canvasId, botbar.width, botbar.height)
         if (!result[0]) {
             // Canvas not ready, retry
-            requestAnimationFrame(() => setup())
+            scheduleSetup()
             return
         }
         ;[canvas, ctx] = result
         update()
-        setupTimeScaleZoom()
+        setupTimeScaleZoom().catch(error => {
+            if (!disposed) console.warn('Time scale setup failed:', error)
+        })
     }
 
     // Time-scale zoom: vertical drag on botbar (same idea as price scale on sidebar)
@@ -82,6 +100,7 @@
         let hub = DataHub.instance(props.id)
         if (!canvas || !layout.botbar || !layout.main || !hub.mainOv) return
         const Hammer = await import('hammerjs')
+        if (disposed) return
         mc = new Hammer.Manager(canvas)
         mc.add(new Hammer.Pan({ direction: Hammer.DIRECTION_HORIZONTAL, threshold: 0 }))
         mc.add(new Hammer.Tap({ event: 'doubletap', taps: 2, posThreshold: 50 }))
@@ -95,6 +114,7 @@
 
         function flushRangeChange() {
             rafPending = null
+            if (disposed) return
             events.emit('range-changed', props.range)
             update()
         }
@@ -159,7 +179,7 @@
     }
 
     function update() {
-        if (!layout.botbar || !ctx) return // If not exists or canvas not ready
+        if (disposed || !layout.botbar || !ctx) return
 
         bb.body(props, layout, ctx)
 
@@ -172,7 +192,7 @@
 
     function resizeWatch() {
         let botbar = layout.botbar
-        if (!canvas || !botbar) return
+        if (disposed || !canvas || !botbar) return
         if (dpr.resize(canvas, ctx, botbar.width, botbar.height)) {
             update()
         }

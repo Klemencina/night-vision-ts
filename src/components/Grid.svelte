@@ -4,7 +4,7 @@
     // Input: props (tf, range, ...), overlay scripts, data
     // Output: bunch of renderers, each for different context
 
-    import { onMount, untrack } from 'svelte'
+    import { onMount, onDestroy, untrack } from 'svelte'
     import Scripts from '../core/scripts'
     import DataHub from '../core/dataHub'
     import MetaHub from '../core/metaHub'
@@ -36,16 +36,19 @@
     let renderers = $state([])
     let input = $state(null)
     let keyboard = $state(null)
+    let disposed = false
+    let attachTimer = null
+    let generation = 0
 
     // EVENT INTEFACE
     $effect(() => {
-        events.on(`grid-${id}:update-grid`, update)
-        events.on(`grid-${id}:remake-grid`, make)
-        events.on(`grid-${id}:propagate`, propagate)
-        events.on(`grid-${id}:run-grid-task`, onTask)
+        const subscriptionId = `grid-${id}`
+        events.on(`${subscriptionId}:update-grid`, update)
+        events.on(`${subscriptionId}:remake-grid`, make)
+        events.on(`${subscriptionId}:propagate`, propagate)
+        events.on(`${subscriptionId}:run-grid-task`, onTask)
         return () => {
-            events.off(`grid-${id}`)
-            if (keyboard) keyboard.off()
+            events.off(subscriptionId)
         }
     })
 
@@ -61,11 +64,25 @@
         keyboard = new Keyboard(`grid-${id}`, events)
     })
 
+    onDestroy(() => {
+        disposed = true
+        generation++
+        clearTimeout(attachTimer)
+        attachTimer = null
+        keyboard?.off()
+        detachInputs()
+        destroyLayers()
+    })
+
     function make() {
-        if (!hub.panes()[id]) return // If not exists
+        if (disposed || !hub.panes()[id]) return
+        const currentGeneration = ++generation
+        clearTimeout(attachTimer)
+        attachTimer = null
 
         // console.log(`Grid ${id} re-made`)
 
+        detachInputs()
         destroyLayers()
 
         layers = makeLayers()
@@ -74,9 +91,9 @@
         // Attach input to the last renderer
         let last = renderers[renderers.length - 1]
         if (last)
-            setTimeout(() => {
-                if (last.ref) {
-                    detachInputs()
+            attachTimer = setTimeout(() => {
+                attachTimer = null
+                if (!disposed && currentGeneration === generation && last.ref) {
                     // TODO: when grid is 're-made', input
                     // internal state is lost, need to store it,
                     // or just reuse the input instance
@@ -88,15 +105,26 @@
     // Detach inputs from previous "last" renderer
     function detachInputs() {
         for (var rr of renderers) {
-            rr.ref.detach()
+            rr.ref?.detach()
         }
+        input = null
     }
 
     // Call destroy() function on each layer
     function destroyLayers() {
-        for (var layer of layers) {
-            layer.overlay.destroy()
-            layer.env.destroy()
+        const previous = layers
+        layers = []
+        for (const layer of previous) {
+            try {
+                layer.overlay.destroy()
+            } catch (error) {
+                console.warn(`Layer ${id}.${layer.id} destroy error:`, error)
+            }
+            try {
+                layer.env.destroy()
+            } catch (error) {
+                console.warn(`Layer ${id}.${layer.id} cleanup error:`, error)
+            }
         }
     }
 
@@ -170,6 +198,7 @@
 
     // Update all renderers
     function update($layout = layout) {
+        if (disposed) return
         if (input) input.layout = $layout
         for (var l of layers) {
             // Update environment variables
@@ -186,6 +215,7 @@
     }
 
     function propagate(e) {
+        if (disposed) return
         let { name, event } = e
         for (var layer of layers) {
             if (layer.overlay[name]) {
@@ -202,6 +232,7 @@
 
     // Perform various task over layers / renderers
     function onTask(event) {
+        if (disposed) return
         event.handler(layers, renderers, { update })
     }
 </script>

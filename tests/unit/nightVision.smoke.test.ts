@@ -52,7 +52,7 @@ const resizeMock = vi.hoisted(() => {
 vi.mock('svelte', () => {
     return {
         mount: () => ({ getChart: () => ({ getLayout: () => ({}) }) }),
-        unmount: () => {}
+        unmount: vi.fn(() => Promise.resolve())
     }
 })
 
@@ -90,6 +90,7 @@ vi.mock('../../src/stuff/resizeTracker', () => {
 })
 
 import { NightVision } from '../../src/interface'
+import { unmount } from 'svelte'
 
 describe('NightVision integration smoke', () => {
     beforeEach(() => {
@@ -194,6 +195,22 @@ describe('NightVision integration smoke', () => {
         expect(resizeMock.tracker).toHaveBeenCalledTimes(1)
         chart.destroy()
         expect(resizeMock.cleanup).toHaveBeenCalledTimes(1)
+    })
+
+    it('releases registries even when component cleanup throws', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        const first = new NightVision(document.createElement('div'), { id: 'cleanup-error' })
+        const firstWorker = first.ww as unknown as MockWorker
+        vi.mocked(unmount).mockImplementationOnce(() => { throw new Error('cleanup failed') })
+
+        first.destroy()
+        const second = new NightVision(document.createElement('div'), { id: 'cleanup-error' })
+
+        expect(firstWorker.stop).toHaveBeenCalledOnce()
+        expect(second.ww).not.toBe(first.ww)
+        expect(second.events).not.toBe(first.events)
+        second.destroy()
+        warn.mockRestore()
     })
 
     it('does not allocate a worker when the target container is missing', () => {
