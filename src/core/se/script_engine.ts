@@ -7,6 +7,18 @@ import symstd from './symstd'
 import TS from './script_ts'
 import { TimeSeries } from './script_std'
 
+type ScriptDelta = Record<string, Record<string, unknown>>
+
+export function mergeDeltas(deltas: ScriptDelta[]): ScriptDelta {
+    const merged: ScriptDelta = {}
+    for (const delta of deltas) {
+        for (const id of Object.keys(delta)) {
+            merged[id] = { ...merged[id], ...delta[id] }
+        }
+    }
+    return merged
+}
+
 const DEF_LIMIT = 5
 
 interface DataSource {
@@ -41,7 +53,7 @@ class ScriptEngine {
     map: { [key: string]: any }
     data: { [key: string]: DataSource }
     queue: unknown[]
-    delta_queue: unknown[]
+    delta_queue: ScriptDelta[]
     update_queue: [TimeSeries[], UpdateEvent][]
     sett: { [key: string]: unknown }
     state: { [key: string]: unknown }
@@ -452,8 +464,7 @@ class ScriptEngine {
         if (this.queue.length) {
             this.exec_all()
         } else if (this.delta_queue.length) {
-            this.exec_sel(this.delta_queue.pop())
-            this.delta_queue = []
+            void this.exec_sel(mergeDeltas(this.delta_queue.splice(0)))
         } else {
             while (this.update_queue.length) {
                 let upd = this.update_queue.shift()

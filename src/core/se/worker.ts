@@ -1,6 +1,6 @@
 // Web-worker
 
-import se from './script_engine'
+import se, { mergeDeltas } from './script_engine'
 import Utils from '../../stuff/utils'
 import * as u from './script_utils'
 import { DatasetWW } from './dataset'
@@ -12,6 +12,7 @@ import { DatasetWW } from './dataset'
 ;(self as any).paneStruct = {}
 
 interface WorkerMessage {
+    ids?: string[]
     data: {
         type: string
         id?: string
@@ -19,8 +20,47 @@ interface WorkerMessage {
     }
 }
 
-// DC => WW
-self.onmessage = async (e: WorkerMessage) => {
+const pending: WorkerMessage[] = []
+let processing = false
+
+// Preserve command order while historical calculations yield to the event loop.
+self.onmessage = (e: WorkerMessage) => {
+    const command = { data: { ...e.data }, ids: e.data.id ? [e.data.id] : [] }
+    const previous = pending[pending.length - 1]
+    const type = command.data.type
+    if (previous?.data.type === type && (type === 'exec-all-scripts' || type === 'exec-sel')) {
+        previous.data.data = type === 'exec-sel'
+            ? mergeDeltas([previous.data.data, command.data.data])
+            : command.data.data
+        previous.ids!.push(...command.ids)
+    } else {
+        pending.push(command)
+    }
+    void drain()
+}
+
+async function drain(): Promise<void> {
+    if (processing) return
+    processing = true
+    try {
+        while (pending.length) {
+            const command = pending.shift()!
+            try {
+                await handleMessage(command)
+            } catch (error) {
+                console.error('[Worker] Command failed:', command.data.type, error)
+            }
+        }
+    } finally {
+        processing = false
+    }
+}
+
+function complete(e: WorkerMessage, type: string): void {
+    for (const id of e.ids || []) self.postMessage({ type, id, data: {} })
+}
+
+async function handleMessage(e: WorkerMessage): Promise<void> {
     switch (e.data.type) {
         case 'upload-scripts':
             ;(self as any).scriptLib = e.data.data
@@ -40,30 +80,11 @@ self.onmessage = async (e: WorkerMessage) => {
             se.recalc_size()
             se.send('data-uploaded', {}, e.data.id)
             break
-        case 'exec-all-scripts': {
-            const reqId = e.data.id
-            // Don't overwrite paneStruct while run() is in progress or map/format_data use wrong data
-            if (!(se as any).running) {
-                ;(self as any).paneStruct = e.data.data
-            }
-            try {
-                await se.exec_all()
-            } catch (err) {
-                console.error('[Worker] exec_all failed:', err)
-                // Still send overlay-data so client gets current state
-                const paneStruct = (self as any).paneStruct || []
-                se.send(
-                    'overlay-data',
-                    paneStruct.map((x: any) => ({
-                        id: x.id,
-                        uuid: x.uuid,
-                        overlays: x.overlays || []
-                    }))
-                )
-            }
-            self.postMessage({ type: 'exec-all-scripts-done', id: reqId, data: {} })
+        case 'exec-all-scripts':
+            ;(self as any).paneStruct = e.data.data
+            await se.exec_all()
+            complete(e, 'exec-all-scripts-done')
             break
-        }
         case 'update-data':
             DatasetWW.update_all(se, e.data.data)
             if (e.data.data.ohlcv) {
@@ -72,7 +93,7 @@ self.onmessage = async (e: WorkerMessage) => {
             break
         case 'exec-sel':
             await se.exec_sel(e.data.data)
-            self.postMessage({ type: 'exec-sel-done', id: e.data.id, data: {} })
+            complete(e, 'exec-sel-done')
             break
     }
 }
