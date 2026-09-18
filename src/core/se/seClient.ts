@@ -138,6 +138,7 @@ class SeClient {
                 range = [main[0][0], main[main.length - 1][0]]
             }
         }
+        this.scan?.calcIndexOffsets()
         if (range?.length) {
             this.hub.calcSubset(range)
         }

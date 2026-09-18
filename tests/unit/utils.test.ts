@@ -136,6 +136,24 @@ describe('Utils TypeScript Migration', () => {
         })
     })
 
+    describe('findIndexOffset', () => {
+        it('finds either offset direction and restarts agreement after a gap', () => {
+            const main = [0, 1, 2, 3, 4, 5].map(t => [t, t])
+            expect(Utils.findIndexOffset(main, main.slice(2))).toBe(2)
+            expect(Utils.findIndexOffset(main.slice(2), main)).toBe(-2)
+            expect(Utils.findIndexOffset(main, [0, 2, 3, 4, 5].map(t => [t, t]))).toBe(1)
+        })
+
+        it('matches the last duplicate without counting one timestamp multiple times', () => {
+            const main = [0, 10, 10, 20, 20, 30, 30].map(t => [t, t])
+            expect(Utils.findIndexOffset(main, main.slice(1))).toBe(1)
+            expect(Utils.findIndexOffset(main, [[10, 1], [10, 2], [10, 3]])).toBe(0)
+            expect(Utils.findIndexOffset(main, [[100, 1], [110, 2], [120, 3]])).toBe(0)
+            expect(Utils.findIndexOffset([], main)).toBe(0)
+            expect(Utils.findIndexOffset(main, [])).toBe(0)
+        })
+    })
+
     describe('uuid', () => {
         it('should generate valid UUID format', () => {
             const uuid = Utils.uuid()

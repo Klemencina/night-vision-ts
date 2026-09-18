@@ -436,30 +436,35 @@ export default {
     // Calculate an index offset for a timeseries
     // against the main ts. (for indexBased mode)
     findIndexOffset(mainTs: TimeSeries, ts: TimeSeries): number {
-        let set1: Record<number, number> = {} // main set of time => index
-        let set2: Record<number, number> = {} // another set
-        for (var i = 0; i < mainTs.length; i++) {
-            set1[mainTs[i][0]] = i
-        }
-        for (var i = 0; i < ts.length; i++) {
-            set2[ts[i][0]] = i
-        }
-        let deltas: number[] = []
-        for (var t in set2) {
-            let time = parseInt(t)
-            if (set1[time] !== undefined) {
-                let d = set1[time] - set2[time]
-                if (!deltas.length || deltas[0] === d) {
-                    deltas.unshift(d)
-                }
-                // 3 equal deltas means that we likely found
-                // the true index offset
-                if (deltas.length === 3) {
-                    return deltas.pop()!
-                }
+        if (!mainTs.length || !ts.length) return 0
+        const start = Math.max(mainTs[0][0], ts[0][0])
+        const end = Math.min(mainTs[mainTs.length - 1][0], ts[ts.length - 1][0])
+        if (start > end) return 0
+
+        let i = lowerBound(mainTs, start)
+        let j = lowerBound(ts, start)
+        let offset = 0
+        let matches = 0
+        while (i < mainTs.length && j < ts.length) {
+            const mainTime = mainTs[i][0]
+            const time = ts[j][0]
+            if (mainTime < time) {
+                i++
+            } else if (time < mainTime) {
+                j++
+            } else {
+                // Match the last row for each distinct timestamp.
+                while (i + 1 < mainTs.length && mainTs[i + 1][0] === mainTime) i++
+                while (j + 1 < ts.length && ts[j + 1][0] === time) j++
+                const nextOffset = i - j
+                matches = matches && nextOffset === offset ? matches + 1 : 1
+                offset = nextOffset
+                if (matches === 3) return offset
+                i++
+                j++
             }
         }
-        return 0 // We didn't find the offset
+        return 0
     },
 
     // Format cash values

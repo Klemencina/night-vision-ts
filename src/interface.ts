@@ -453,6 +453,7 @@ class NightVision {
                 // TODO: update cursor if it's ahead of the last candle
                 // (needs to track the new last)
                 const range = this.range
+                this.scan.calcIndexOffsets()
                 if (range) {
                     this.hub.updateRange(range)
                 }

@@ -13,6 +13,7 @@ class DataScanner {
     interval: number
     ibMode: boolean
     panesHash: string
+    private inferredOffsets = new WeakMap<object, number>()
 
     constructor() {
         this.props = null
@@ -88,14 +89,21 @@ class DataScanner {
     }
 
     calcIndexOffsets(): void {
-        if (!this.hub?.data?.indexBased || !this.all?.length) return
-        for (var ov of this.all) {
-            if (ov.data === this.main) {
-                ov.indexOffset = ov.indexOffset ?? 0
+        if (!this.hub?.data?.indexBased) return
+        this.all = Utils.allOverlays(this.hub.data.panes)
+        const mainOv = this.all.find((ov: any) => ov.main) || this.all[0]
+        this.main = mainOv?.data || []
+        for (const ov of this.all) {
+            const inferred = this.inferredOffsets.get(ov)
+            if (ov.indexOffset != null && ov.indexOffset !== inferred) {
+                this.inferredOffsets.delete(ov)
                 continue
             }
-            let d = Utils.findIndexOffset(this.main, ov.data)
-            ov.indexOffset = ov.indexOffset ?? d
+            const offset = ov.data === this.main
+                ? 0
+                : Utils.findIndexOffset(this.main, ov.data || [])
+            ov.indexOffset = offset
+            this.inferredOffsets.set(ov, offset)
         }
     }
 

@@ -152,6 +152,50 @@ describe('NightVision integration smoke', () => {
         second.destroy()
     })
 
+    it('refreshes inferred offsets before filtering data after a history prepend', () => {
+        const main = [10, 20, 30, 40, 50, 60].map(t => [t, t])
+        const data = { indexBased: true, panes: [{ settings: {}, overlays: [
+            { main: true, data: main }, { data: main.slice(2) }
+        ] }] }
+        const chart = new NightVision(document.createElement('div'), { data })
+        const range = vi.spyOn(chart, 'range', 'get').mockReturnValue([4, 4])
+        chart.scan.init({ id: chart.id })
+        chart.scan.calcIndexOffsets()
+        chart.hub.calcSubset([4, 4])
+        chart.hub.detectMain()
+
+        main.unshift([0, 0])
+        chart.update('data')
+
+        const overlay = chart.hub.panes()[0].overlays[1]
+        expect(overlay.indexOffset).toBe(3)
+        expect(overlay.dataSubset!.map(row => row[0])).toEqual([30, 40, 50])
+        range.mockRestore()
+        chart.destroy()
+    })
+
+    it('infers offsets for replacement script overlays before making their subsets', () => {
+        const main = [10, 20, 30, 40, 50, 60].map(t => [t, t])
+        const data = { indexBased: true, panes: [{ settings: {}, overlays: [
+            { main: true, data: main }
+        ] }] }
+        const chart = new NightVision(document.createElement('div'), { data })
+        const range = vi.spyOn(chart, 'range', 'get').mockReturnValue([3, 3])
+        chart.scan.init({ id: chart.id })
+        chart.hub.calcSubset([3, 3])
+        chart.hub.detectMain()
+        const pane = chart.hub.panes()[0]
+
+        chart.se.replaceOverlays([{ uuid: pane.uuid, overlays: [
+            { prod: true, type: 'line', data: main.slice(2) }
+        ] }])
+
+        expect(pane.overlays[1].indexOffset).toBe(2)
+        expect(pane.overlays[1].dataSubset!.map(row => row[0])).toEqual([30, 40, 50])
+        range.mockRestore()
+        chart.destroy()
+    })
+
     it('releases chart registries and subscriptions so the same id can be reused', () => {
         const root = document.createElement('div')
         root.id = 'nv-reuse'
