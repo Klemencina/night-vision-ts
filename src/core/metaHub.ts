@@ -16,11 +16,15 @@ interface LegendFn {
     noLegend?: boolean
 }
 
-interface ValueTracker {
+interface ValueTrackerResult {
     show?: boolean
-    value?: () => number
-    color?: () => string
+    value: number
+    color?: string
+    line?: boolean
+    [key: string]: unknown
 }
+
+type ValueTracker = (data: any[]) => ValueTrackerResult | null | undefined
 
 interface OhlcMapEntry {
     ref: any[]

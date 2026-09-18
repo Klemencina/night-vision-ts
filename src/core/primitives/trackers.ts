@@ -16,8 +16,6 @@ interface Tracker {
     ovId: number
 }
 
-type ValueTracker = (data: any[]) => Tracker
-
 export default class Trackers extends Layer {
     zIndex: number
     ctxType: string
@@ -74,19 +72,20 @@ export default class Trackers extends Layer {
         this.trackers = []
 
         for (var i = 0; i < trackers.length; i++) {
-            let vt = trackers[i] as ValueTracker | undefined
+            let vt = trackers[i]
             if (!vt) continue
             const source = this.hub.overlay(gridIdNum, i)
             if (!source || source.settings?.display === false) continue
             let data = this.hub.ovData(gridIdNum, i) || []
             let last = data[data.length - 1] || []
-            let tracker = vt(last)
-            if (!tracker?.show || !Number.isFinite(tracker.value)) continue
-            tracker.ovId = i
-
-            tracker.y = this.layout.value2y(tracker.value)
+            const valueTracker = vt(last)
+            if (!valueTracker?.show || !Number.isFinite(valueTracker.value)) continue
+            const tracker: Tracker = Object.assign(valueTracker, {
+                ovId: i,
+                y: this.layout.value2y(valueTracker.value),
+                color: valueTracker.color || this.props.colors.scale
+            })
             if (!Number.isFinite(tracker.y)) continue
-            tracker.color = tracker.color || this.props.colors.scale
             if (tracker.line){
                 priceLine(this.layout, ctx, tracker)
             }

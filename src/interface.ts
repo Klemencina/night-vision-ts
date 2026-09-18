@@ -15,7 +15,7 @@ import resizeTracker from './stuff/resizeTracker'
 // Re-export types for users
 export type { Data, Pane, Overlay }
 
-interface Colors {
+export interface Colors {
     back?: string
     grid?: string
     text?: string
@@ -33,7 +33,7 @@ interface Colors {
     [key: string]: string | undefined
 }
 
-interface ChartConfig {
+export interface ChartConfig {
     DEFAULT_LEN?: number
     MINIMUM_LEN?: number
     TOOLBAR?: number
@@ -41,12 +41,12 @@ interface ChartConfig {
 }
 
 interface Script {
-    name: string
+    name?: string
     code: string
     [key: string]: unknown
 }
 
-interface Props {
+export interface NightVisionProps {
     data?: Data
     scripts?: Script[]
     id?: string
@@ -70,7 +70,7 @@ class NightVision {
     private _id: string
     private _data: Data
     private _scripts: Script[]
-    private _props: Props
+    private _props: NightVisionProps
     private _scriptsReady: Promise<unknown>
     private _resizeCleanup: (() => void) | null = null
     private _timers = new Set<ReturnType<typeof setTimeout>>()
@@ -85,7 +85,7 @@ class NightVision {
     public comp: ReturnType<typeof mount> | null = null
     private _pendingRemountRange: [number, number] | null = null
 
-    constructor(target: string | HTMLElement, props: Props = {}) {
+    constructor(target: string | HTMLElement, props: NightVisionProps = {}) {
         this._data = props.data || {}
         this._scripts = props.scripts || []
         this._props = { ...props }

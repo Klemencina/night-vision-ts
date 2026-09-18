@@ -2,6 +2,8 @@ import js from '@eslint/js'
 import svelte from 'eslint-plugin-svelte'
 import globals from 'globals'
 import prettier from 'eslint-config-prettier'
+import tsParser from '@typescript-eslint/parser'
+import tsPlugin from '@typescript-eslint/eslint-plugin'
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
@@ -32,7 +34,7 @@ export default [
 
     // Source files configuration
     {
-        files: ['src/**/*.js', 'src/**/*.svelte'],
+        files: ['src/**/*.js', 'src/**/*.ts', 'src/**/*.svelte'],
         rules: {
             // Lenient rules (warnings, not errors) per user preference
             'no-unused-vars': 'warn',
@@ -70,7 +72,7 @@ export default [
 
     // Test files configuration
     {
-        files: ['tests/**/*.js'],
+        files: ['tests/**/*.js', 'tests/**/*.ts'],
         rules: {
             // Very lenient for test files - most rules off
             'no-unused-vars': 'off',
@@ -89,6 +91,27 @@ export default [
             'no-var': 'off',
             'prefer-const': 'off',
             'eqeqeq': 'off'
+        }
+    },
+
+    {
+        files: ['src/**/*.ts', 'tests/**/*.ts'],
+        languageOptions: { parser: tsParser },
+        plugins: { '@typescript-eslint': tsPlugin },
+        rules: {
+            'no-undef': 'off',
+            'no-unused-vars': 'off',
+            '@typescript-eslint/no-unused-vars': 'warn'
+        }
+    },
+    {
+        files: ['tests/**/*.ts'],
+        rules: { '@typescript-eslint/no-unused-vars': 'off' }
+    },
+    {
+        files: ['src/**/*.svelte'],
+        languageOptions: {
+            parserOptions: { parser: tsParser }
         }
     },
 

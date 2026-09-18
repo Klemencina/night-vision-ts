@@ -26,7 +26,7 @@
         // indexBased = false, // Currently unused
         timezone = 0,
         data = {},
-        scriptsReady
+        scriptsReady = undefined
         // autoResize = false // Currently unused
     } = $props()
 

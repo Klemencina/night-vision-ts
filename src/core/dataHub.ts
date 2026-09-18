@@ -8,6 +8,7 @@ import SeClient, { SeClient as SeClientType } from './se/seClient'
 import DataView$ from './dataView'
 
 interface Overlay {
+    name?: string
     id?: number
     main?: boolean
     data?: any[]
@@ -22,6 +23,8 @@ interface Overlay {
 }
 
 interface Script {
+    type?: string
+    name?: string
     id?: number
     settings?: Record<string, any>
     props?: Record<string, any>
@@ -30,10 +33,16 @@ interface Script {
 
 interface Pane {
     id?: number
-    overlays: Overlay[]
+    overlays?: Overlay[]
     scripts?: Script[]
-    settings: Record<string, any>
+    settings?: Record<string, any>
     uuid?: string
+}
+
+interface NormalizedPane extends Pane {
+    overlays: Overlay[]
+    settings: Record<string, any>
+    uuid: string
 }
 
 interface Data {
@@ -58,8 +67,8 @@ class DataHub {
     se: SeClientType
     data!: Data
     indexBased!: boolean
-    chart: Pane | null = null
-    offchart: Pane[] | null = null
+    chart: NormalizedPane | null = null
+    offchart: NormalizedPane[] | null = null
     mainOv: Overlay | null = null
     mainPaneId: number | null = null
     legendCollapsed: boolean
@@ -104,7 +113,7 @@ class DataHub {
     // filters only (not updating the full structure)
     updateRange(range: [number, number]): void {
         for (var pane of this.data.panes || []) {
-            for (var ov of pane.overlays) {
+            for (var ov of pane.overlays || []) {
                 let off = ov.indexOffset
                 ov.dataView = this.filter(ov.data!, range, off)
                 ov.dataSubset = ov.dataView.makeSubset()
@@ -167,11 +176,10 @@ class DataHub {
 
         mainOv.main = true // If there is only one OV
 
-        this.chart =
-            (this.data.panes || []).find((x: Pane) => x.overlays.find((y: Overlay) => y.main)) ||
-            null
+        const panes = this.panes()
+        this.chart = panes.find(pane => pane.overlays.some(overlay => overlay.main)) || null
 
-        this.offchart = (this.data.panes || []).filter((x: Pane) => x !== this.chart)
+        this.offchart = panes.filter(pane => pane !== this.chart)
 
         this.mainOv = mainOv
         this.mainPaneId = this.chart ? this.panes().indexOf(this.chart) : null
@@ -190,8 +198,10 @@ class DataHub {
     }
 
     // [API] Get all active panes (with uuid)
-    panes(): Pane[] {
-        return (this.data.panes || []).filter((x: Pane) => x.uuid)
+    panes(): NormalizedPane[] {
+        return (this.data.panes || []).filter(
+            (pane): pane is NormalizedPane => Boolean(pane.uuid && pane.overlays && pane.settings)
+        )
     }
 
     // [API] Get overlay ref by paneId & ovId
@@ -262,7 +272,7 @@ function instance(id: string): DataHub {
     return instances[id]
 }
 
-export type { Overlay, Script, Pane, Data }
+export type { Overlay, Script, Pane, NormalizedPane, Data }
 function release(id: string): void {
     delete instances[id]
 }

@@ -17,23 +17,29 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch",
+    "check:svelte": "svelte-check --tsconfig ./tsconfig.svelte.json",
     "lint": "eslint src tests",
     "lint:fix": "eslint src tests --fix",
     "format": "prettier --write \"src/**/*.{js,ts,svelte}\" \"tests/**/*.{js,ts}\"",
     "format:check": "prettier --check \"src/**/*.{js,ts,svelte}\" \"tests/**/*.{js,ts}\"",
     "audit": "npm audit",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "ci": "npm run lint && npm run typecheck && npm run check:svelte && npm run test && npm run build",
     "prepublishOnly": "npm run build"
   },
   "main": "./dist/night-vision.js",
   "module": "./dist/night-vision.js",
-  "types": "./dist/night-vision.d.ts",
+  "types": "./dist/index.d.ts",
   "unpkg": "./dist/night-vision.umd.cjs",
   "exports": {
     ".": {
-      "types": "./dist/night-vision.d.ts",
-      "import": "./dist/night-vision.js",
-      "require": "./dist/night-vision.umd.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/night-vision.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/night-vision.umd.cjs"
+      }
     }
   },
   "author": "ChartMaster",
@@ -46,9 +52,12 @@
     "svelte": "^5.55.7"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@types/hammerjs": "^2.0.46",
     "@types/node": "^25.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.70.0",
+    "@typescript-eslint/parser": "^8.70.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-svelte": "^3.14.0",
@@ -56,6 +65,7 @@
     "happy-dom": "^20.9.0",
     "prettier": "^3.8.1",
     "prettier-plugin-svelte": "^3.4.1",
+    "svelte-check": "^4.7.6",
     "typescript": "^5.9.3",
     "vite": "^6.4.2",
     "vite-plugin-banner": "^0.7.1",

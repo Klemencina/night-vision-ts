@@ -16,3 +16,6 @@ export {
     DataScan, Scripts, Events,
     Const, Utils, Parser
 }
+
+export type { Data, Pane, Overlay, NightVisionProps, ChartConfig, Colors } from './interface'
+export type { NormalizedPane } from './core/dataHub'
