@@ -13,9 +13,11 @@ export default function(T: string, auto = false) {
         let time = t ?? (se as any).t
         let val = auto ? (se as any)[T][0] : x
         
-        if (!this.__t0__ || time >= this.__t0__ + tf) {
+        if (this.__t0__ === undefined || time >= this.__t0__ + tf) {
             this.unshift(Ti !== 3 ? val : 0)
             this.__t0__ = time - time % tf
+            delete this.__sourceTime__
+            delete this.__sourceVolume__
         }
 
         switch(Ti) {
@@ -29,7 +31,13 @@ export default function(T: string, auto = false) {
                 this[0] = val
                 break
             case 3:
-                this[0] += val
+                if (auto) {
+                    this[0] += this.__sourceTime__ === time ? val - this.__sourceVolume__ : val
+                    this.__sourceTime__ = time
+                    this.__sourceVolume__ = val
+                } else {
+                    this[0] += val
+                }
         }
 
         this.length = this.__len__ || DEF_LIMIT

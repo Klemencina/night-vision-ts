@@ -18,6 +18,8 @@ export interface TimeSeries extends Array<number> {
     __fn__?: (x: number, t?: number) => void
     __offset__?: number
     __t0__?: number
+    __sourceTime__?: number
+    __sourceVolume__?: number
 }
 
 // Environment type

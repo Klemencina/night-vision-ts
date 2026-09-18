@@ -247,34 +247,28 @@ class ScriptEngine {
 
         try {
             let ohlcv = this.data.ohlcv.data as number[][]
-            let i = ohlcv.length - 1
-            let last = ohlcv[i] as number[]
-            let sel = Object.keys(this.map)
-            let unshift = false
+            const sel = Object.keys(this.map)
             this.shared.event = 'update'
 
-            for (var candle of candles) {
-                if (candle[0] > last[0]) {
+            for (const candle of candles) {
+                const last = ohlcv[ohlcv.length - 1]
+                if (candle[0] < last[0]) continue
+                const append = candle[0] > last[0]
+                if (append) {
                     this.shared.onclose = true
                     step(sel, false)
                     ohlcv.push(candle)
-                    unshift = true
-                    i++
-                } else if (candle[0] < last[0]) {
-                    continue
                 } else {
-                    ohlcv[i] = candle
+                    ohlcv[ohlcv.length - 1] = candle
                 }
+                this.iter = ohlcv.length - 1
+                this.t = candle[0]
+                this.step(candle, append)
+                this.shared.onclose = false
+                step(sel, append)
+                this.limit()
             }
 
-            this.iter = i
-            this.t = ohlcv[i][0]
-            this.step(ohlcv[i] as number[], unshift)
-
-            this.shared.onclose = false
-            step(sel, unshift)
-
-            this.limit()
             this.send_update(e.data.id)
             this.send_state()
         } catch (err) {
@@ -294,6 +288,8 @@ class ScriptEngine {
                 ...Object.values(this.tss)]) {
                 ts.length = 0
                 delete ts.__t0__
+                delete ts.__sourceTime__
+                delete ts.__sourceVolume__
             }
         } else {
             this.open = TS('open', [])
