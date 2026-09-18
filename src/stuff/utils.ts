@@ -1,4 +1,3 @@
-import IndexedArray from 'arrayslicer'
 import Const from './constants'
 
 const { MINUTE, MINUTE5, MINUTE15, HOUR, HOUR4, DAY, WEEK, MONTH, YEAR } = Const
@@ -17,26 +16,28 @@ export type Overlay = {
     settings?: Record<string, unknown>
 }
 
-type IndexCache = {
-    ia: any
-    len: number
-    last: number | undefined
+// First timestamp greater than or equal to t in a sorted series.
+export function lowerBound(arr: TimeSeries, t: number): number {
+    let lo = 0
+    let hi = arr.length
+    while (lo < hi) {
+        const mid = lo + Math.floor((hi - lo) / 2)
+        if (arr[mid][0] < t) lo = mid + 1
+        else hi = mid
+    }
+    return lo
 }
 
-const indexCache = new WeakMap<TimeSeries, IndexCache>()
-
-function getIndex(arr: TimeSeries): any {
-    let last = arr.length ? arr[arr.length - 1][0] : undefined
-    let cached = indexCache.get(arr)
-    if (!cached || cached.len !== arr.length || cached.last !== last) {
-        cached = {
-            ia: new (IndexedArray as any)(arr, '0'),
-            len: arr.length,
-            last
-        }
-        indexCache.set(arr, cached)
+// First timestamp greater than t in a sorted series.
+export function upperBound(arr: TimeSeries, t: number): number {
+    let lo = 0
+    let hi = arr.length
+    while (lo < hi) {
+        const mid = lo + Math.floor((hi - lo) / 2)
+        if (arr[mid][0] <= t) lo = mid + 1
+        else hi = mid
     }
-    return cached.ia
+    return lo
 }
 
 // Window type with custom properties
@@ -165,45 +166,21 @@ export default {
         return min
     },
 
-    // Fast filter. Really fast, like 10X
+    // Filter an inclusive time range and return its first source index.
     fastFilter(arr: TimeSeries, t1: number, t2: number): [TimeSeries, number | undefined] {
         if (!arr.length) return [arr, undefined]
-        try {
-            let ia = getIndex(arr)
-            let res = ia.getRange(t1, t2)
-            let i0 = ia.valpos[t1.toString()]?.next
-            return [res, i0]
-        } catch (e) {
-            // Something wrong with fancy slice lib
-            // Fast fix: fallback to filter
-            return [arr.filter(x => x[0] >= t1 && x[0] <= t2), 0]
-        }
+        if (!(t1 <= t2)) return [[], undefined]
+        const start = lowerBound(arr, t1)
+        const end = upperBound(arr, t2)
+        return [arr.slice(start, end), start < end ? start : undefined]
     },
 
-    // Fast filter 2 (returns indices)
-    fastFilter2(arr: TimeSeries, t1: number, t2: number): [number | null, number] {
-        if (!arr.length) return [0, arr.length]
-        try {
-            let ia = getIndex(arr)
-
-            // fetch start and default to the next index above
-            ia.fetch(t1)
-            let start: number | null = ia.cursor ?? ia.nexthigh
-
-            // fetch finish and default to the next index below
-            ia.fetch(t2)
-            let finish: number | null = ia.cursor ?? ia.nextlow
-
-            return [start, (finish ?? 0) + 1]
-        } catch (e) {
-            // Something wrong with fancy slice lib
-            // Fast fix: fallback to filter
-            let subset = arr.filter(x => x[0] >= t1 && x[0] <= t2)
-            let i1 = arr.indexOf(subset[0])
-            let i2 = arr.indexOf(subset[subset.length - 1])
-
-            return [i1, i2]
-        }
+    // Start inclusive, end exclusive. DataView adds the adjacent points.
+    fastFilter2(arr: TimeSeries, t1: number, t2: number): [number, number] {
+        if (!arr.length) return [0, 0]
+        // This sentinel also produces an empty DataView without neighbors.
+        if (!(t1 <= t2)) return [0, -1]
+        return [lowerBound(arr, t1), upperBound(arr, t2)]
     },
 
     // Fast filter (index-based)
@@ -218,14 +195,10 @@ export default {
 
     // Nearest indexes (left and right)
     fastNearest(arr: TimeSeries, t1: number): [number | null, number | null] {
-        try {
-            let ia = getIndex(arr)
-            ia.fetch(t1)
-            return [ia.nextlow, ia.nexthigh]
-        } catch (e) {
-            let idx = this.nearestTs(t1, arr)[0]
-            return [idx, idx]
-        }
+        if (!arr.length || Number.isNaN(t1)) return [null, null]
+        const next = lowerBound(arr, t1)
+        if (next < arr.length && arr[next][0] === t1) return [null, null]
+        return [next > 0 ? next - 1 : null, next < arr.length ? next : null]
     },
 
     now(): number {

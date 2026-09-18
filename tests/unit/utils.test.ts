@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import Utils from '../../src/stuff/utils'
+import Utils, { lowerBound, upperBound } from '../../src/stuff/utils'
+import DataView from '../../src/core/dataView'
 
 describe('Utils TypeScript Migration', () => {
     
@@ -58,21 +59,80 @@ describe('Utils TypeScript Migration', () => {
         })
     })
 
-    describe('fastFilter', () => {
-        it('should filter data by time range', () => {
-            const data = [
-                [1000, 1],
-                [2000, 2],
-                [3000, 3],
-                [4000, 4]
-            ]
-            const [result, index] = Utils.fastFilter(data, 1500, 3500)
-            expect(Array.isArray(result)).toBe(true)
+    describe('time-series searches', () => {
+        it('includes exact bounds and duplicate timestamps with the correct source index', () => {
+            const data = [[0, 1], [10, 2], [10, 3], [20, 4]]
+
+            expect(Utils.fastFilter(data, 0, 10)).toEqual([data.slice(0, 3), 0])
+            expect(Utils.fastFilter(data, 10, 10)).toEqual([data.slice(1, 3), 1])
+            expect(Utils.fastFilter(data, 5, 15)).toEqual([data.slice(1, 3), 1])
+            expect(lowerBound(data, 10)).toBe(1)
+            expect(upperBound(data, 10)).toBe(3)
         })
-        
-        it('should handle empty data', () => {
-            const [result, index] = Utils.fastFilter([], 1000, 2000)
-            expect(result).toEqual([])
+
+        it('preserves DataView neighbors at exact, missing, and outside bounds', () => {
+            const data = [[10, 1], [20, 2], [30, 3], [40, 4]]
+            const cases = [
+                { range: [20, 30], indices: [1, 3], subset: data },
+                { range: [21, 29], indices: [2, 2], subset: data.slice(1, 3) },
+                { range: [-10, 0], indices: [0, 0], subset: data.slice(0, 1) },
+                { range: [50, 60], indices: [4, 4], subset: data.slice(3) },
+                { range: [-Infinity, Infinity], indices: [0, 4], subset: data }
+            ]
+
+            for (const { range, indices, subset } of cases) {
+                const result = Utils.fastFilter2(data, range[0], range[1])
+                expect(result).toEqual(indices)
+                const view = new DataView(data, ...result)
+                expect(view.makeSubset()).toEqual(subset)
+                expect(view.length).toBe(subset.length)
+            }
+            expect(Utils.fastFilter(data, 21, 29)).toEqual([[], undefined])
+            expect(Utils.fastFilter(data, 50, 60)).toEqual([[], undefined])
+        })
+
+        it('returns empty results for empty input and invalid ranges', () => {
+            const data = [[10, 1], [20, 2]]
+            const cases: [number[][], number, number][] = [
+                [[], 0, 30],
+                [data, 20, 10],
+                [data, NaN, 20],
+                [data, 10, NaN]
+            ]
+
+            for (const [source, start, end] of cases) {
+                expect(Utils.fastFilter(source, start, end)).toEqual([[], undefined])
+                const view = new DataView(source, ...Utils.fastFilter2(source, start, end))
+                expect(view.makeSubset()).toEqual([])
+                expect(view.length).toBe(0)
+            }
+        })
+
+        it('keeps exact-match and missing-neighbor semantics', () => {
+            const data = [[0, 1], [10, 2], [10, 3], [20, 4]]
+
+            expect(Utils.fastNearest(data, 0)).toEqual([null, null])
+            expect(Utils.fastNearest(data, 10)).toEqual([null, null])
+            expect(Utils.fastNearest(data, 5)).toEqual([0, 1])
+            expect(Utils.fastNearest(data, 15)).toEqual([2, 3])
+            expect(Utils.fastNearest(data, -1)).toEqual([null, 0])
+            expect(Utils.fastNearest(data, 21)).toEqual([3, null])
+            expect(Utils.fastNearest(data, NaN)).toEqual([null, null])
+            expect(Utils.fastNearest([], 10)).toEqual([null, null])
+        })
+
+        it('reflects timestamp changes and row replacements without length or endpoint changes', () => {
+            const data = [[10, 1], [20, 2], [30, 3], [40, 4], [50, 5]]
+
+            expect(Utils.fastFilter2(data, 25, 35)).toEqual([2, 3])
+            expect(Utils.fastNearest(data, 35)).toEqual([2, 3])
+            data[2][0] = 39
+            expect(Utils.fastFilter2(data, 25, 35)).toEqual([2, 2])
+            expect(Utils.fastFilter(data, 25, 35)).toEqual([[], undefined])
+            expect(Utils.fastNearest(data, 35)).toEqual([1, 2])
+            data[2] = [32, 9]
+            expect(Utils.fastFilter(data, 25, 35)).toEqual([[data[2]], 2])
+            expect(Utils.fastNearest(data, 35)).toEqual([2, 3])
         })
     })
 
