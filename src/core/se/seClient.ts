@@ -2,6 +2,7 @@
 
 import DataHub from '../dataHub'
 import Utils from '../../stuff/utils'
+import type { OverlayUpdate } from './script_engine'
 
 interface Chart {
     ww: WebWork | null
@@ -79,25 +80,15 @@ class SeClient {
         if (!this.hub?.mainOv?.data) return
         let ohlcv = this.hub.mainOv.data
         if (!this.ww) return
-        let data = await this.ww.exec('update-data', { ohlcv: ohlcv.slice(-2) })
-        let unshift = false
+        const data: Record<string, OverlayUpdate> = await this.ww.exec('update-data', { ohlcv: ohlcv.slice(-2) })
         for (var ov of this.hub.allOverlays()) {
-            if (data[ov.uuid]) {
-                let last = ov.data[ov.data.length - 1]
-                let nw = data[ov.uuid]
-                if (!last || nw[0] > last[0]) {
-                    ov.data.push(nw)
-                    unshift = true
-                } else if (nw[0] === last[0]) {
-                    ov.data[ov.data.length - 1] = nw
-                }
-            }
+            const update = data[ov.uuid]
+            if (!update) continue
+            ov.data.length = update.start
+            for (const row of update.data) ov.data.push(row)
         }
-        if (unshift) {
-            this.chart.update('data')
-        } else {
-            this.chart.update()
-        }
+        // Visible subsets keep row references, including the previous live row.
+        this.chart.update('data')
     }
 
     async execScripts(): Promise<void> {

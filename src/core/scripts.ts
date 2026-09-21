@@ -66,6 +66,7 @@ class Scripts {
 
     parse(): void {
         this.prefabs = {}
+        this.iScripts = {}
         for (var s of this.srcLib) {
             let parser = new Parser(s)
             for (var ov of parser.overlays) {

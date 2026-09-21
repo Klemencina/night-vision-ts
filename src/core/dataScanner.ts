@@ -73,7 +73,7 @@ class DataScanner {
         const ml = this.props.config.MINIMUM_LEN + 0.5
         const l = this.main.length - 1
 
-        if (this.main.length < 2) return []
+        if (this.main.length < 2 && (!Number.isFinite(this.tf) || this.tf <= 0)) return []
         if (this.main.length <= dl) {
             var s = 0,
                 d = ml

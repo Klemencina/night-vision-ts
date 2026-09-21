@@ -121,3 +121,23 @@ describe('DataHub multiple overlays and indicators', () => {
         DataHub.release(id)
     })
 })
+
+describe('DataScanner default ranges', () => {
+    const config = { DEFAULT_LEN: 3, MINIMUM_LEN: 1 }
+
+    it.each([false, true])('creates a range for one candle with a supplied timeframe, indexBased=%s', indexBased => {
+        const id = `single-candle-range-${indexBased}`
+        const hub = DataHub.instance(id)
+        hub.init({ indexBased, panes: [{ overlays: [{
+            main: true, data: [[1_000_000, 10]], settings: { timeFrame: '1m' }
+        }] }] })
+        const scan = DataScanner.instance(id)
+        scan.init({ id, config })
+
+        expect(scan.getTimeframe()).toBe(60_000)
+        expect(scan.defaultRange()).toEqual(indexBased ? [-1.5, 1.5] : [910_000, 1_090_000])
+        DataScanner.release(id)
+        DataHub.release(id)
+    })
+
+})

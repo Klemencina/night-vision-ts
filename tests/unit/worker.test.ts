@@ -1,7 +1,57 @@
 import { expect, it, vi } from 'vitest'
 import se from '../../src/core/se/script_engine'
 import Utils from '../../src/stuff/utils'
+import { SeClient } from '../../src/core/se/seClient'
 import '../../src/core/se/worker'
+
+it('delivers the finalized candle revision and new row through the worker client', async () => {
+    const replies: any[] = []
+    const tasks = new Map<string, (data: any) => void>()
+    let sequence = 0
+    const post = vi.spyOn(self, 'postMessage').mockImplementation((message: any) => {
+        const reply = structuredClone(message)
+        replies.push(reply)
+        tasks.get(reply.id)?.(reply.data)
+        tasks.delete(reply.id)
+    })
+    const exec = (type: string, data: any) => new Promise<any>(resolve => {
+        const id = `transport-${++sequence}`
+        tasks.set(id, resolve)
+        self.onmessage!({ data: { type, id, data: structuredClone(data) } } as MessageEvent)
+    })
+    Object.assign(se, {
+        data: {}, map: {}, queue: [], delta_queue: [], update_queue: [],
+        tf: 60000, running: false, _restart: false, mods: {}, sett: {}
+    })
+    try {
+        await exec('upload-scripts', { prefabs: { Spline: {} }, iScripts: {
+            Close: { code: { update: 'Spline(close[0])' } }
+        } })
+        const main = [[300000, 1, 1, 1, 1, 1]]
+        await exec('upload-data', { meta: { tf: 60000, range: [300000, 360000] }, dss: { ohlcv: main } })
+        await exec('exec-all-scripts', [{ uuid: 'pane', overlays: [], scripts: [{
+            uuid: 'a', type: 'Close', props: {}
+        }] }])
+        const overlay = replies.find(x => x.type === 'overlay-data').data[0].overlays[0]
+        const chart = { ww: { exec, onevent: vi.fn() }, update: vi.fn() }
+        const client = new SeClient('transport-client', chart)
+        client.setRefs({ mainOv: { data: main }, allOverlays: () => [overlay] }, {})
+        main[0][4] = 99
+        main.push([360000, 2, 2, 2, 2, 1])
+
+        await client.updateData()
+
+        expect(overlay.data).toEqual([[300000, 99], [360000, 2]])
+        expect(replies.find(x => x.type === 'overlay-update')).toMatchObject({
+            id: 'transport-4', data: {
+                [overlay.uuid]: { start: 0, data: [[300000, 99], [360000, 2]] }
+            }
+        })
+        expect(chart.update).toHaveBeenCalledWith('data')
+    } finally {
+        post.mockRestore()
+    }
+})
 
 it('serializes worker commands and retains changes received during execution', async () => {
     let release!: () => void

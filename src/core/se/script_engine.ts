@@ -9,6 +9,11 @@ import { TimeSeries } from './script_std'
 
 type ScriptDelta = Record<string, Record<string, unknown>>
 
+export interface OverlayUpdate {
+    start: number
+    data: any[][]
+}
+
 export function mergeDeltas(deltas: ScriptDelta[]): ScriptDelta {
     const merged: ScriptDelta = {}
     for (const delta of deltas) {
@@ -227,6 +232,14 @@ class ScriptEngine {
 
         if (!this.shared) return this.send_update(e.data.id)
 
+        const starts: Record<string, number> = {}
+        for (const pane of (self as any).paneStruct || []) {
+            for (const ov of pane.overlays || []) {
+                // Overlay writes replace the final row or append new rows.
+                starts[ov.uuid] = Math.max(ov.data.length - 1, 0)
+            }
+        }
+
         let mfs1 = this.make_mods_hooks('pre_step')
         let mfs2 = this.make_mods_hooks('post_step')
 
@@ -268,7 +281,7 @@ class ScriptEngine {
                 this.limit()
             }
 
-            this.send_update(e.data.id)
+            this.send_update(e.data.id, starts)
             this.send_state()
         } catch (err) {
             this.send_state()
@@ -343,8 +356,8 @@ class ScriptEngine {
         })
     }
 
-    send_update(taskId: string): void {
-        this.send('overlay-update', this.format_update(), taskId)
+    send_update(taskId: string, starts?: Record<string, number>): void {
+        this.send('overlay-update', this.format_update(starts), taskId)
     }
 
     init_map(): void {
@@ -489,11 +502,12 @@ class ScriptEngine {
         return ovs
     }
 
-    format_update(): { [key: string]: any } {
-        let map: { [key: string]: any } = {}
+    format_update(starts?: Record<string, number>): Record<string, OverlayUpdate> {
+        const map: Record<string, OverlayUpdate> = {}
         for (var pane of (self as any).paneStruct || []) {
             for (var ov of pane.overlays || []) {
-                map[ov.uuid] = ov.data[ov.data.length - 1]
+                const start = starts ? starts[ov.uuid] ?? 0 : Math.max(ov.data.length - 1, 0)
+                map[ov.uuid] = { start, data: ov.data.slice(start) }
             }
         }
         return map

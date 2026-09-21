@@ -184,7 +184,7 @@
     function drawLayer(layer) {
         if (!layer.display) return true
         ctx.save()
-        if (layer.opacity) ctx.globalAlpha = layer.opacity
+        if (layer.opacity != null) ctx.globalAlpha = layer.opacity
         try {
             layer.overlay.draw(ctx)
             return true

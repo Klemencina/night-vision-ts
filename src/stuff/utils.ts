@@ -185,10 +185,9 @@ export default {
     // Fast filter (index-based)
     fastFilterIB(arr: TimeSeries, t1: number, t2: number): [number, number] {
         if (!arr.length) return [0, 0]
-        let i1 = Math.floor(t1)
-        if (i1 < 0) i1 = 0
-        let i2 = Math.floor(t2 + 1)
-        //let res = arr.slice(i1, i2)
+        if (!(t1 <= t2)) return [0, -1]
+        let i1 = Math.max(0, Math.min(arr.length, Math.floor(t1)))
+        let i2 = Math.max(0, Math.min(arr.length, Math.floor(t2 + 1)))
         return [i1, i2]
     },
 
@@ -232,7 +231,7 @@ export default {
         if (c.length === 7) {
             let n = Math.floor(op * 255)
             n = this.clamp(n, 0, 255)
-            c += n.toString(16)
+            c += n.toString(16).padStart(2, '0')
         }
         return c
     },
@@ -489,7 +488,7 @@ export default {
     numberLR(x: number | null): [number, number] {
         var str = x != null ? x.toString() : ''
         let l: string, r: { length: number } | string
-        if ((x as number) < 0.000001) {
+        if (str.includes('e-')) {
             // Parsing the exponential form. Gosh this
             // smells trickily
             var [ls, rs] = str.split('e-')

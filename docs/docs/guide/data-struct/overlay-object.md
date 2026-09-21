@@ -140,3 +140,5 @@ Set the precision of this overlay. It will not affect other overlays on the pane
 - **Type:** `string` | `number` String e.g., '1h, 15m, 1d' or number of milliseconds.
 
 Forced time-frame of the chart (if specified for the main overlay). Overwrites the auto-detected time-frame. 
+
+For a dataset with one candle, set `settings.timeFrame` on the main overlay, for example `'1m'`. One timestamp is not enough to infer the interval.

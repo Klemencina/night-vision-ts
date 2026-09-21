@@ -37,7 +37,6 @@
     let nRef = $state(null) // Reference to the legend-name span
     let ctrlRef = $state(null) // Reference to the legend controls
     let selected = $state(false)
-    let show = $state(true)
     let display = $state(untrack(() => ov.settings.display !== false))
     let showSettings = $state(false)
 
@@ -138,17 +137,14 @@
     let hasCursorData = $derived(cursorData != null)
     let scale = $derived(findOverlayScale(layout.scales))
     let prec = $derived(scale.prec)
+    let legendValues = $derived(legend && data ? legend(data, prec) : null)
+    let show = $derived(!legend || !data || !!legendValues)
     let isIndicator = $derived(!!ov.prod)
     let hideValues = $derived(collapsed && ov.main)
     let staticLegendHtml = $derived(sanitizeLegendHtml(ov.settings.legendHtml))
     let dynamicLegendHtml = $derived(
         legendHtml && hasCursorData ? sanitizeLegendHtml(legendHtml(data, prec, formatter)) : ''
     )
-
-    // Disable legend if legend() returns null dynamically
-    $effect(() => {
-        if (legend && data && !legend(data, prec)) show = false
-    })
 
     function update() {
         display = ov.settings.display !== false
@@ -268,7 +264,7 @@
                 {:else if legendHtml && hasCursorData}
                     {@html dynamicLegendHtml}
                 {:else if legend && data.length}
-                    {#each legend(data, prec) || [] as v}
+                    {#each legendValues || [] as v}
                         <span class="nvjs-ll-value" style={`color: ${v[1]}`}>
                             {formatter(v[0])}
                         </span>

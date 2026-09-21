@@ -56,7 +56,9 @@
     let interval = $state(scan.detectInterval())
     let timeFrame = $state(scan.getTimeframe())
     let range = $state(scan.defaultRange())
-    let cursor = $state(new Cursor(meta))
+    const cursor = new Cursor(meta)
+    // Svelte does not track field mutations on class instances.
+    let cursorRevision = $state(0)
     let storage = {} // Storage for helper variables
     let ctx = new Context(initialProps) // For measuring text
     let chartRR = $state(0)
@@ -74,7 +76,10 @@
 
     scan.calcIndexOffsets()
 
-    let chartProps = $derived(Object.assign({ interval, timeFrame, range, ctx, cursor }, props))
+    let chartProps = $derived.by(() => {
+        void cursorRevision
+        return Object.assign({ interval, timeFrame, range, ctx, cursor }, props)
+    })
 
     // EVENT INTEFACE
     $effect(() => {
@@ -256,6 +261,7 @@
 
         // Emit a global event (hook)
         if (emit) events.emit('$chart-pre-update')
+        cursorRevision++
         // If we changed UUIDs of but don't want to trigger
         // the full update, we need to set updateHash:true
         if (updateHash) scan.updatePanesHash()
@@ -265,7 +271,6 @@
             // update layout and remake grid without re-running fullUpdate (loadScripts).
             if (scan.panesChanged()) {
                 scan.updatePanesHash()
-                cursor = cursor
                 layout = new Layout(chartProps, hub, meta)
                 events.emit('update-pane', layout)
                 events.emitSpec('botbar', 'update-bb', layout)
@@ -273,7 +278,6 @@
                 if (emit) events.emit('$chart-update')
                 return
             }
-            cursor = cursor // Trigger Svelte update
             layout = new Layout(chartProps, hub, meta)
             events.emit('update-pane', layout) // Update all panes
             events.emitSpec('botbar', 'update-bb', layout)
@@ -282,7 +286,6 @@
         }
 
         if (!layout) return
-        cursor = cursor // Trigger Svelte update
         events.emit(content ? 'update-pane' : 'update-cursor-pane', layout)
         events.emitSpec('botbar', 'update-bb', layout)
         if (emit) events.emit('$chart-update')

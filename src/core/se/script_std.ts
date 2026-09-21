@@ -192,13 +192,12 @@ export default class ScriptStd {
     tstf(x: number, tf: number | string, _id: string): TimeSeries {
         let ts = this.env.tss[_id]
         if (!ts) {
-            ts = this.env.tss[_id] = [x] as TimeSeries
+            ts = this.env.tss[_id] = [] as unknown as TimeSeries
             ts.__id__ = _id
             ts.__tf__ = u.tf_from_str(tf)
             ts.__fn__ = Sampler('close').bind(ts) as (x: number, t?: number) => void
-        } else {
-            ts.__fn__!(x)
         }
+        ts.__fn__!(x)
         return ts
     }
 
@@ -213,13 +212,12 @@ export default class ScriptStd {
     sample(x: number, type: string, tf: number | string, _id: string): TimeSeries {
         let ts = this.env.tss[_id]
         if (!ts) {
-            ts = this.env.tss[_id] = [x] as TimeSeries
+            ts = this.env.tss[_id] = [] as unknown as TimeSeries
             ts.__id__ = _id
             ts.__tf__ = u.tf_from_str(tf)
             ts.__fn__ = Sampler(type).bind(ts) as (x: number, t?: number) => void
-        } else {
-            ts.__fn__!(x)
         }
+        ts.__fn__!(x)
         return ts
     }
 

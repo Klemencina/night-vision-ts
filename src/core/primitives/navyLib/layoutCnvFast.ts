@@ -96,7 +96,7 @@ export default function layoutCnvFast(
     if (showVolume) {
         let volScale = vScale ?? config.VOLSCALE
         maxv = maxVolume(core.dataSubset, vIndex)
-        vs = ((volScale ?? 0) * layout.height) / maxv
+        vs = maxv > 0 ? ((volScale ?? 0) * layout.height) / maxv : 0
     }
     var x1: number = 0,
         x2: number = 0,

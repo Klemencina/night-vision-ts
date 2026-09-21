@@ -189,8 +189,6 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
     }
 
     function calcPositions(): void {
-        if (data.length < 2) return
-
         let dt = range[1] - range[0]
 
         // A pixel space available to draw on (x-axis)
@@ -207,7 +205,7 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
         if (self.indexBased) {
             self.startx = (view.i1 - range[0]) * r
         } else {
-            self.startx = (data[0][0] - range[0]) * r
+            self.startx = ((data[0]?.[0] ?? range[0]) - range[0]) * r
         }
     }
 
@@ -228,6 +226,7 @@ function GridMaker(id: number, specs: Specs, mainGrid: LayoutSelf | null = null)
 
             self.tStep = timeStep()
             self.xs = []
+            if (!data.length) return
             const dt = range[1] - range[0]
             const r = self.spacex! / dt
 

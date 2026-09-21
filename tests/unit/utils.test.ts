@@ -168,6 +168,35 @@ describe('Utils TypeScript Migration', () => {
         })
     })
 
+    describe('index-based data views', () => {
+        it('does not copy an entire later-starting overlay before its first row is visible', () => {
+            const data = Array.from({ length: 100_000 }, (_, i) => [i, i])
+            const view = new DataView(data, ...Utils.fastFilterIB(data, -10, -5))
+            const subset = view.makeSubset()
+
+            expect(subset).toHaveLength(1)
+            expect(subset[0]).toBe(data[0])
+            expect(view.length).toBe(subset.length)
+
+            const visible = new DataView(data, ...Utils.fastFilterIB(data, 1, 2))
+            expect(visible.makeSubset()).toEqual(data.slice(0, 4))
+        })
+    })
+
+    describe('numberLR', () => {
+        it('preserves precision for negative decimals and scientific notation', () => {
+            expect(Utils.numberLR(-0.25)).toEqual([2, 2])
+            expect(Utils.numberLR(-1.234e-7)).toEqual([2, 10])
+        })
+    })
+
+    describe('applyOpacity', () => {
+        it('pads transparent and low-opacity alpha bytes', () => {
+            expect(Utils.applyOpacity('#ff0000', 0)).toBe('#ff000000')
+            expect(Utils.applyOpacity('#ff0000', 0.01)).toBe('#ff000002')
+        })
+    })
+
     describe('uuid', () => {
         it('should generate valid UUID format', () => {
             const uuid = Utils.uuid()

@@ -33,6 +33,7 @@ export default defineConfig({
         }
     },
     resolve: {
+        conditions: ['browser'],
         alias: {
             '@': resolve(__dirname, 'src')
         }

@@ -27,6 +27,53 @@ beforeEach(() => {
 })
 
 describe('indicator streaming', () => {
+    it('returns the revised final row and every appended output without copying earlier history', async () => {
+        se.data.ohlcv.data = Array.from({ length: 2000 }, (_, i) => candle(i))
+        ;(self as any).paneStruct[0].scripts = [{ uuid: 'a', type: 'Close', props: {} }]
+        await se.exec_all()
+        vi.mocked(se.send).mockClear()
+        const revision = candle(1999)
+        revision[4] = 3000
+        se.update([revision, candle(2000), candle(2001)], { data: { id: 'batch' } })
+
+        const overlay = (self as any).paneStruct[0].overlays[0]
+        expect(se.send).toHaveBeenCalledWith('overlay-update', {
+            [overlay.uuid]: { start: 1999, data: [
+                [revision[0], 3000], [candle(2000)[0], 2001], [candle(2001)[0], 2002]
+            ] }
+        }, 'batch')
+    })
+
+    it('includes closing revisions in sparse outputs with time offsets', async () => {
+        ;(self as any).scriptLib.iScripts.Sparse = { code: { update: `
+            if (iter % 2 === 0) Spline(offset(onclose() ? close[0] + 100 : close[0], -3))
+        ` } }
+        ;(self as any).paneStruct[0].scripts = [{ uuid: 'a', type: 'Sparse', props: {} }]
+        se.data.ohlcv.data = Array.from({ length: 3 }, (_, i) => candle(i))
+        await se.exec_all()
+        vi.mocked(se.send).mockClear()
+        se.update([candle(3), candle(4)], { data: { id: 'sparse' } })
+
+        const overlay = (self as any).paneStruct[0].overlays[0]
+        expect(se.send).toHaveBeenCalledWith('overlay-update', {
+            [overlay.uuid]: { start: 1, data: [[240000, 103], [360000, 5]] }
+        }, 'sparse')
+    })
+
+    it('initializes custom sampler totals and history on the first candle', async () => {
+        ;(self as any).scriptLib.iScripts.Sampled = { code: { update: `
+            Spline([sample(vol[0], 'vol', '5m')[0], tstf(close[0], '5m')[1]])
+        ` } }
+        ;(self as any).paneStruct[0].scripts = [{ uuid: 'a', type: 'Sampled', props: {} }]
+        se.data.ohlcv.data = Array.from({ length: 6 }, (_, i) => candle(i))
+        await se.exec_all()
+
+        expect((self as any).paneStruct[0].overlays[0].data).toEqual([
+            [300000, 1, undefined], [360000, 2, undefined], [420000, 3, undefined],
+            [480000, 4, undefined], [540000, 5, undefined], [600000, 1, 5]
+        ])
+    })
+
     it('replaces live volume revisions and preserves manual aggregation', async () => {
         se.data.ohlcv.data = [[0, 1, 1, 1, 1, 2]]
         ;(self as any).scriptLib.iScripts.Volume = { code: { update: 'Spline(vol5m[0])' } }

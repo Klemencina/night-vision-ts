@@ -294,6 +294,13 @@ calc(src) => src.close
         await (chart as any)._scriptsReady
         await Promise.resolve()
         expect(update).toHaveBeenCalledWith('full')
+        expect(chart.scriptHub.iScripts.Custom).toBeDefined()
+
+        chart.scripts = []
+        await (chart as any)._scriptsReady
+
+        expect(chart.scriptHub.iScripts.Custom).toBeUndefined()
+        expect(chart.scriptHub.iScripts.SMA).toBeDefined()
         chart.destroy()
     })
 })
