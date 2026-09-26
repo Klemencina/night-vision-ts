@@ -24,7 +24,9 @@
     "format:check": "prettier --check \"src/**/*.{js,ts,svelte}\" \"tests/**/*.{js,ts}\"",
     "audit": "npm audit",
     "ci": "npm run lint && npm run typecheck && npm run check:svelte && npm run test && npm run build",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:browser": "npm run build && node --test tests/browser/package.test.js",
+    "test:local": "npm run ci && node --test tests/browser/package.test.js"
   },
   "main": "./dist/night-vision.js",
   "module": "./dist/night-vision.js",
@@ -63,6 +65,7 @@
     "eslint-plugin-svelte": "^3.14.0",
     "globals": "^17.3.0",
     "happy-dom": "^20.9.0",
+    "playwright": "^1.63.0",
     "prettier": "^3.8.1",
     "prettier-plugin-svelte": "^3.4.1",
     "svelte-check": "^4.7.6",

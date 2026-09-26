@@ -73,6 +73,32 @@ chart.data = {
 }
 ```
 
+## Local tests
+
+Run all checks on your machine:
+
+```sh
+npm install
+npm run test:local
+```
+
+This runs lint, TypeScript and Svelte checks, unit tests, the production build,
+and browser tests. To run only the build and browser tests:
+
+```sh
+npm run test:browser
+```
+
+The browser tests use headless Chromium at `/usr/bin/chromium` when available.
+Set `CHROMIUM_PATH` to use another executable, or run `npx playwright install chromium`
+to install Playwright's browser when system Chromium is unavailable.
+
+Tests load an `npm pack` tarball through a temporary localhost server. They check
+ESM and script-tag builds in time-based and index-based modes, including candle
+pixels, worker-calculated SMA values, live updates, resizing, and chart destruction
+and recreation. Temporary package files, the server, and the browser are cleaned
+up when the run ends. No GitHub Actions setup is required.
+
 ## Roadmap
 
 - ~~Add stocks support (Index-Based mode)~~
