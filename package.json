@@ -1,6 +1,6 @@
 {
   "name": "night-vision-ts",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "description": "Highly customizable charting library, created for professional traders",
   "homepage": "https://github.com/Klemencina/night-vision-ts",
   "type": "module",
@@ -70,9 +70,9 @@
     "prettier-plugin-svelte": "^3.4.1",
     "svelte-check": "^4.7.6",
     "typescript": "^5.9.3",
-    "vite": "^6.4.2",
+    "vite": "^6.4.3",
     "vite-plugin-banner": "^0.7.1",
-    "vitest": "^4.0.18",
-    "ws": "^8.18.0"
+    "vitest": "^4.1.11",
+    "ws": "^8.22.0"
   }
 }

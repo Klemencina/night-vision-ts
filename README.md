@@ -24,6 +24,9 @@ Start your charting journey with our interactive [**[DOCS]**](https://nightvisio
 npm i night-vision-ts
 ```
 
+Charts run in the browser. In server-rendered apps, initialize them on the client.
+The CommonJS bundle also requires `window` when imported, so load it on the client.
+
 ## CDN
 
 ESM import:
@@ -73,12 +76,25 @@ chart.data = {
 }
 ```
 
+## Candle data API
+
+Replace the main candle series or apply a live candle update:
+
+```js
+await chart.setSeries(candles, { resetRange: true })
+await chart.updateCandle([timestamp, open, high, low, close, volume])
+```
+
+An equal timestamp replaces the latest candle; a newer timestamp appends one.
+Both methods update indicators and redraw automatically. See the
+[Data API guide](docs/docs/guide/api/data-api.md) for validation and range behavior.
+
 ## Local tests
 
 Run all checks on your machine:
 
 ```sh
-npm install
+npm ci
 npm run test:local
 ```
 
@@ -92,6 +108,16 @@ npm run test:browser
 The browser tests use headless Chromium at `/usr/bin/chromium` when available.
 Set `CHROMIUM_PATH` to use another executable, or run `npx playwright install chromium`
 to install Playwright's browser when system Chromium is unavailable.
+
+To run the same checks in Firefox:
+
+```sh
+npx playwright install firefox
+NIGHT_VISION_BROWSER=firefox npm run test:browser
+```
+
+`NIGHT_VISION_BROWSER=webkit` selects Playwright's WebKit build, which requires
+its browser download and system libraries.
 
 Tests load an `npm pack` tarball through a temporary localhost server. They check
 ESM and script-tag builds in time-based and index-based modes, including candle
@@ -109,7 +135,7 @@ up when the run ends. No GitHub Actions setup is required.
 - ~~Create a built-in indicator collection~~
 - ~~Add tool overlays (LineTool, RangeTool)~~
 - NavyJS tutorial
-- Data API (the high-level API)
+- Extend the Data API to pane and overlay operations
 - *Toolbar* ???
 - Mobile support
 

@@ -53,7 +53,7 @@ class SeClient {
     }
 
     async uploadData(): Promise<void> {
-        if (!this.hub?.mainOv?.data?.length) return
+        if (!this.hub?.mainOv?.data) return
         let range: any
         try {
             range = this.chart?.range ?? this.scan?.defaultRange?.() ?? []
@@ -62,7 +62,9 @@ class SeClient {
         }
         if (!range?.length) {
             let main = this.hub.mainOv.data
-            if (this.hub?.data?.indexBased) {
+            if (!main.length) {
+                range = []
+            } else if (this.hub?.data?.indexBased) {
                 range = [0, main.length - 1]
             } else {
                 range = [main[0][0], main[main.length - 1][0]]
@@ -130,9 +132,7 @@ class SeClient {
             }
         }
         this.scan?.calcIndexOffsets()
-        if (range?.length) {
-            this.hub.calcSubset(range)
-        }
+        this.hub.calcSubset(range || [])
         this.chart.update()
         // Force grid remake so indicator panes (e.g. RSI) render script-produced overlays
         this.hub.events.emit('remake-grid')

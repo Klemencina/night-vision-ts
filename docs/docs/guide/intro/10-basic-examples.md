@@ -200,7 +200,8 @@ function onButton3() {
 }
 ```
 
-The high-level API ([Data API](/guide/api/data-api)), that bundles data updates with the chart updates, will be released soon.
+For the main candle series, the [Data API](/guide/api/data-api) provides `setSeries()`
+and `updateCandle()`. These methods update indicators and redraw the chart automatically.
 
 ## 5. Displaying Stock data
 

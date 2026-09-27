@@ -52,6 +52,7 @@ const resizeMock = vi.hoisted(() => {
 vi.mock('svelte', () => {
     return {
         mount: () => ({ getChart: () => ({ getLayout: () => ({}) }) }),
+        tick: async () => {},
         unmount: vi.fn(() => Promise.resolve())
     }
 })
@@ -302,5 +303,96 @@ calc(src) => src.close
         expect(chart.scriptHub.iScripts.Custom).toBeUndefined()
         expect(chart.scriptHub.iScripts.SMA).toBeDefined()
         chart.destroy()
+    })
+})
+
+describe('main candle API queue', () => {
+    function createChart() {
+        const chart = new NightVision(document.createElement('div'), {
+            data: { panes: [{ overlays: [{
+                type: 'Candles', main: true,
+                data: [[0, 1, 2, 0, 1], [60000, 1, 2, 0, 1]]
+            }] }] }
+        })
+        const controller = {
+            whenReady: vi.fn(async () => {}),
+            fullUpdate: vi.fn(async (_options: unknown) => {}),
+            getRange: () => [0, 120000]
+        }
+        Object.assign(chart.comp!, { getChart: () => controller })
+        chart.hub.detectMain()
+        return { chart, controller }
+    }
+
+    it('waits for initialization and snapshots replacement data and options at call time', async () => {
+        const { chart, controller } = createChart()
+        let ready!: () => void
+        const gate = new Promise<void>(resolve => { ready = resolve })
+        controller.whenReady.mockReturnValue(gate)
+        const rows: [number, number, number, number, number][] = [
+            [120000, 2, 4, 0, 3], [180000, 2, 4, 0, 3]
+        ]
+        const options = { resetRange: false }
+        try {
+            const pending = chart.setSeries(rows, options)
+            rows[0][4] = -1
+            options.resetRange = true
+            await vi.waitFor(() => expect(controller.whenReady).toHaveBeenCalled())
+            expect(chart.hub.mainOv!.data![0][0]).toBe(0)
+            ready()
+            await pending
+            expect(chart.hub.mainOv!.data![0]).toEqual([120000, 2, 4, 0, 3])
+            expect(controller.fullUpdate).toHaveBeenCalledWith({ resetRange: false })
+        } finally { chart.destroy() }
+    })
+
+    it('finishes each indicator update before applying the next queued candle', async () => {
+        const { chart } = createChart()
+        const snapshots: number[] = []
+        let release!: () => void
+        const gate = new Promise<void>(resolve => { release = resolve })
+        vi.spyOn(chart.se, 'updateData').mockImplementation(async () => {
+            snapshots.push(chart.hub.mainOv!.data!.at(-1)[0])
+            if (snapshots.length === 1) await gate
+        })
+        try {
+            const first = chart.updateCandle([120000, 1, 2, 0, 1])
+            const second = chart.updateCandle([180000, 1, 2, 0, 1])
+            await vi.waitFor(() => expect(snapshots).toEqual([120000]))
+            expect(chart.hub.mainOv!.data).toHaveLength(3)
+            release()
+            await Promise.all([first, second])
+            expect(snapshots).toEqual([120000, 180000])
+            expect(chart.hub.mainOv!.data).toHaveLength(4)
+        } finally { chart.destroy() }
+    })
+
+    it('does not poison the queue after rejecting an old timestamp', async () => {
+        const { chart } = createChart()
+        vi.spyOn(chart.se, 'updateData').mockResolvedValue()
+        try {
+            const results = await Promise.allSettled([
+                chart.updateCandle([0, 1, 2, 0, 1]),
+                chart.updateCandle([120000, 1, 2, 0, 1])
+            ])
+            expect(results.map(x => x.status)).toEqual(['rejected', 'fulfilled'])
+            expect(chart.hub.mainOv!.data).toHaveLength(3)
+            expect(chart.hub.mainOv!.data!.at(-1)[0]).toBe(120000)
+        } finally { chart.destroy() }
+    })
+
+    it('rejects queued changes when destroyed while initialization is pending', async () => {
+        const { chart, controller } = createChart()
+        let ready!: () => void
+        controller.whenReady.mockReturnValue(new Promise<void>(resolve => { ready = resolve }))
+        const pending = chart.setSeries([[120000, 1, 2, 0, 1]])
+        await vi.waitFor(() => expect(controller.whenReady).toHaveBeenCalled())
+        chart.destroy()
+        ready()
+        await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+        expect(controller.fullUpdate).not.toHaveBeenCalled()
+        expect(chart.hub.mainOv!.data).toHaveLength(2)
+        await expect(chart.setSeries(null as never)).rejects.toMatchObject({ name: 'AbortError' })
+        await expect(chart.updateCandle(null as never)).rejects.toMatchObject({ name: 'AbortError' })
     })
 })

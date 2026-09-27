@@ -1,11 +1,14 @@
 const mode = new URLSearchParams(location.search).get('format')
 const { NightVision } = mode === 'umd' ? window.NightVision : await import('night-vision-ts')
 
-window.createChart = (indexBased = false) => {
-    const data = Array.from({ length: 80 }, (_, i) => {
+window.sampleRows = (count = 80, start = 1704067200000) =>
+    Array.from({ length: count }, (_, i) => {
         const close = 100 + i + (i % 2 ? -2 : 2)
-        return [1704067200000 + i * 60000, 100 + i, close + 4, close - 4, close, 1000 + i]
+        return [start + i * 60000, 100 + i, close + 4, close - 4, close, 1000 + i]
     })
+
+window.createChart = (indexBased = false, { empty = false, noMain = false } = {}) => {
+    const data = empty ? [] : window.sampleRows()
     window.chart = new NightVision('chart', {
         id: 'browser-test',
         autoResize: true,
@@ -14,7 +17,9 @@ window.createChart = (indexBased = false) => {
         data: {
             panes: [
                 {
-                    overlays: [{ name: 'Test candles', type: 'Candles', main: true, data }],
+                    overlays: noMain
+                        ? []
+                        : [{ name: 'Test candles', type: 'Candles', main: true, data }],
                     scripts: [{ type: 'SMA', props: { length: 5 } }]
                 }
             ]

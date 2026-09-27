@@ -1,6 +1,6 @@
 // Vanilla JS interface
 
-import { mount, unmount } from 'svelte'
+import { mount, unmount, tick } from 'svelte'
 import NightVisionComp from './NightVision.svelte'
 import DataHub, { Data, Pane, Overlay } from './core/dataHub'
 import MetaHub, { MetaHub as MetaHubType } from './core/metaHub'
@@ -11,9 +11,16 @@ import WebWork, { WebWork as WebWorkType } from './core/se/webWork'
 import SeClient, { SeClient as SeClientType } from './core/se/seClient'
 
 import resizeTracker from './stuff/resizeTracker'
+import { copyCandle, copySeries, type Candle, type SetSeriesOptions } from './core/candleData'
 
 // Re-export types for users
 export type { Data, Pane, Overlay }
+export type { Candle, SetSeriesOptions }
+
+interface SeriesChart {
+    whenReady(): Promise<void>
+    fullUpdate(options: SetSeriesOptions): Promise<void>
+}
 
 export interface Colors {
     back?: string
@@ -74,6 +81,7 @@ class NightVision {
     private _scriptsReady: Promise<unknown>
     private _resizeCleanup: (() => void) | null = null
     private _timers = new Set<ReturnType<typeof setTimeout>>()
+    private _seriesQueue: Promise<void> = Promise.resolve()
     public ww!: WebWorkType
     public se!: SeClientType
     public hub!: ReturnType<typeof DataHub.instance>
@@ -428,6 +436,85 @@ class NightVision {
     }
 
     // *** METHODS ***
+
+    /** Replace the main candle series and recalculate indicators. */
+    async setSeries(rows: readonly Candle[], options: SetSeriesOptions = {}): Promise<void> {
+        this._assertActive()
+        const data = copySeries(rows)
+        const resetRange = options.resetRange ?? true
+        if (typeof resetRange !== 'boolean') {
+            throw new TypeError('resetRange must be a boolean')
+        }
+        return this._queueSeries(async chart => {
+            const overlay = this._candleOverlay()
+            overlay.data = data
+            await chart.fullUpdate({ resetRange })
+        })
+    }
+
+    /** Replace the latest candle at the same timestamp, or append a newer candle. */
+    async updateCandle(row: Candle): Promise<void> {
+        this._assertActive()
+        const candle = copyCandle(row)
+        return this._queueSeries(async chart => {
+            const overlay = this._candleOverlay()
+            const data = overlay.data || (overlay.data = [])
+            const last = data[data.length - 1]
+            if (last && candle[0] < last[0]) {
+                throw new RangeError('Cannot update an older candle; use setSeries to replace history')
+            }
+            const previousLength = data.length
+            if (last && candle[0] === last[0]) data[data.length - 1] = candle
+            else data.push(candle)
+
+            // Rebuild the timeframe and worker state when starting an empty series.
+            if (previousLength < 2) await chart.fullUpdate({ resetRange: !this.range?.length })
+            else await this.se.updateData()
+        })
+    }
+
+    private _assertActive(): void {
+        if (!this._registered) {
+            throw new DOMException('Chart is not mounted or has been destroyed', 'AbortError')
+        }
+    }
+
+    private _queueSeries(operation: (chart: SeriesChart) => Promise<void>): Promise<void> {
+        const pending = this._seriesQueue.then(async () => {
+            this._assertActive()
+            await tick()
+            this._assertActive()
+            const comp = this.comp as unknown as { getChart(): SeriesChart }
+            const chart = comp.getChart()
+            await chart.whenReady()
+            await this._scriptsReady
+            this._assertActive()
+            await operation(chart)
+            this._assertActive()
+            await tick()
+        })
+        // A rejected request must not prevent later valid updates.
+        this._seriesQueue = pending.catch(() => {})
+        return pending
+    }
+
+    private _candleOverlay(): Overlay {
+        this.hub.detectMain()
+        const main = this.hub.mainOv
+        if (main) {
+            if (main.type !== 'Candles' && main.type !== 'CandlesPlus') {
+                throw new TypeError('The main overlay must use Candles or CandlesPlus')
+            }
+            return main
+        }
+        const panes = this._data.panes || (this._data.panes = [])
+        if (!panes.length) panes.push({ overlays: [] })
+        const overlays = panes[0].overlays || (panes[0].overlays = [])
+        const overlay: Overlay = { name: 'Candles', type: 'Candles', main: true, data: [] }
+        overlays.unshift(overlay)
+        this.hub.init(this._data)
+        return overlay
+    }
 
     resize(width: number, height: number): void {
         const widthChanged = !this._sameSize(this._props.width, width)

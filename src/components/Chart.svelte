@@ -29,6 +29,9 @@
     export function getCursor() {
         return cursor
     }
+    export async function whenReady() {
+        await initialization
+    }
 
     // Setters
     export function setRange(val) {
@@ -65,6 +68,7 @@
     let layout = $state(null)
 
     let updateRaf = null
+    let initialization = Promise.resolve()
     let disposed = false
     let cursorHideTimer = null
     let pendingUpdate = {
@@ -95,7 +99,7 @@
     })
 
     onMount(() => {
-        initialize()
+        initialization = initialize()
     })
 
     onDestroy(() => {
@@ -295,7 +299,7 @@
     // or the list of panes/overlays is changed
     // TODO: we can update only panes with
     // overlay changes. But it requires more work
-    async function fullUpdate(opt = {}) {
+    export async function fullUpdate(opt = {}) {
         if (disposed) return
         let prevIbMode = scan.ibMode
         interval = scan.detectInterval()
