@@ -1,0 +1,10 @@
+# Candle datasets stored in JavaScript wrappers are test data.
+tests/tvjs-test/aave-perp.js -linguist-detectable
+tests/tvjs-test/ada-perp.js -linguist-detectable
+tests/tvjs-test/data.js -linguist-detectable
+
+# Third-party bundle used by the TradingVue comparison page.
+tests/tvjs-test/trading-vue.min.js linguist-vendored
+
+# Generated documentation dependency cache.
+docs/docs/.vitepress/cache/** linguist-generated
