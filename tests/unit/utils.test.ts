@@ -158,6 +158,15 @@ describe('Utils TypeScript Migration', () => {
             expect(Utils.findIndexOffset(main, [0, 2, 3, 4, 5].map(t => [t, t]))).toBe(1)
         })
 
+        it('anchors short live series and future points to their matching history bars', () => {
+            const main = [0, 10, 20, 30, 40].map(t => [t, t])
+            expect(Utils.findIndexOffset(main, [[40, 1]])).toBe(4)
+            expect(Utils.findIndexOffset(main, [[30, 1], [40, 2]])).toBe(3)
+            expect(Utils.findIndexOffset(main, [[40, 1], [50, 2], [60, 3]])).toBe(4)
+            expect(Utils.findIndexOffset([[40, 1]], main)).toBe(-4)
+            expect(Utils.findIndexOffset(main, [[10, 1], [30, 2]])).toBe(0)
+        })
+
         it('matches the last duplicate without counting one timestamp multiple times', () => {
             const main = [0, 10, 10, 20, 20, 30, 30].map(t => [t, t])
             expect(Utils.findIndexOffset(main, main.slice(1))).toBe(1)

@@ -11,13 +11,16 @@ import WebWork, { WebWork as WebWorkType } from './core/se/webWork'
 import SeClient, { SeClient as SeClientType } from './core/se/seClient'
 
 import resizeTracker from './stuff/resizeTracker'
+import Utils from './stuff/utils'
+import { copyOverlay, copyOverlayPoint, copyIndicator, copyPane, findTarget, resetRangeOption, validateOverlayData, type IndicatorInput, type IndicatorPatch, type OverlayRow, type DataTarget, type DataUpdateOptions, type OverlayInput, type OverlayPatch, type PaneInput, type PanePatch } from './core/paneData'
 import { copyCandle, copySeries, type Candle, type SetSeriesOptions } from './core/candleData'
 
 // Re-export types for users
 export type { Data, Pane, Overlay }
 export type { Candle, SetSeriesOptions }
+export type { IndicatorInput, IndicatorPatch, DataTarget, DataUpdateOptions, OverlayInput, OverlayPatch, OverlayRow, PaneInput, PanePatch } from './core/paneData'
 
-interface SeriesChart {
+interface DataChart {
     whenReady(): Promise<void>
     fullUpdate(options: SetSeriesOptions): Promise<void>
 }
@@ -81,7 +84,7 @@ class NightVision {
     private _scriptsReady: Promise<unknown>
     private _resizeCleanup: (() => void) | null = null
     private _timers = new Set<ReturnType<typeof setTimeout>>()
-    private _seriesQueue: Promise<void> = Promise.resolve()
+    private _dataQueue: Promise<void> = Promise.resolve()
     public ww!: WebWorkType
     public se!: SeClientType
     public hub!: ReturnType<typeof DataHub.instance>
@@ -445,7 +448,7 @@ class NightVision {
         if (typeof resetRange !== 'boolean') {
             throw new TypeError('resetRange must be a boolean')
         }
-        return this._queueSeries(async chart => {
+        return this._queueData(async chart => {
             const overlay = this._candleOverlay()
             overlay.data = data
             await chart.fullUpdate({ resetRange })
@@ -456,7 +459,7 @@ class NightVision {
     async updateCandle(row: Candle): Promise<void> {
         this._assertActive()
         const candle = copyCandle(row)
-        return this._queueSeries(async chart => {
+        return this._queueData(async chart => {
             const overlay = this._candleOverlay()
             const data = overlay.data || (overlay.data = [])
             const last = data[data.length - 1]
@@ -473,28 +476,223 @@ class NightVision {
         })
     }
 
+    /** Append a pane and return its stable UUID. */
+    async addPane(input: PaneInput = {}, options: DataUpdateOptions = {}): Promise<string> {
+        this._assertActive()
+        const pane = copyPane(input)
+        const resetRange = resetRangeOption(options)
+        return this._queueData(async chart => {
+            pane.uuid = Utils.uuid3()
+            for (const overlay of pane.overlays || []) overlay.uuid = Utils.uuid3()
+            const main = pane.overlays?.find(overlay => overlay.main)
+            if (main) this._selectMain(main)
+            ;(this._data.panes ||= []).push(pane)
+            await this._refreshData(chart, resetRange)
+            return pane.uuid!
+        })
+    }
+
+    /** Shallow-merge pane settings without changing its identity or contents. */
+    async updatePane(target: DataTarget, patch: PanePatch, options: DataUpdateOptions = {}): Promise<void> {
+        this._assertActive()
+        const next = copyPane(patch, true)
+        const resetRange = resetRangeOption(options)
+        return this._queueData(async chart => {
+            const pane = findTarget(this._data.panes || [], target, 'Pane')
+            if (next.settings) pane.settings = { ...pane.settings, ...next.settings }
+            await this._refreshData(chart, resetRange)
+        })
+    }
+
+    /** Remove a pane, including its overlays and indicator scripts. */
+    async removePane(target: DataTarget, options: DataUpdateOptions = {}): Promise<void> {
+        this._assertActive()
+        const resetRange = resetRangeOption(options)
+        return this._queueData(async chart => {
+            const panes = this._data.panes || []
+            const pane = findTarget(panes, target, 'Pane')
+            panes.splice(panes.indexOf(pane), 1)
+            await this._refreshData(chart, resetRange)
+        })
+    }
+
+    /** Append an overlay to a pane and return its stable UUID. */
+    async addOverlay(target: DataTarget, input: OverlayInput, options: DataUpdateOptions = {}): Promise<string> {
+        this._assertActive()
+        const overlay = copyOverlay(input, true)
+        const resetRange = resetRangeOption(options)
+        return this._queueData(async chart => {
+            const pane = findTarget(this._data.panes || [], target, 'Pane')
+            overlay.uuid = Utils.uuid3()
+            if (overlay.main) this._selectMain(overlay)
+            ;(pane.overlays ||= []).push(overlay)
+            await this._refreshData(chart, resetRange)
+            return overlay.uuid!
+        })
+    }
+
+    /** Replace supplied fields; shallow-merge settings and props. */
+    async updateOverlay(paneTarget: DataTarget, target: DataTarget, patch: OverlayPatch, options: DataUpdateOptions = {}): Promise<void> {
+        this._assertActive()
+        const next = copyOverlay(patch)
+        const resetRange = resetRangeOption(options)
+        return this._queueData(async chart => {
+            const overlay = this._editableOverlay(paneTarget, target)
+            if (next.type !== undefined || next.data !== undefined) {
+                validateOverlayData(next.type ?? overlay.type, next.data ?? overlay.data ?? [])
+            }
+            if (next.main) this._selectMain(overlay)
+            const settings = next.settings ? { ...overlay.settings, ...next.settings } : overlay.settings
+            const props = next.props ? { ...overlay.props, ...next.props } : overlay.props
+            Object.assign(overlay, next, { settings, props })
+            await this._refreshData(chart, resetRange)
+        })
+    }
+
+    /** Remove a user-supplied overlay. Its pane remains in the dataset. */
+    async removeOverlay(paneTarget: DataTarget, target: DataTarget, options: DataUpdateOptions = {}): Promise<void> {
+        this._assertActive()
+        const resetRange = resetRangeOption(options)
+        return this._queueData(async chart => {
+            const overlay = this._editableOverlay(paneTarget, target)
+            const pane = findTarget(this._data.panes || [], paneTarget, 'Pane')
+            pane.overlays!.splice(pane.overlays!.indexOf(overlay), 1)
+            await this._refreshData(chart, resetRange)
+        })
+    }
+
+    /** Replace the latest overlay row at the same timestamp, or append a newer row. */
+    async updateOverlayPoint(paneTarget: DataTarget, target: DataTarget, row: OverlayRow): Promise<void> {
+        this._assertActive()
+        const point = copyOverlayPoint(row)
+        return this._queueData(async chart => {
+            const overlay = this._editableOverlay(paneTarget, target)
+            validateOverlayData(overlay.type, [point])
+            const data = overlay.data || []
+            const last = data[data.length - 1]
+            if (last && (point[0] as number) < last[0]) {
+                throw new RangeError('Cannot update an older overlay point; use updateOverlay to replace history')
+            }
+            const previousLength = data.length
+            if (last && point[0] === last[0]) data[data.length - 1] = point
+            else data.push(point)
+            overlay.data = data
+            this.hub.detectMain()
+            if (overlay === this.hub.mainOv) {
+                if (previousLength < 2) await chart.fullUpdate({ resetRange: !this.range?.length })
+                else await this.se.updateData()
+            } else {
+                this.update('data')
+            }
+        })
+    }
+
+    /** Add a registered indicator to a pane and return its stable script UUID. */
+    async addIndicator(paneTarget: DataTarget, input: IndicatorInput, options: DataUpdateOptions = {}): Promise<string> {
+        this._assertActive()
+        const indicator = copyIndicator(input, true)
+        const resetRange = resetRangeOption(options)
+        return this._queueData(async chart => {
+            const pane = findTarget(this._data.panes || [], paneTarget, 'Pane')
+            this._assertIndicatorType(indicator.type)
+            indicator.uuid = Utils.uuid3()
+            ;(pane.scripts ||= []).push(indicator)
+            await this._refreshData(chart, resetRange)
+            return indicator.uuid!
+        })
+    }
+
+    /** Update an indicator definition and recalculate its generated overlays. */
+    async updateIndicator(paneTarget: DataTarget, target: DataTarget, patch: IndicatorPatch, options: DataUpdateOptions = {}): Promise<void> {
+        this._assertActive()
+        const next = copyIndicator(patch)
+        const resetRange = resetRangeOption(options)
+        return this._queueData(async chart => {
+            const pane = findTarget(this._data.panes || [], paneTarget, 'Pane')
+            const indicator = findTarget(pane.scripts || [], target, 'Indicator')
+            this._assertIndicatorType(next.type ?? indicator.type)
+            const settings = next.settings ? { ...indicator.settings, ...next.settings } : indicator.settings
+            const props = next.props ? { ...indicator.props, ...next.props } : indicator.props
+            Object.assign(indicator, next, { settings, props })
+            await this._refreshData(chart, resetRange)
+        })
+    }
+
+    /** Remove an indicator and all overlays it generated, keeping its pane. */
+    async removeIndicator(paneTarget: DataTarget, target: DataTarget, options: DataUpdateOptions = {}): Promise<void> {
+        this._assertActive()
+        const resetRange = resetRangeOption(options)
+        return this._queueData(async chart => {
+            const pane = findTarget(this._data.panes || [], paneTarget, 'Pane')
+            const indicator = findTarget(pane.scripts || [], target, 'Indicator')
+            pane.scripts!.splice(pane.scripts!.indexOf(indicator), 1)
+            for (const current of this._data.panes || []) {
+                current.overlays = (current.overlays || []).filter(overlay =>
+                    !indicator.uuid || overlay.prod !== indicator.uuid)
+            }
+            await this._refreshData(chart, resetRange)
+        })
+    }
+
+    private _assertIndicatorType(type: string | undefined): void {
+        if (!type || !Object.prototype.hasOwnProperty.call(this.scriptHub.iScripts, type)) {
+            throw new RangeError(`Unknown indicator type: ${type}`)
+        }
+    }
+
+    private async _refreshData(chart: DataChart, resetRange: boolean): Promise<void> {
+        const panes = this._data.panes || []
+        const authored = panes.flatMap(pane => pane.overlays || [])
+            .filter(overlay => !overlay.prod)
+        const main = authored.find(overlay => overlay.main) || authored[0]
+        if (main) {
+            this._selectMain(main)
+            main.main = true
+        } else {
+            // Derived overlays cannot keep a removed source series alive.
+            for (const pane of panes) pane.overlays = []
+        }
+        await chart.fullUpdate({ resetRange })
+    }
+
+    private _editableOverlay(paneTarget: DataTarget, target: DataTarget): Overlay {
+        const pane = findTarget(this._data.panes || [], paneTarget, 'Pane')
+        const overlay = findTarget(pane.overlays || [], target, 'Overlay')
+        if (overlay.prod) {
+            throw new TypeError('Script-produced overlays must be managed through their indicator scripts')
+        }
+        return overlay
+    }
+
+    private _selectMain(overlay: Overlay): void {
+        for (const pane of this._data.panes || []) {
+            for (const current of pane.overlays || []) current.main = current === overlay
+        }
+    }
+
     private _assertActive(): void {
         if (!this._registered) {
             throw new DOMException('Chart is not mounted or has been destroyed', 'AbortError')
         }
     }
 
-    private _queueSeries(operation: (chart: SeriesChart) => Promise<void>): Promise<void> {
-        const pending = this._seriesQueue.then(async () => {
+    private _queueData<T>(operation: (chart: DataChart) => Promise<T>): Promise<T> {
+        const pending = this._dataQueue.then(async () => {
             this._assertActive()
             await tick()
             this._assertActive()
-            const comp = this.comp as unknown as { getChart(): SeriesChart }
+            const comp = this.comp as unknown as { getChart(): DataChart }
             const chart = comp.getChart()
             await chart.whenReady()
             await this._scriptsReady
             this._assertActive()
-            await operation(chart)
+            const result = await operation(chart)
             this._assertActive()
             await tick()
+            return result
         })
         // A rejected request must not prevent later valid updates.
-        this._seriesQueue = pending.catch(() => {})
+        this._dataQueue = pending.then(() => {}, () => {})
         return pending
     }
 

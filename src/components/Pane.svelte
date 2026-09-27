@@ -52,7 +52,7 @@ function updateCursor($layout) {
 }
 
 function update($layout, cursorOnly = false) {
-    if (!$layout.grids) return
+    if (!$layout.grids?.[id]) return
     layout = $layout.grids[id]
     events.emitSpec(`grid-${id}`, cursorOnly ? 'update-cursor-grid' : 'update-grid', layout)
     let layers = (grid && grid.getLayers) ?

@@ -8,6 +8,8 @@ import SeClient, { SeClient as SeClientType } from './se/seClient'
 import DataView$ from './dataView'
 
 interface Overlay {
+    /** UUID of the indicator that generated this overlay. */
+    prod?: string
     name?: string
     id?: number
     main?: boolean

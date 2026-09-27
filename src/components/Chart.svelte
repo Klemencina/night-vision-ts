@@ -65,6 +65,7 @@
     let storage = {} // Storage for helper variables
     let ctx = new Context(initialProps) // For measuring text
     let chartRR = $state(0)
+    let renderedPaneIds = ''
     let layout = $state(null)
 
     let updateRaf = null
@@ -271,6 +272,13 @@
         if (updateHash) scan.updatePanesHash()
 
         if (needsLayout) {
+            // Pane components own positional event subscriptions and grid resources.
+            // Recreate them when panes change or a different pane becomes main.
+            const paneIds = JSON.stringify([hub.mainPaneId, hub.panes().map(pane => pane.uuid)])
+            if (paneIds !== renderedPaneIds) {
+                renderedPaneIds = paneIds
+                chartRR++
+            }
             // When only panes/overlays changed (e.g. script-produced overlays),
             // update layout and remake grid without re-running fullUpdate (loadScripts).
             if (scan.panesChanged()) {

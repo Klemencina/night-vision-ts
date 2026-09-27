@@ -387,6 +387,400 @@ for (const format of ['esm', 'umd']) {
                     }
                 )
 
+                await t.test('edits SMA length and applies it to the next candle', async () => {
+                    const result = await page.evaluate(async () => {
+                        const chart = window.chart
+                        const pane = chart.hub.panes()[0]
+                        const script = pane.scripts[0]
+                        const range = [...chart.range]
+                        const originalProps = { ...script.props }
+                        try {
+                            await chart.updateIndicator(pane.uuid, script.uuid, {
+                                props: { length: 3 }
+                            })
+                            const changed = pane.overlays.find(ov => ov.prod === script.uuid)
+                            const closes = chart.hub.mainOv.data.slice(-3).map(row => row[4])
+                            const expected = closes.reduce((sum, close) => sum + close, 0) / 3
+                            const afterEdit = {
+                                value: changed.data.at(-1)[1], expected,
+                                prod: changed.prod,
+                                length: script.props.length,
+                                range: [...chart.range]
+                            }
+                            const last = [...chart.hub.mainOv.data.at(-1)]
+                            last[4] += 12
+                            last[2] = Math.max(last[2], last[4])
+                            await chart.updateCandle(last)
+                            const live = pane.overlays.find(ov => ov.prod === script.uuid)
+                            const liveCloses = chart.hub.mainOv.data.slice(-3).map(row => row[4])
+                            return {
+                                range, afterEdit,
+                                liveValue: live.data.at(-1)[1],
+                                liveExpected: liveCloses.reduce((sum, close) => sum + close, 0) / 3
+                            }
+                        } finally {
+                            await chart.updateIndicator(pane.uuid, script.uuid, {
+                                props: originalProps
+                            })
+                        }
+                    })
+                    assert.equal(result.afterEdit.prod.length > 0, true)
+                    assert.equal(result.afterEdit.length, 3)
+                    assert.deepEqual(result.afterEdit.range, result.range)
+                    assert.ok(Math.abs(result.afterEdit.value - result.afterEdit.expected) < 1e-8)
+                    assert.ok(Math.abs(result.liveValue - result.liveExpected) < 1e-8)
+                    await checkSma(page)
+                })
+
+                await t.test('adds RSI to a pane and removes its generated output', async () => {
+                    const result = await page.evaluate(async () => {
+                        const chart = window.chart
+                        const range = [...chart.range]
+                        const paneId = await chart.addPane()
+                        try {
+                            const unknown = await chart.addIndicator(paneId, {
+                                type: 'MissingIndicator'
+                            }).then(() => 'accepted', error => error.name)
+                            const scriptId = await chart.addIndicator(paneId, {
+                                type: 'RSI', props: { length: 7 }
+                            })
+                            const pane = chart.hub.panes().find(item => item.uuid === paneId)
+                            const output = pane.overlays.find(ov => ov.prod === scriptId)
+                            const added = {
+                                unknown, scriptId, scriptType: pane.scripts[0].type,
+                                outputType: output?.type, outputProd: output?.prod,
+                                outputRows: output?.data.length,
+                                paneCount: chart.hub.panes().length,
+                                range: [...chart.range]
+                            }
+                            await chart.removeIndicator(paneId, 0)
+                            return {
+                                added,
+                                remainingScripts: pane.scripts.length,
+                                remainingOutputs: pane.overlays.filter(ov => ov.prod === scriptId).length,
+                                rangeAfterRemove: [...chart.range],
+                                smaRows: window.indicator().data.length,
+                                range
+                            }
+                        } finally {
+                            await chart.removePane(paneId)
+                        }
+                    })
+                    assert.equal(result.added.unknown, 'RangeError')
+                    assert.equal(result.added.scriptType, 'RSI')
+                    assert.equal(result.added.outputType, 'Range')
+                    assert.equal(result.added.outputProd, result.added.scriptId)
+                    assert.equal(result.added.outputRows, 37)
+                    assert.equal(result.added.paneCount, 2)
+                    assert.equal(result.remainingScripts, 0)
+                    assert.equal(result.remainingOutputs, 0)
+                    assert.equal(result.smaRows, 37)
+                    assert.deepEqual(result.added.range, result.range)
+                    assert.deepEqual(result.rangeAfterRemove, result.range)
+                    await checkSma(page)
+                })
+
+                await t.test('keeps the other SMA when two generate Spline overlays', async () => {
+                    const result = await page.evaluate(async () => {
+                        const chart = window.chart
+                        const pane = chart.hub.panes()[0]
+                        const originalId = pane.scripts[0].uuid
+                        const originalRows = chart.hub.mainOv.data.map(row => [...row])
+                        const firstId = await chart.addIndicator(pane.uuid, {
+                            type: 'SMA', props: { length: 3 }
+                        })
+                        const secondId = await chart.addIndicator(pane.uuid, {
+                            type: 'SMA', props: { length: 7 }
+                        })
+                        try {
+                            const before = pane.overlays.filter(ov => ov.type === 'Spline' && ov.prod)
+                                .map(ov => ov.prod)
+                            await chart.removeIndicator(pane.uuid, firstId)
+                            const after = pane.overlays.filter(ov => ov.type === 'Spline' && ov.prod)
+                                .map(ov => ov.prod)
+                            const last = chart.hub.mainOv.data.at(-1)
+                            await chart.updateCandle([
+                                last[0] + 300000, 260, 270, 250, 265, 10
+                            ])
+                            const remaining = pane.overlays.find(ov => ov.prod === secondId)
+                            const closes = chart.hub.mainOv.data.slice(-7).map(row => row[4])
+                            return {
+                                originalId, firstId, secondId, before, after,
+                                liveValue: remaining.data.at(-1)[1],
+                                liveExpected: closes.reduce((sum, close) => sum + close, 0) / 7,
+                                liveTimestamp: remaining.data.at(-1)[0],
+                                candleTimestamp: chart.hub.mainOv.data.at(-1)[0]
+                            }
+                        } finally {
+                            await chart.removeIndicator(pane.uuid, secondId)
+                            await chart.setSeries(originalRows, { resetRange: false })
+                        }
+                    })
+                    assert.deepEqual(new Set(result.before), new Set([
+                        result.originalId, result.firstId, result.secondId
+                    ]))
+                    assert.deepEqual(new Set(result.after), new Set([
+                        result.originalId, result.secondId
+                    ]))
+                    assert.ok(Math.abs(result.liveValue - result.liveExpected) < 1e-8)
+                    assert.equal(result.liveTimestamp, result.candleTimestamp)
+                    await checkSma(page)
+                })
+
+                await t.test('streams Spline points without changing candle or SMA data', async () => {
+                    const result = await page.evaluate(async () => {
+                        const chart = window.chart
+                        const paneId = chart.hub.panes()[0].uuid
+                        const range = [...chart.range]
+                        const last = chart.hub.mainOv.data.at(-1)
+                        const overlayId = await chart.addOverlay(paneId, {
+                            type: 'Spline', data: [[last[0], 10]]
+                        })
+                        const emptyId = await chart.addOverlay(paneId, {
+                            type: 'Spline', data: []
+                        })
+                        try {
+                            const smaData = window.indicator().data
+                            const smaLast = [...smaData.at(-1)]
+                            const pane = chart.hub.panes()[0]
+                            const overlay = pane.overlays.find(ov => ov.uuid === overlayId)
+                            const data = overlay.data
+                            const replacement = [last[0], 20, { note: { value: 1 } }]
+                            await chart.updateOverlayPoint(paneId, overlayId, replacement)
+                            replacement[2].note.value = 99
+                            const replaced = structuredClone(overlay.data.at(-1))
+                            const point = [last[0] + 300000, 30, { note: { value: 2 } }]
+                            await chart.updateOverlayPoint(paneId, overlayId, point)
+                            point[2].note.value = 99
+                            const appended = structuredClone(overlay.data.at(-1))
+                            const beforeStale = JSON.stringify(overlay.data)
+                            const stale = await chart.updateOverlayPoint(paneId, overlayId, [
+                                last[0], 99
+                            ]).then(() => 'accepted', error => error.name)
+                            const afterStale = JSON.stringify(overlay.data)
+                            await chart.updateOverlayPoint(paneId, emptyId, [last[0], 5])
+                            const empty = pane.overlays.find(ov => ov.uuid === emptyId)
+                            return {
+                                replaced, appended, stale, beforeStale, afterStale,
+                                dataLength: overlay.data.length,
+                                sameData: overlay.data === data,
+                                indexOffset: overlay.indexOffset,
+                                expectedOffset: chart.hub.mainOv.data.length - 1,
+                                emptyData: structuredClone(empty.data),
+                                range: [...chart.range], previousRange: range,
+                                sameSmaData: window.indicator().data === smaData,
+                                smaLast: [...window.indicator().data.at(-1)],
+                                previousSmaLast: smaLast
+                            }
+                        } finally {
+                            await chart.removeOverlay(paneId, overlayId)
+                            await chart.removeOverlay(paneId, emptyId)
+                        }
+                    })
+                    assert.deepEqual(result.replaced, [result.replaced[0], 20, {
+                        note: { value: 1 }
+                    }])
+                    assert.deepEqual(result.appended, [result.appended[0], 30, {
+                        note: { value: 2 }
+                    }])
+                    assert.equal(result.dataLength, 2)
+                    assert.equal(result.sameData, true)
+                    if (indexBased) assert.equal(result.indexOffset, result.expectedOffset)
+                    assert.equal(result.stale, 'RangeError')
+                    assert.equal(result.afterStale, result.beforeStale)
+                    assert.equal(result.emptyData.length, 1)
+                    assert.equal(result.emptyData[0][1], 5)
+                    assert.deepEqual(result.range, result.previousRange)
+                    assert.equal(result.sameSmaData, true)
+                    assert.deepEqual(result.smaLast, result.previousSmaLast)
+                    await checkSma(page)
+                })
+
+                await t.test('adds and edits panes and overlays by stable UUID', async () => {
+                    const result = await page.evaluate(async () => {
+                        const chart = window.chart
+                        const beforeRange = [...chart.range]
+                        const rows = chart.hub.mainOv.data
+                        const paneInput = {
+                            settings: { height: 0.3, tag: 'first' },
+                            overlays: [{
+                                type: 'Spline',
+                                name: 'First series',
+                                data: rows.map(row => [row[0], row[4]])
+                            }]
+                        }
+                        const firstPaneId = await chart.addPane(paneInput)
+                        const secondPaneId = await chart.addPane({
+                            settings: { height: 0.4, tag: 'second' },
+                            overlays: [{
+                                type: 'Spline',
+                                name: 'Second series',
+                                data: rows.map(row => [row[0], row[4] + 5])
+                            }]
+                        })
+                        const secondOverlayId = chart.hub.panes()[2].overlays[0].uuid
+                        const input = {
+                            type: 'Histogram',
+                            name: 'Added histogram',
+                            data: rows.map((row, i) => [row[0], i + 1]),
+                            props: { barWidth: 4 },
+                            settings: { scale: 'B' }
+                        }
+                        const pending = chart.addOverlay(secondPaneId, input)
+                        input.data[0][1] = -1000
+                        input.props.barWidth = 99
+                        const addedOverlayId = await pending
+                        await chart.removePane(firstPaneId)
+                        await chart.updatePane(secondPaneId, {
+                            settings: { height: 0.5 }
+                        })
+                        await chart.updateOverlay(secondPaneId, addedOverlayId, {
+                            name: 'Updated histogram',
+                            data: rows.map((row, i) => [row[0], i + 2]),
+                            props: { lineWidth: 3 },
+                            settings: { display: false }
+                        })
+                        const pane = chart.hub.panes()[1]
+                        const updated = pane.overlays.find(ov => ov.uuid === addedOverlayId)
+                        const workerId = chart.hub.panes()[0].overlays.find(ov => ov.prod)?.uuid
+                        const workerEdit = await chart.removeOverlay(0, workerId).then(
+                            () => 'accepted', error => error.name
+                        )
+                        const snapshot = {
+                            beforeRange,
+                            afterRange: [...chart.range],
+                            paneId: pane.uuid,
+                            paneIndex: pane.id,
+                            layoutGrids: chart.layout.grids.length,
+                            paneSettings: pane.settings,
+                            retainedOverlayId: pane.overlays[0].uuid,
+                            addedOverlayId: updated.uuid,
+                            addedFirstValue: updated.data[0][1],
+                            props: updated.props,
+                            settings: updated.settings,
+                            name: updated.name,
+                            workerEdit
+                        }
+                        await new Promise(resolve => requestAnimationFrame(() =>
+                            requestAnimationFrame(resolve)
+                        ))
+                        snapshot.renderedPanes = document.querySelectorAll('.nvjs-pane').length
+                        snapshot.legendNames = [...document.querySelectorAll('.nvjs-ll-name')]
+                            .map(node => node.textContent.trim())
+                        await chart.removeOverlay(1, 0)
+                        snapshot.remainingOverlayId = chart.hub.panes()[1].overlays[0].uuid
+                        await chart.removePane(secondPaneId)
+                        snapshot.finalPaneCount = chart.hub.panes().length
+                        return snapshot
+                    })
+                    assert.deepEqual(result.afterRange, result.beforeRange)
+                    assert.equal(result.paneIndex, 1)
+                    assert.equal(result.paneId.length > 0, true)
+                    assert.equal(result.layoutGrids, 2)
+                    assert.equal(result.renderedPanes, 2)
+                    assert.ok(result.legendNames.includes('Updated histogram'))
+                    assert.equal(result.paneSettings.tag, 'second')
+                    assert.equal(result.paneSettings.height, 0.5)
+                    assert.equal(result.addedFirstValue, 2)
+                    assert.equal(result.props.barWidth, 4)
+                    assert.equal(result.props.lineWidth, 3)
+                    assert.equal(result.settings.scale, 'B')
+                    assert.equal(result.settings.display, false)
+                    assert.equal(result.name, 'Updated histogram')
+                    assert.equal(result.workerEdit, 'TypeError')
+                    assert.equal(result.remainingOverlayId, result.addedOverlayId)
+                    assert.notEqual(result.retainedOverlayId, result.addedOverlayId)
+                    assert.equal(result.finalPaneCount, 1)
+                    await checkSma(page)
+                    await page.waitForFunction(() =>
+                        document.querySelectorAll('.nvjs-pane').length === 1 &&
+                        window.hasCandlePixels()
+                    )
+                })
+
+                await t.test('moves the main source between existing panes', async () => {
+                    const result = await page.evaluate(async () => {
+                        const chart = window.chart
+                        const originalId = chart.hub.mainOv.uuid
+                        const paneId = await chart.addPane({ overlays: [{
+                            type: 'Candles', name: 'New source',
+                            data: chart.hub.mainOv.data.map(row => [...row])
+                        }] })
+                        await chart.updateOverlay(paneId, 0, { main: true })
+                        chart.hub.legendCollapsed = true
+                        chart.events.emit('update-legend')
+                        await new Promise(resolve => requestAnimationFrame(() =>
+                            requestAnimationFrame(resolve)
+                        ))
+                        const snapshot = {
+                            mainPane: chart.hub.mainPaneId,
+                            legendNames: [...document.querySelectorAll('.nvjs-ll-name')]
+                                .map(node => node.textContent.trim())
+                        }
+                        await chart.updateOverlay(0, originalId, { main: true })
+                        await chart.removePane(paneId)
+                        chart.hub.legendCollapsed = false
+                        chart.events.emit('update-legend')
+                        return snapshot
+                    })
+                    assert.equal(result.mainPane, 1)
+                    assert.deepEqual(result.legendNames, ['New source'])
+                    await checkSma(page)
+                })
+
+                await t.test('promotes a remaining candle overlay and restores an empty chart', async () => {
+                    const result = await page.evaluate(async () => {
+                        const chart = window.chart
+                        const originalId = chart.hub.mainOv.uuid
+                        const rows = chart.hub.mainOv.data.map(row => [...row])
+                        const replacementId = await chart.addOverlay(0, {
+                            type: 'Candles', name: 'Replacement candles', data: rows
+                        })
+                        await chart.removeOverlay(0, originalId)
+                        const promoted = {
+                            uuid: chart.hub.mainOv.uuid,
+                            main: chart.hub.mainOv.main,
+                            workerRows: window.indicator()?.data.length
+                        }
+                        await chart.removeOverlay(0, replacementId)
+                        const empty = {
+                            main: chart.hub.mainOv,
+                            overlays: chart.hub.allOverlays().length,
+                            layoutMain: Boolean(chart.layout?.main)
+                        }
+                        await chart.setSeries(rows)
+                        const restored = {
+                            candles: chart.hub.mainOv.data.length,
+                            indicatorRows: window.indicator()?.data.length
+                        }
+                        await chart.removePane(0)
+                        const noPanes = chart.hub.panes().length
+                        const paneId = await chart.addPane({
+                            overlays: [{ type: 'Candles', main: true, data: rows }]
+                        })
+                        return {
+                            replacementId, promoted, empty, restored, noPanes,
+                            paneId, finalMain: chart.hub.mainOv.uuid,
+                            finalRows: chart.hub.mainOv.data.length
+                        }
+                    })
+                    assert.equal(result.promoted.uuid, result.replacementId)
+                    assert.equal(result.promoted.main, true)
+                    assert.equal(result.promoted.workerRows, 37)
+                    assert.deepEqual(result.empty, {
+                        main: null, overlays: 0, layoutMain: false
+                    })
+                    assert.deepEqual(result.restored, { candles: 37, indicatorRows: 37 })
+                    assert.equal(result.noPanes, 0)
+                    assert.ok(result.paneId)
+                    assert.ok(result.finalMain)
+                    assert.equal(result.finalRows, 37)
+                    await page.waitForFunction(() =>
+                        document.querySelectorAll('.nvjs-pane').length === 1 &&
+                        window.hasCandlePixels()
+                    )
+                })
+
                 await t.test(
                     'resizes through ResizeObserver and preserves the right edge',
                     async () => {
@@ -446,6 +840,67 @@ for (const format of ['esm', 'umd']) {
                         assert.equal(workers.size, 0)
                     }
                 )
+
+                await t.test('adds an indicator before candles and streams the main overlay', async () => {
+                    await page.evaluate(indexBased => {
+                        window.createChart(indexBased, { empty: true, noMain: true })
+                    }, indexBased)
+                    try {
+                        const result = await page.evaluate(async () => {
+                            const chart = window.chart
+                            const paneId = chart.hub.panes()[0].uuid
+                            const indicatorId = await chart.addIndicator(paneId, {
+                                type: 'RSI', props: { length: 3 }
+                            })
+                            const beforeSource = {
+                                main: chart.hub.mainOv,
+                                scriptId: chart.hub.panes()[0].scripts[1].uuid
+                            }
+                            const candleId = await chart.addOverlay(paneId, {
+                                type: 'Candles', main: true, data: []
+                            })
+                            const rows = window.sampleRows(5)
+                            await chart.updateOverlayPoint(paneId, candleId, rows[0])
+                            const afterFirst = chart.hub.mainOv.data.length
+                            await chart.updateOverlayPoint(paneId, candleId, rows[1])
+                            const afterSecond = chart.hub.mainOv.data.length
+                            for (const row of rows.slice(2)) {
+                                await chart.updateOverlayPoint(paneId, candleId, row)
+                            }
+                            const rsi = chart.hub.panes()[0].overlays.find(ov =>
+                                ov.prod === indicatorId
+                            )
+                            return {
+                                beforeSource, indicatorId, candleId,
+                                afterFirst, afterSecond,
+                                mainId: chart.hub.mainOv.uuid,
+                                candles: chart.hub.mainOv.data.length,
+                                smaRows: window.indicator().data.length,
+                                rsiRows: rsi?.data.length,
+                                rsiLast: rsi?.data.at(-1)?.[1],
+                                smaLast: window.indicator().data.at(-1)?.[1],
+                                expectedSma: window.expectedSma()
+                            }
+                        })
+                        assert.equal(result.beforeSource.main, null)
+                        assert.equal(result.beforeSource.scriptId, result.indicatorId)
+                        assert.equal(result.mainId, result.candleId)
+                        assert.equal(result.afterFirst, 1)
+                        assert.equal(result.afterSecond, 2)
+                        assert.equal(result.candles, 5)
+                        assert.equal(result.smaRows, 5)
+                        assert.equal(result.rsiRows, 5)
+                        assert.ok(Number.isFinite(result.rsiLast))
+                        assert.ok(Math.abs(result.smaLast - result.expectedSma) < 1e-8)
+                    } finally {
+                        const closed = [...workers].map(worker =>
+                            once(worker, 'close', { signal: AbortSignal.timeout(15000) })
+                        )
+                        await page.evaluate(() => window.chart.destroy())
+                        await Promise.all(closed)
+                    }
+                    assert.equal(workers.size, 0)
+                })
 
                 await t.test('accepts a series immediately on an empty chart', async () => {
                     await page.evaluate(indexBased => {

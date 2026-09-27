@@ -1,7 +1,6 @@
 // Client-side api for Script Engine. Emits/listens to se events
 
 import DataHub from '../dataHub'
-import Utils from '../../stuff/utils'
 import type { OverlayUpdate } from './script_engine'
 
 interface Chart {
@@ -53,7 +52,8 @@ class SeClient {
     }
 
     async uploadData(): Promise<void> {
-        if (!this.hub?.mainOv?.data) return
+        if (!this.hub) return
+        const ohlcv = this.hub.mainOv?.data || []
         let range: any
         try {
             range = this.chart?.range ?? this.scan?.defaultRange?.() ?? []
@@ -61,7 +61,7 @@ class SeClient {
             range = this.scan?.defaultRange?.() ?? []
         }
         if (!range?.length) {
-            let main = this.hub.mainOv.data
+            let main = ohlcv
             if (!main.length) {
                 range = []
             } else if (this.hub?.data?.indexBased) {
@@ -73,7 +73,7 @@ class SeClient {
         if (this.ww) {
             await this.ww.exec('upload-data', {
                 meta: { range, tf: this.scan.tf },
-                dss: { ohlcv: this.hub.mainOv.data }
+                dss: { ohlcv }
             })
         }
     }
@@ -143,13 +143,15 @@ class SeClient {
             let p = data.find(x => x.uuid === pane.uuid)
             if (p?.overlays) {
                 let ovs = pane.overlays.filter((x: any) => x.prod)
+                let incoming = p.overlays.filter((x: any) => x.prod)
                 for (var i = 0; i < ovs.length; i++) {
                     let dst = ovs[i]
-                    let src = p.overlays[i]
+                    let src = incoming[i]
                     if (dst && src) {
                         dst.name = src.name
                         dst.data = src.data
                         dst.uuid = src.uuid
+                        dst.prod = src.prod
                         if (dst.props && src.props) {
                             Object.assign(dst.props, src.props)
                         } else if (src.props) {
@@ -168,10 +170,16 @@ class SeClient {
     }
 
     onOverlayData(data: any[]): void {
-        let h1 = Utils.ovDispositionHash(this.hub.panes())
-        let h2 = Utils.ovDispositionHash(data)
+        const sameDisposition = this.hub.panes().every((pane: any) => {
+            const current = pane.overlays.filter((ov: any) => ov.prod)
+            const incoming = (data.find(x => x.uuid === pane.uuid)?.overlays || [])
+                .filter((ov: any) => ov.prod)
+            return current.length === incoming.length && current.every((ov: any, i: number) =>
+                ov.prod === incoming[i].prod && ov.type === incoming[i].type
+            )
+        })
 
-        if (h1 === h2) {
+        if (sameDisposition) {
             this.updateOverlays(data)
         } else {
             this.replaceOverlays(data)

@@ -76,7 +76,7 @@ chart.data = {
 }
 ```
 
-## Candle data API
+## Data API
 
 Replace the main candle series or apply a live candle update:
 
@@ -88,6 +88,36 @@ await chart.updateCandle([timestamp, open, high, low, close, volume])
 An equal timestamp replaces the latest candle; a newer timestamp appends one.
 Both methods update indicators and redraw automatically. See the
 [Data API guide](docs/docs/guide/api/data-api.md) for validation and range behavior.
+
+Manage panes and overlays without editing `chart.data`:
+
+```js
+const paneId = await chart.addPane({ settings: { height: 1 } })
+const overlayId = await chart.addOverlay(paneId, {
+    type: 'Spline', name: 'Reference', data: referenceRows
+})
+await chart.updateOverlay(paneId, overlayId, { props: { color: '#38bdf8' } })
+await chart.updatePane(paneId, { settings: { height: 2 } })
+await chart.removeOverlay(paneId, overlayId)
+await chart.removePane(paneId)
+```
+
+The returned UUIDs remain stable when positions change. These methods share the
+candle update queue and preserve the visible range by default.
+
+Add indicators and stream other overlay series through the same queue:
+
+```js
+const smaId = await chart.addIndicator(0, { type: 'SMA', props: { length: 20 } })
+await chart.updateIndicator(0, smaId, { props: { length: 50 } })
+await chart.removeIndicator(0, smaId)
+
+const lineId = await chart.addOverlay(0, { type: 'Spline', data: [] })
+await chart.updateOverlayPoint(0, lineId, [timestamp, value])
+```
+
+Point updates replace the latest row at an equal timestamp or append a newer row.
+Updates to auxiliary series do not rerun indicators.
 
 ## Local tests
 
@@ -135,7 +165,7 @@ up when the run ends. No GitHub Actions setup is required.
 - ~~Create a built-in indicator collection~~
 - ~~Add tool overlays (LineTool, RangeTool)~~
 - NavyJS tutorial
-- Extend the Data API to pane and overlay operations
+- ~~Extend the Data API to pane and overlay operations~~
 - *Toolbar* ???
 - Mobile support
 

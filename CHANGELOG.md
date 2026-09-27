@@ -1,5 +1,27 @@
 ## Unreleased
 
+* Removed empty documentation placeholders and the unused sidebar entry.
+* Added typed `addIndicator()`, `updateIndicator()`, and `removeIndicator()` methods
+  with stable script UUIDs, registered-type validation, and automatic recalculation.
+* Added `updateOverlayPoint()` for incremental overlay rows. Auxiliary series retain
+  their history arrays and update without rerunning indicators.
+* Aligned newly streamed series in index-based charts from one or two matching
+  timestamps instead of requiring three points before finding their bar offset.
+* Matched worker-generated overlays by their producing indicator and output type,
+  preventing stale ownership when indicators are removed or replaced.
+
+* Added typed pane and overlay add, update, and remove methods with UUID targets,
+  copied inputs, and the shared candle update queue. Structural updates preserve
+  the visible range by default and recalculate indicators.
+* Rebuilt rendered panes when the pane list changes, keeping the DOM and layout
+  in sync after additions and removals.
+* Cleared the worker source dataset when the final source overlay is removed.
+* Added local unit and packed-browser coverage for pane and overlay operations,
+  stable identities, input validation, and recovery from an empty chart. Pane input
+  validation rejects overlay arrays with empty slots.
+* Documented the OHLCV source requirement for candle-based indicators when changing
+  the main overlay.
+
 * Excluded JavaScript-wrapped candle datasets, the bundled TradingVue dependency,
   and the generated documentation cache from GitHub language statistics.
 * Backfilled release notes for 0.5.4 and the live-overlay fixes in 0.6.0.

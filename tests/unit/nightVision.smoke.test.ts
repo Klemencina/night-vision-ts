@@ -396,3 +396,217 @@ describe('main candle API queue', () => {
         await expect(chart.updateCandle(null as never)).rejects.toMatchObject({ name: 'AbortError' })
     })
 })
+
+describe('pane and overlay API queue', () => {
+    function createChart() {
+        const chart = new NightVision(document.createElement('div'), {
+            data: { panes: [{ overlays: [{
+                type: 'Candles', main: true,
+                data: [[0, 1, 2, 0, 1], [60000, 1, 2, 0, 1]]
+            }] }] }
+        })
+        const controller = {
+            whenReady: vi.fn(async () => {}),
+            fullUpdate: vi.fn(async (_options: unknown) => {
+                chart.hub.calcSubset([0, 120000])
+                chart.hub.init(chart.data)
+                chart.hub.detectMain()
+            }),
+            getRange: () => [0, 120000]
+        }
+        Object.assign(chart.comp!, { getChart: () => controller })
+        chart.hub.calcSubset([0, 120000])
+        chart.hub.detectMain()
+        return { chart, controller }
+    }
+
+    it('snapshots input before readiness and preserves identities through renumbering', async () => {
+        const { chart, controller } = createChart()
+        let ready!: () => void
+        controller.whenReady.mockReturnValue(new Promise<void>(resolve => { ready = resolve }))
+        const input = { settings: { height: 2 }, overlays: [{ type: 'Spline', data: [[0, 1], [60000, 2]] as [number, number][] }] }
+        const pending = chart.addPane(input)
+        input.overlays[0].data[0][1] = 999
+        input.settings.height = 999
+        try {
+            await vi.waitFor(() => expect(controller.whenReady).toHaveBeenCalled())
+            expect(chart.data.panes).toHaveLength(1)
+            ready()
+            const paneId = await pending
+            const pane = chart.data.panes![1]
+            const overlayId = pane.overlays![0].uuid!
+            expect(pane.settings!.height).toBe(2)
+            expect(pane.overlays![0].data![0][1]).toBe(1)
+            await chart.removePane(0)
+            await chart.updatePane(paneId, { settings: { height: 3 } })
+            await chart.updateOverlay(paneId, overlayId, { name: 'survives' })
+            expect(chart.data.panes![0]).toBe(pane)
+            expect(pane.id).toBe(0)
+            expect(pane.uuid).toBe(paneId)
+            expect(pane.overlays![0].uuid).toBe(overlayId)
+            expect(pane.overlays![0].name).toBe('survives')
+            expect(controller.fullUpdate).toHaveBeenLastCalledWith({ resetRange: false })
+        } finally { ready(); chart.destroy() }
+    })
+
+    it('merges settings and props, replaces data, and selects one main overlay', async () => {
+        const { chart, controller } = createChart()
+        try {
+            const id = await chart.addOverlay(0, {
+                type: 'Spline', settings: { scale: 'B', display: true },
+                props: { color: 'red', lineWidth: 2 }, data: [[0, 1], [60000, 2]]
+            })
+            const data = [[0, 5], [60000, 6]] as const
+            await chart.updateOverlay(0, id, {
+                main: true, data, settings: { display: false }, props: { color: 'blue' }
+            }, { resetRange: true })
+            const overlay = chart.hub.mainOv!
+            expect(overlay.uuid).toBe(id)
+            expect(chart.hub.allOverlays().filter(ov => ov.main)).toHaveLength(1)
+            expect(overlay.settings).toMatchObject({ scale: 'B', display: false })
+            expect(overlay.props).toMatchObject({ color: 'blue', lineWidth: 2 })
+            expect(overlay.data).toEqual(data)
+            expect(overlay.data).not.toBe(data)
+            expect(controller.fullUpdate).toHaveBeenLastCalledWith({ resetRange: true })
+            await chart.removeOverlay(0, id)
+            expect(chart.hub.mainOv!.type).toBe('Candles')
+        } finally { chart.destroy() }
+    })
+
+    it('queues structural changes with candles and recovers after a missing target', async () => {
+        const { chart, controller } = createChart()
+        let release!: () => void
+        const gate = new Promise<void>(resolve => { release = resolve })
+        const update = vi.spyOn(chart.se, 'updateData').mockImplementation(async () => { await gate })
+        try {
+            const candle = chart.updateCandle([120000, 1, 2, 0, 1])
+            const results = Promise.allSettled([
+                chart.removePane('missing'),
+                chart.addOverlay(0, { type: 'Spline', data: [[0, 1]] })
+            ])
+            await vi.waitFor(() => expect(update).toHaveBeenCalled())
+            expect(controller.fullUpdate).not.toHaveBeenCalled()
+            release()
+            await candle
+            expect((await results).map(x => x.status)).toEqual(['rejected', 'fulfilled'])
+            expect(chart.hub.mainOv!.data).toHaveLength(3)
+            expect(chart.hub.allOverlays()).toHaveLength(2)
+        } finally { release(); chart.destroy() }
+    })
+
+    it('rejects invalid and script-owned edits without mutation', async () => {
+        const { chart, controller } = createChart()
+        try {
+            const pane = chart.data.panes![0]
+            const produced = { type: 'Spline', uuid: 'produced', prod: 'indicator', data: [] }
+            pane.overlays!.push(produced)
+            await expect(chart.updateOverlay(0, 0, { data: [[1, 1]] })).rejects.toThrow('candle')
+            await expect(chart.removeOverlay(0, 'produced')).rejects.toThrow('indicator scripts')
+            await expect(chart.updateOverlay(0, 'produced', { name: 'changed' })).rejects.toThrow('indicator scripts')
+            await expect(chart.addOverlay(0, { type: 'Spline', data: [[2, 1], [1, 2]] })).rejects.toThrow('increasing')
+            await expect(chart.updatePane(0, { settings: {} }, { resetRange: 'yes' } as never)).rejects.toThrow('boolean')
+            expect(pane.overlays![1]).toBe(produced)
+            expect(controller.fullUpdate).not.toHaveBeenCalled()
+            await chart.removeOverlay(0, 0)
+            expect(pane.overlays).toEqual([])
+            expect(chart.hub.mainOv).toBeNull()
+            await chart.setSeries([[0, 1, 2, 0, 1], [60000, 1, 2, 0, 1]])
+            expect(chart.hub.mainOv!.type).toBe('Candles')
+        } finally { chart.destroy() }
+    })
+
+    it('streams copied auxiliary rows without recalculating the worker or replacing history', async () => {
+        const { chart, controller } = createChart()
+        try {
+            const id = await chart.addOverlay(0, { type: 'Spline', data: [[0, 1], [60000, 2]] })
+            const overlay = chart.hub.allOverlays().find(ov => ov.uuid === id)!
+            const data = overlay.data!
+            controller.fullUpdate.mockClear()
+            const workerUpdate = vi.spyOn(chart.se, 'updateData')
+            const row: [number, { value: number }] = [120000, { value: 3 }]
+            const pending = chart.updateOverlayPoint(0, id, row)
+            row[1].value = 999
+            await pending
+            await chart.updateOverlayPoint(0, id, [120000, 4])
+            expect(overlay.data).toBe(data)
+            expect(data).toEqual([[0, 1], [60000, 2], [120000, 4]])
+            expect(workerUpdate).not.toHaveBeenCalled()
+            expect(controller.fullUpdate).not.toHaveBeenCalled()
+            const results = await Promise.allSettled([
+                chart.updateOverlayPoint(0, id, [0, 99]),
+                chart.updateOverlayPoint(0, id, [180000, 5])
+            ])
+            expect(results.map(result => result.status)).toEqual(['rejected', 'fulfilled'])
+            expect(data).toHaveLength(4)
+        } finally { chart.destroy() }
+    })
+
+    it('validates candle points and routes main-source updates to the worker', async () => {
+        const { chart } = createChart()
+        try {
+            const update = vi.spyOn(chart.se, 'updateData').mockResolvedValue()
+            await expect(chart.updateOverlayPoint(0, 0, [120000, 1])).rejects.toThrow('candle')
+            await chart.updateOverlayPoint(0, 0, [120000, 1, 2, 0, 1])
+            expect(update).toHaveBeenCalledTimes(1)
+            expect(chart.hub.mainOv!.data).toHaveLength(3)
+            chart.data.panes![0].overlays!.push({ uuid: 'generated', prod: 'indicator', data: [] } as never)
+            await expect(chart.updateOverlayPoint(0, 'generated', [120000, 1])).rejects.toThrow('indicator scripts')
+        } finally { chart.destroy() }
+    })
+
+    it('adds and edits indicator definitions by stable UUID and rejects unknown types', async () => {
+        const { chart, controller } = createChart()
+        try {
+            const input = { type: 'SMA', props: { length: 5, color: 'red' } }
+            const pending = chart.addIndicator(0, input)
+            input.props.length = 999
+            const first = await pending
+            const second = await chart.addIndicator(0, { type: 'RSI', props: { length: 14 } })
+            expect(chart.data.panes![0].scripts![0].props!.length).toBe(5)
+            await chart.updateIndicator(0, first, { props: { length: 10 }, settings: { execOrder: 2 } })
+            expect(chart.data.panes![0].scripts![0]).toMatchObject({
+                uuid: first, type: 'SMA', props: { length: 10, color: 'red' }, settings: { execOrder: 2 }
+            })
+            await expect(chart.updateIndicator(0, first, { type: 'Missing' })).rejects.toThrow('Unknown indicator')
+            await expect(chart.addIndicator(0, { type: 'toString' })).rejects.toThrow('Unknown indicator')
+            expect(chart.data.panes![0].scripts).toHaveLength(2)
+            await chart.removeIndicator(0, first)
+            await chart.updateIndicator(0, second, { props: { length: 7 } })
+            expect(chart.data.panes![0].scripts![0]).toMatchObject({ uuid: second, props: { length: 7 } })
+            expect(controller.fullUpdate).toHaveBeenLastCalledWith({ resetRange: false })
+        } finally { chart.destroy() }
+    })
+
+    it('removes only the selected indicator outputs across all panes', async () => {
+        const { chart } = createChart()
+        try {
+            const first = await chart.addIndicator(0, { type: 'SMA' })
+            const second = await chart.addIndicator(0, { type: 'SMA' })
+            const paneId = await chart.addPane()
+            const pane = chart.data.panes![1]
+            const retained = { prod: second, type: 'Spline', data: [], uuid: 'keep' }
+            chart.data.panes![0].overlays!.push({ prod: first, data: [] } as never, retained)
+            pane.overlays!.push({ prod: first, data: [] } as never)
+            await chart.removeIndicator(0, first)
+            expect(chart.data.panes![0].overlays).toContain(retained)
+            expect(pane.overlays).toEqual([])
+            expect(pane.uuid).toBe(paneId)
+            expect(chart.data.panes![0].scripts!.map(script => script.uuid)).toEqual([second])
+        } finally { chart.destroy() }
+    })
+
+    it('rejects queued and subsequent pane operations after destruction', async () => {
+        const { chart, controller } = createChart()
+        let ready!: () => void
+        controller.whenReady.mockReturnValue(new Promise<void>(resolve => { ready = resolve }))
+        const pending = chart.addPane()
+        await vi.waitFor(() => expect(controller.whenReady).toHaveBeenCalled())
+        chart.destroy()
+        ready()
+        await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+        await expect(chart.addOverlay(0, { type: 'Spline' })).rejects.toMatchObject({ name: 'AbortError' })
+        await expect(chart.addIndicator(0, { type: 'SMA' })).rejects.toMatchObject({ name: 'AbortError' })
+        await expect(chart.updateOverlayPoint(0, 0, [0, 1])).rejects.toMatchObject({ name: 'AbortError' })
+        expect(controller.fullUpdate).not.toHaveBeenCalled()
+    })
+})

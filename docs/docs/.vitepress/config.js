@@ -122,10 +122,6 @@ export default {
                     {
                         text: 'Indicator Scripts',
                         link: '/guide/navy-js/indicator-scripts'
-                    },
-                    {
-                        text: 'Advanced Stuff',
-                        link: '/guide/navy-js/advanced-stuff'
                     }
                 ]
             },

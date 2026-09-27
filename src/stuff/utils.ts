@@ -443,6 +443,7 @@ export default {
         let j = lowerBound(ts, start)
         let offset = 0
         let matches = 0
+        let consistent = true
         while (i < mainTs.length && j < ts.length) {
             const mainTime = mainTs[i][0]
             const time = ts[j][0]
@@ -455,6 +456,7 @@ export default {
                 while (i + 1 < mainTs.length && mainTs[i + 1][0] === mainTime) i++
                 while (j + 1 < ts.length && ts[j + 1][0] === time) j++
                 const nextOffset = i - j
+                if (matches && nextOffset !== offset) consistent = false
                 matches = matches && nextOffset === offset ? matches + 1 : 1
                 offset = nextOffset
                 if (matches === 3) return offset
@@ -462,7 +464,9 @@ export default {
                 j++
             }
         }
-        return 0
+        // A new live series may share only one or two timestamps with history.
+        // Use those anchors when they agree instead of placing it at bar zero.
+        return consistent && matches ? offset : 0
     },
 
     // Format cash values
