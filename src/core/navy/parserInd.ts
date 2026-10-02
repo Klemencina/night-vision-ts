@@ -3,8 +3,8 @@
 import tools from './tools'
 
 const SPLIT = /\[[\s]*?UPDATE[\s]*?\]|\[[\s]*?POST[\s]*?\]/gm
-const UPDATE = /\[[\s]*?UPDATE[\s]*?\]([\s\S]*?)(\[POST|\[UPDATE|\[EOF)/gm
-const POST = /\[[\s]*?POST[\s]*?\]([\s\S]*?)(\[POST|\[UPDATE|\[EOF)/gm
+const UPDATE = /\[\s*UPDATE\s*\]([\s\S]*?)(?=\[\s*(?:POST|UPDATE|EOF)\s*\])/gm
+const POST = /\[\s*POST\s*\]([\s\S]*?)(?=\[\s*(?:POST|UPDATE|EOF)\s*\])/gm
 const PROP_REGEX = /prop\s*\(\s*['"]([^'"]+)['"]\s*,\s*\{([^}]+)\}\s*\)/g
 
 interface TagProps {
