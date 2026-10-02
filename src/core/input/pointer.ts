@@ -19,6 +19,9 @@ interface Layout {
     height: number
     $hi: number
     $lo: number
+    scaleSpecs: {
+        log: boolean
+    }
     settings: {
         logScale?: boolean
     }
@@ -537,7 +540,7 @@ export default class Input {
         let d$ = this.layout.$hi - this.layout.$lo
         d$ *= (this.drug!.y - y) / this.layout.height
         let offset = this.drug!.o + d$
-        let ls = this.layout.settings.logScale
+        let ls = this.layout.scaleSpecs.log
 
         var range: number[] | undefined
         if (ls && this.drug!.y_r) {
