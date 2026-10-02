@@ -138,7 +138,7 @@ export default class ParserOV {
                 let block = code.slice(arrow).split('\n')[0].trim()
                 this.parseFlags(fname, fargs, block)
 
-                i = arrow + 1
+                i = arrow
             }
         } while (m)
         return copy + code.slice(i)
