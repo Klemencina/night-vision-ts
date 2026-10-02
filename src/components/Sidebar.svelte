@@ -334,7 +334,7 @@
         let range = yRange.slice()
         let delta = range[0] - range[1]
 
-        if (!scale.log) {
+        if (!scale.scaleSpecs.log) {
             range[0] = range[0] + delta * zk * diff1
             range[1] = range[1] - delta * zk * diff2
         } else {
