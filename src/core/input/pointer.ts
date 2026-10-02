@@ -486,7 +486,7 @@ export default class Input {
             if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) {
                 delta *= 0.1
             }
-            this.trackpadScroll(event)
+            this.trackpadScroll(event, true)
             updated = true
         }
 
@@ -500,8 +500,11 @@ export default class Input {
         // needs to follow f(mouse_wheel_speed) and
         // if speed is low, scroll shoud be slower
         let data = this.hub.mainOv.dataSubset
-        if (delta < 0 && data.length <= this.MIN_ZOOM) return
-        if (delta > 0 && data.length > this.MAX_ZOOM) return
+        if ((delta < 0 && data.length <= this.MIN_ZOOM) ||
+            (delta > 0 && data.length > this.MAX_ZOOM)) {
+            if (updated) this.changeRange()
+            return
+        }
         let k = this.interval / 1000
         let diff = delta * k * data.length
         let tl = this.props.config.ZOOM_MODE === 'tl'
@@ -529,8 +532,7 @@ export default class Input {
                 diff2
             })
         }
-        // TODO: fix doulbe updates (only on120hz macbook)
-        /*if (!updated)*/ this.changeRange()
+        this.changeRange()
     }
 
     mousedrag(x: number, y: number, deferChange = false): boolean {
@@ -587,7 +589,7 @@ export default class Input {
         return true
     }
 
-    trackpadScroll(event: any): void {
+    trackpadScroll(event: any, deferChange = false): void {
         if (this.meta.scrollLock) return
 
         let dt = this.range[1] - this.range[0]
@@ -595,7 +597,7 @@ export default class Input {
         this.range[0] += event.deltaX * dt * 0.011
         this.range[1] += event.deltaX * dt * 0.011
 
-        this.changeRange()
+        if (!deferChange) this.changeRange()
     }
 
     changeRange(): void {
