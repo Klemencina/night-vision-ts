@@ -12,6 +12,122 @@ const FDEFS1 = /(function |)([$A-Za-z_$][0-9A-Za-z_$.]*)[\s]*?\(([^)]*)\)/im
 const FDEFS2 = /(function |)([$A-Za-z_$][0-9A-Za-z_$.]*)[\s]*?\(([^)]*)\)/gims
 const DEF_LIMIT = 5
 
+// Keep literal text out of call and history-index rewriting. Template expressions
+// remain code, including expressions inside nested templates.
+function protectLiterals(src: string): { code: string; restore: (code: string) => string } {
+    let prefix = '__navy_literal_'
+    while (src.includes(prefix)) prefix += '_'
+    const literals: string[] = []
+    let cursor = 0
+    const save = (text: string): string => `${prefix}${literals.push(text) - 1}__`
+
+    const quoted = (): string => {
+        const start = cursor
+        const quote = src[cursor++]
+        while (cursor < src.length) {
+            const char = src[cursor++]
+            if (char === '\\') cursor++
+            else if (char === quote) break
+        }
+        return save(src.slice(start, cursor))
+    }
+
+    const template = (): string => {
+        let result = src[cursor++]
+        let start = cursor
+        while (cursor < src.length) {
+            if (src[cursor] === '\\') {
+                cursor += 2
+            } else if (src[cursor] === '`') {
+                result += save(src.slice(start, cursor)) + src[cursor++]
+                return result
+            } else if (src[cursor] === '$' && src[cursor + 1] === '{') {
+                result += save(src.slice(start, cursor)) + '${'
+                cursor += 2
+                result += code(true)
+                start = cursor
+            } else {
+                cursor++
+            }
+        }
+        return result + save(src.slice(start, cursor))
+    }
+
+    const code = (expression = false): string => {
+        let result = ''
+        let depth = 0
+        let canStartRegex = true
+        let lastToken = ''
+        const controlParens: boolean[] = []
+        while (cursor < src.length) {
+            const char = src[cursor]
+            if (char === '"' || char === "'") {
+                result += quoted()
+                canStartRegex = false
+                lastToken = ''
+            } else if (char === '`') {
+                result += template()
+                canStartRegex = false
+                lastToken = ''
+            } else if (char === '/' && (src[cursor + 1] === '/' || src[cursor + 1] === '*')) {
+                const start = cursor
+                if (src[cursor + 1] === '/') {
+                    while (cursor < src.length && src[cursor] !== '\n') cursor++
+                } else {
+                    const end = src.indexOf('*/', cursor + 2)
+                    cursor = end < 0 ? src.length : end + 2
+                }
+                result += save(src.slice(start, cursor))
+            } else if (char === '/' && canStartRegex) {
+                const start = cursor++
+                let characterClass = false
+                while (cursor < src.length) {
+                    const next = src[cursor++]
+                    if (next === '\\') cursor++
+                    else if (next === '[') characterClass = true
+                    else if (next === ']') characterClass = false
+                    else if (next === '/' && !characterClass) break
+                }
+                while (/[a-z]/i.test(src[cursor] || '') && cursor < src.length) cursor++
+                result += save(src.slice(start, cursor))
+                canStartRegex = false
+                lastToken = ''
+            } else if (/[$\w]/.test(char)) {
+                const start = cursor++
+                while (cursor < src.length && /[$\w]/.test(src[cursor])) cursor++
+                const token = src.slice(start, cursor)
+                result += token
+                canStartRegex = /^(?:return|throw|case|delete|typeof|void|new|in|instanceof|yield|await)$/.test(token)
+                lastToken = token
+            }
+            else {
+                cursor++
+                result += char
+                if (char === '{') depth++
+                if (char === '}' && expression && depth-- === 0) break
+                if (!/\s/.test(char)) {
+                    if ((char === '+' || char === '-') && src[cursor] === char) {
+                        result += src[cursor++]
+                    } else if (char === ')') {
+                        canStartRegex = controlParens.pop() || false
+                    } else {
+                        if (char === '(') controlParens.push(/^(?:if|while|for|with|switch|catch)$/.test(lastToken))
+                        canStartRegex = !/[\]}]/.test(char) && char !== '.'
+                    }
+                    lastToken = ''
+                }
+            }
+        }
+        return result
+    }
+
+    return {
+        code: code(),
+        restore: value => value.replace(new RegExp(`${prefix}(\\d+)__`, 'g'),
+            (_match, index: string) => literals[Number(index)])
+    }
+}
+
 interface Script {
     uuid: string
     type: string
@@ -185,6 +301,8 @@ export default class ScriptEnv {
     }
 
     prep(src: string): string {
+        const literals = protectLiterals(src)
+        src = literals.code
         let h = this.src.type
         src = '\t\t  let _pref = \`\${_id}<-' + h + '<-\`\n' + src
 
@@ -233,7 +351,7 @@ export default class ScriptEnv {
         } while (m)
 
         let out = u.wrap_idxs(src, 'std_')
-        return out
+        return literals.restore(out)
     }
 
     replace_std_calls(src: string, call_id: number): { src: string; call_id: number } {
