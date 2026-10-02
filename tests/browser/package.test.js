@@ -236,6 +236,41 @@ for (const format of ['esm', 'umd']) {
                     await page.waitForFunction(() => window.hasCandlePixels())
                 })
 
+                await t.test('switches index mode and filters the visible candles in both directions', async () => {
+                    const result = await page.evaluate(async initialMode => {
+                        const chart = window.chart
+                        // Early timestamps keep a broken time-mode grid extension bounded.
+                        const rows = window.sampleRows(80, 60000)
+                        await chart.setSeries(rows)
+                        const snapshots = []
+                        for (const mode of [!initialMode, initialMode]) {
+                            chart.indexBased = mode
+                            await new Promise(resolve => setTimeout(resolve, 0))
+                            await chart.comp.getChart().whenReady()
+                            const defaultRange = [...chart.range]
+                            chart.range = mode ? [10, 30] : [rows[10][0], rows[30][0]]
+                            snapshots.push({
+                                mode,
+                                layoutMode: chart.layout.indexBased,
+                                defaultRange,
+                                visible: chart.hub.mainOv.dataSubset.map(row => row[0])
+                            })
+                        }
+                        await chart.setSeries(window.sampleRows())
+                        return { snapshots, expected: rows.slice(9, 32).map(row => row[0]) }
+                    }, indexBased)
+                    for (const snapshot of result.snapshots) {
+                        assert.equal(snapshot.layoutMode, snapshot.mode)
+                        assert.deepEqual(snapshot.visible, result.expected)
+                        assert.ok(snapshot.defaultRange[0] >= (snapshot.mode ? 0 : 60000))
+                        assert.ok(snapshot.defaultRange[0] < (snapshot.mode ? 79 : 4800000))
+                        assert.ok(snapshot.defaultRange[1] > (snapshot.mode ? 79 : 4800000))
+                        assert.ok(snapshot.defaultRange[1] < (snapshot.mode ? 100 : 6000000))
+                    }
+                    await waitForChart(page)
+                    await checkSma(page)
+                })
+
                 await t.test('serializes a burst of copied candle updates', async () => {
                     const result = await page.evaluate(async () => {
                         const chart = window.chart

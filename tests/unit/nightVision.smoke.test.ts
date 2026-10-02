@@ -153,6 +153,20 @@ describe('NightVision integration smoke', () => {
         second.destroy()
     })
 
+    it.each([false, true])('filters the visible range after changing indexBased from %s', initialMode => {
+        const main = Array.from({ length: 8 }, (_, i) => [60000 * (i + 1), i])
+        const chart = new NightVision(document.createElement('div'), {
+            indexBased: initialMode,
+            data: { panes: [{ overlays: [{ main: true, data: main }] }] }
+        })
+
+        chart.indexBased = !initialMode
+        chart.hub.calcSubset(initialMode ? [180000, 300000] : [2, 4])
+
+        expect(chart.hub.ovDataSubset(0, 0)).toEqual(main.slice(1, 6))
+        chart.destroy()
+    })
+
     it('refreshes inferred offsets before filtering data after a history prepend', () => {
         const main = [10, 20, 30, 40, 50, 60].map(t => [t, t])
         const data = { indexBased: true, panes: [{ settings: {}, overlays: [

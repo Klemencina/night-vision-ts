@@ -281,6 +281,7 @@ class NightVision {
     set indexBased(val: boolean) {
         this._props.indexBased = val
         this._data.indexBased = val
+        if (this.hub) this.hub.indexBased = val
         this._remount()
     }
 
