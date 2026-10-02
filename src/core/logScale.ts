@@ -45,8 +45,15 @@ const logScale: LogScale = {
 
     expand(self: ScaleSelf, height: number): void {
         // expand log scale
-        let A = - height / (math.log(self.$hi) - math.log(self.$lo))
-        let B = - math.log(self.$hi) * A
+        let hi = math.log(self.$hi)
+        let lo = math.log(self.$lo)
+        if (hi === lo && Number.isFinite(hi)) {
+            const padding = Math.log(1.05)
+            hi += padding
+            lo -= padding
+        }
+        let A = - height / (hi - lo)
+        let B = - hi * A
 
         let top = -height * 0.1
         let bot = height * 1.1
