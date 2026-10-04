@@ -1,0 +1,225 @@
+// Navy ~ 0.2-lite
+// <ds>Divergence indicator (price vs oscillator)</ds>
+
+[INDICATOR name=Divergence, version=1.1.0]
+
+prop('oscType', {
+    type: 'string',
+    def: 'rsi',
+    options: ['rsi', 'stoch', 'macd', 'tsi', 'mfi', 'cmo', 'cci', 'roc', 'mom', 'wpr', 'source']
+})
+prop('source', {
+    type: 'string',
+    def: 'close',
+    options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4']
+})
+prop('oscLength', { type: 'integer', def: 14 })
+prop('stochSmooth', { type: 'integer', def: 3 })
+prop('macdFast', { type: 'integer', def: 12 })
+prop('macdSlow', { type: 'integer', def: 26 })
+prop('macdSignal', { type: 'integer', def: 9 })
+prop('macdSource', {
+    type: 'string',
+    def: 'macd',
+    options: ['macd', 'signal', 'hist']
+})
+prop('tsiShort', { type: 'integer', def: 13 })
+prop('tsiLong', { type: 'integer', def: 25 })
+prop('tsiSignal', { type: 'integer', def: 13 })
+prop('tsiSource', {
+    type: 'string',
+    def: 'tsi',
+    options: ['tsi', 'signal']
+})
+prop('lbL', { type: 'integer', def: 7 })
+prop('lbR', { type: 'integer', def: 1 })
+prop('delayPlot', { type: 'boolean', def: true })
+prop('plotOsc', { type: 'boolean', def: true })
+prop('oscStyle', {
+    type: 'string',
+    def: 'auto',
+    options: ['auto', 'spline', 'range']
+})
+prop('showHidden', { type: 'boolean', def: true })
+prop('oscColor', { type: 'color', def: '#3399ff' })
+prop('bandColor', { type: 'color', def: '#535559' })
+prop('backColor', { type: 'color', def: '#381e9c16' })
+prop('bullColor', { type: 'color', def: '#00ff00' })
+prop('bearColor', { type: 'color', def: '#ff0000' })
+prop('hiddenBullColor', { type: 'color', def: '#00ff0080' })
+prop('hiddenBearColor', { type: 'color', def: '#ff000080' })
+prop('upperBand', { type: 'number', def: 70 })
+prop('lowerBand', { type: 'number', def: 30 })
+prop('prec', { type: 'integer', def: 2 })
+prop('zIndex', { type: 'integer', def: 0 })
+
+this.oscRangeSpecs = {
+    name: `Divergence ${$props.oscType.toUpperCase()}`,
+    props: {
+        color: $props.oscColor,
+        bandColor: $props.bandColor,
+        backColor: $props.backColor,
+        upperBand: $props.upperBand,
+        lowerBand: $props.lowerBand
+    },
+    settings: {
+        precision: $props.prec,
+        zIndex: $props.zIndex
+    }
+}
+
+this.oscSplineSpecs = {
+    name: `Divergence ${$props.oscType.toUpperCase()}`,
+    props: {
+        color: $props.oscColor
+    },
+    settings: {
+        precision: $props.prec,
+        zIndex: $props.zIndex
+    }
+}
+
+this.bullSpecs = {
+    name: 'Bull Divergence',
+    props: {
+        color: $props.bullColor,
+        shape: 'triangle',
+        size: 5
+    },
+    settings: {
+        zIndex: $props.zIndex + 1
+    }
+}
+
+this.bearSpecs = {
+    name: 'Bear Divergence',
+    props: {
+        color: $props.bearColor,
+        shape: 'square',
+        size: 4
+    },
+    settings: {
+        zIndex: $props.zIndex + 1
+    }
+}
+
+this.hiddenBullSpecs = {
+    name: 'Hidden Bull Divergence',
+    props: {
+        color: $props.hiddenBullColor,
+        shape: 'triangle',
+        size: 4
+    },
+    settings: {
+        zIndex: $props.zIndex + 1
+    }
+}
+
+this.hiddenBearSpecs = {
+    name: 'Hidden Bear Divergence',
+    props: {
+        color: $props.hiddenBearColor,
+        shape: 'square',
+        size: 3
+    },
+    settings: {
+        zIndex: $props.zIndex + 1
+    }
+}
+
+this.state = {
+    prevLow: NaN,
+    prevLowPrice: NaN,
+    prevHigh: NaN,
+    prevHighPrice: NaN
+}
+
+[UPDATE]
+
+let $ = $props
+let src = close
+if ($.source === 'open') src = open
+if ($.source === 'high') src = high
+if ($.source === 'low') src = low
+if ($.source === 'hl2') src = ts((high[0] + low[0]) / 2)
+if ($.source === 'hlc3') src = ts((high[0] + low[0] + close[0]) / 3)
+if ($.source === 'ohlc4') src = ts((open[0] + high[0] + low[0] + close[0]) / 4)
+
+let osc = src
+if ($.oscType === 'rsi') osc = rsi(src, $.oscLength)
+if ($.oscType === 'stoch') osc = sma(stoch(close, high, low, $.oscLength), $.stochSmooth)
+if ($.oscType === 'macd') {
+    let [m, s, h] = macd(src, $.macdFast, $.macdSlow, $.macdSignal)
+    osc = $.macdSource === 'signal' ? s : $.macdSource === 'hist' ? h : m
+}
+if ($.oscType === 'tsi') {
+    let val = tsi(src, $.tsiShort, $.tsiLong)
+    let sig = ema(val, $.tsiSignal)
+    osc = $.tsiSource === 'signal' ? sig : val
+}
+if ($.oscType === 'mfi') osc = mfi(src, $.oscLength)
+if ($.oscType === 'cmo') osc = cmo(src, $.oscLength)
+if ($.oscType === 'cci') osc = cci(src, $.oscLength)
+if ($.oscType === 'roc') osc = roc(src, $.oscLength)
+if ($.oscType === 'mom') osc = mom(src, $.oscLength)
+if ($.oscType === 'wpr') osc = wpr($.oscLength)
+
+let pl = pivotlow(osc, $.lbL, $.lbR)
+let ph = pivothigh(osc, $.lbL, $.lbR)
+let shouldPlot = !$.delayPlot || onclose()
+
+let bull = NaN
+let hiddenBull = NaN
+let bear = NaN
+let hiddenBear = NaN
+
+if (shouldPlot) {
+    if (!na(pl[0])) {
+        let oscLow = osc[$.lbR]
+        let priceLow = close[$.lbR]
+        if (!na(this.state.prevLow) && !na(this.state.prevLowPrice)) {
+            if (priceLow < this.state.prevLowPrice && oscLow > this.state.prevLow) {
+                bull = oscLow
+            }
+            if ($.showHidden && priceLow > this.state.prevLowPrice && oscLow < this.state.prevLow) {
+                hiddenBull = oscLow
+            }
+        }
+        this.state.prevLow = oscLow
+        this.state.prevLowPrice = priceLow
+    }
+
+    if (!na(ph[0])) {
+        let oscHigh = osc[$.lbR]
+        let priceHigh = close[$.lbR]
+        if (!na(this.state.prevHigh) && !na(this.state.prevHighPrice)) {
+            if (priceHigh > this.state.prevHighPrice && oscHigh < this.state.prevHigh) {
+                bear = oscHigh
+            }
+            if ($.showHidden && priceHigh < this.state.prevHighPrice && oscHigh > this.state.prevHigh) {
+                hiddenBear = oscHigh
+            }
+        }
+        this.state.prevHigh = oscHigh
+        this.state.prevHighPrice = priceHigh
+    }
+}
+
+let bounded = ['rsi', 'stoch', 'mfi', 'wpr', 'cmo'].includes($.oscType)
+let useRange = $.oscStyle === 'range' || ($.oscStyle === 'auto' && bounded)
+
+if ($.plotOsc) {
+    if (useRange) {
+        Range(osc, this.oscRangeSpecs)
+    } else {
+        Spline(osc, this.oscSplineSpecs)
+    }
+}
+
+Sparse(bull, this.bullSpecs)
+Sparse(bear, this.bearSpecs)
+
+if ($.showHidden) {
+    Sparse(hiddenBull, this.hiddenBullSpecs)
+    Sparse(hiddenBear, this.hiddenBearSpecs)
+}
