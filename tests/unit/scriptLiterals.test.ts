@@ -14,6 +14,33 @@ beforeEach(() => {
 })
 
 describe('indicator string literals', () => {
+    it.each([
+        ['keyword property division', `const obj = {return: 4}; const value = obj.return / 2; Spline(sma(close, 1)[0] / value)`, 2],
+        ['optional keyword property division', `const obj = {return: 4}; const value = obj?.return / 2; Spline(sma(close, 1)[0] / value)`, 2],
+        ['regex after a statement block', `if (true) {} /"/.test('"'); Spline(sma(close, 1)[0])`, 4],
+        ['regex after else', `if (false) {} else /"/.test('"'); Spline(sma(close, 1)[0])`, 4],
+        ['object expression division', `const value = {} / 2; if (!Number.isNaN(value)) throw new Error('Division changed'); Spline(sma(close, 1)[0])`, 4],
+        ['function expression division', `const value = function() {} / 2; if (!Number.isNaN(value)) throw new Error('Division changed'); Spline(sma(close, 1)[0])`, 4],
+        ['async function expression division', `const value = async function() {} / 2; if (!Number.isNaN(value)) throw new Error('Division changed'); Spline(sma(close, 1)[0])`, 4],
+        ['keyword object keys', `const value = {function: 1, class: 2} / 2; if (!Number.isNaN(value)) throw new Error('Division changed'); Spline(sma(close, 1)[0])`, 4],
+        ['ternary object division', `const value = false ? 0 : {} / 2; Spline(sma(close, 1)[0])`, 4],
+        ['ternary function division', `const value = false ? 0 : function() {} / 2; Spline(sma(close, 1)[0])`, 4],
+        ['ternary class division', `const value = false ? 0 : class {} / 2; Spline(sma(close, 1)[0])`, 4],
+        ['nested ternary division', `const value = false ? true ? 1 : 2 : false ? 3 : {} / 2; Spline(sma(close, 1)[0])`, 4],
+        ['object key inside a ternary', `const value = false ? {key: 1} : {} / 2; Spline(sma(close, 1)[0])`, 4],
+        ['optional chaining before a label', `const obj = {}; const value = obj?.key; label: {} /"/.test('"'); Spline(sma(close, 1)[0])`, 4],
+        ['nullish coalescing before a switch case', `const value = null ?? 1; switch (value) { case 1: {} /"/.test('"'); } Spline(sma(close, 1)[0])`, 4],
+        ['ternary in a switch case', `switch (1) { case true ? 1 : 0: {} /"/.test('"'); } Spline(sma(close, 1)[0])`, 4],
+        ['regex after a function declaration', `function noop() {} /"/.test('"'); Spline(sma(close, 1)[0])`, 4],
+        ['regex after adjacent blocks', `if (true) {} {} /"/.test('"'); Spline(sma(close, 1)[0])`, 4],
+        ['regex after a catch block', `try {} catch {} /"/.test('"'); Spline(sma(close, 1)[0])`, 4],
+        ['nested block in a template expression', 'Spline(close[0], {name: `${(() => { if (true) {} /"/.test(\'"\'); return sma(close, 1)[0] })()}`})', 4]
+    ])('executes %s without hiding following indicator calls', async (_name, update, value) => {
+        ;(self as any).scriptLib.iScripts.Test = { code: { update } }
+        await se.exec_all()
+        expect((self as any).paneStruct[0].overlays[0]?.data).toEqual([[0, value]])
+    })
+
     it('keeps regex literals and division executable around quoted text', async () => {
         ;(self as any).scriptLib.iScripts.Test = { code: {
             update: `

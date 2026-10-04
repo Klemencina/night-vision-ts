@@ -23,7 +23,15 @@ export type { IndicatorInput, IndicatorPatch, DataTarget, DataUpdateOptions, Ove
 interface DataChart {
     whenReady(): Promise<void>
     fullUpdate(options: SetSeriesOptions): Promise<void>
+    refreshPresentation(options: SetSeriesOptions): void
 }
+
+const panePresentationSettings = new Set([
+    'height', 'logScale', 'scales', 'scaleIndex', 'scaleTemplate', 'scaleSideIdxs'
+])
+const overlayPresentationSettings = new Set([
+    'display', 'zIndex', 'scale', 'precision', 'showLegend', 'legendHtml'
+])
 
 export interface Colors {
     back?: string
@@ -501,7 +509,11 @@ class NightVision {
         return this._queueData(async chart => {
             const pane = findTarget(this._data.panes || [], target, 'Pane')
             if (next.settings) pane.settings = { ...pane.settings, ...next.settings }
-            await this._refreshData(chart, resetRange)
+            if (Object.keys(next.settings || {}).every(key => panePresentationSettings.has(key))) {
+                chart.refreshPresentation({ resetRange })
+            } else {
+                await this._refreshData(chart, resetRange)
+            }
         })
     }
 
@@ -546,7 +558,11 @@ class NightVision {
             const settings = next.settings ? { ...overlay.settings, ...next.settings } : overlay.settings
             const props = next.props ? { ...overlay.props, ...next.props } : overlay.props
             Object.assign(overlay, next, { settings, props })
-            await this._refreshData(chart, resetRange)
+            const presentationOnly = next.type === undefined && next.data === undefined &&
+                next.main === undefined && Object.keys(next.settings || {})
+                    .every(key => overlayPresentationSettings.has(key))
+            if (presentationOnly) chart.refreshPresentation({ resetRange })
+            else await this._refreshData(chart, resetRange)
         })
     }
 
@@ -583,7 +599,7 @@ class NightVision {
                 if (previousLength < 2) await chart.fullUpdate({ resetRange: !this.range?.length })
                 else await this.se.updateData()
             } else {
-                this.update('data')
+                this.update('data', { changes: new Map([[overlay, Math.max(0, previousLength - 1)]]) })
             }
         })
     }
@@ -679,18 +695,28 @@ class NightVision {
 
     private _queueData<T>(operation: (chart: DataChart) => Promise<T>): Promise<T> {
         const pending = this._dataQueue.then(async () => {
-            this._assertActive()
-            await tick()
-            this._assertActive()
-            const comp = this.comp as unknown as { getChart(): DataChart }
-            const chart = comp.getChart()
-            await chart.whenReady()
-            await this._scriptsReady
-            this._assertActive()
-            const result = await operation(chart)
-            this._assertActive()
-            await tick()
-            return result
+            while (true) {
+                this._assertActive()
+                await tick()
+                this._assertActive()
+                const comp = this.comp as unknown as { getChart(): DataChart }
+                const chart = comp.getChart()
+                const scriptsReady = this._scriptsReady
+                try {
+                    await chart.whenReady()
+                    await scriptsReady
+                } catch (error) {
+                    this._assertActive()
+                    if (this.comp !== comp || this._scriptsReady !== scriptsReady) continue
+                    throw error
+                }
+                this._assertActive()
+                if (this.comp !== comp || this._scriptsReady !== scriptsReady) continue
+                const result = await operation(chart)
+                this._assertActive()
+                await tick()
+                return result
+            }
         })
         // A rejected request must not prevent later valid updates.
         this._dataQueue = pending.then(() => {}, () => {})
@@ -741,7 +767,7 @@ class NightVision {
                 const range = this.range
                 this.scan.calcIndexOffsets()
                 if (range) {
-                    this.hub.updateRange(range)
+                    this.hub.updateRange(range, opt.changes)
                 }
                 this.meta.calcOhlcMap()
                 ev.emitSpec('chart', 'update-layout', opt)

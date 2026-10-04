@@ -303,10 +303,23 @@
         if (emit) events.emit('$chart-update')
     }
 
-    // Full update when the dataset changed completely
-    // or the list of panes/overlays is changed
-    // TODO: we can update only panes with
-    // overlay changes. But it requires more work
+    // Refresh overlay instances and layout while preserving indicator history.
+    export function refreshPresentation(opt = {}) {
+        if (disposed) return
+        if (opt.resetRange) {
+            rangeUpdate(scan.defaultRange())
+            hub.updateRange(range)
+        }
+        // Overlay constructors can capture props and register metadata.
+        meta.init(props)
+        meta.restore()
+        update({ immediate: true })
+        events.emit('remake-grid')
+        events.emit('update-legend')
+    }
+
+    // Full update when the dataset or list of panes/overlays changes.
+    // TODO: update only panes with overlay changes.
     export async function fullUpdate(opt = {}) {
         if (disposed) return
         let prevIbMode = scan.ibMode

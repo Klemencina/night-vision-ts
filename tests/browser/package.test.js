@@ -299,6 +299,159 @@ for (const format of ['esm', 'umd']) {
                     await checkSma(page)
                 })
 
+                await t.test('reuses visible subsets during a burst of current-candle updates', async () => {
+                    const result = await page.evaluate(async () => {
+                        const chart = window.chart
+                        const main = chart.hub.mainOv
+                        const indicator = window.indicator()
+                        const mainSubset = main.dataSubset
+                        const indicatorSubset = indicator.dataSubset
+                        const last = main.data.at(-1)
+                        await Promise.all(Array.from({ length: 20 }, (_, i) =>
+                            chart.updateCandle([
+                                last[0], last[1], Math.max(last[2], last[4] + i),
+                                last[3], last[4] + i, last[5]
+                            ])
+                        ))
+                        return {
+                            mainReused: main.dataSubset === mainSubset,
+                            indicatorReused: indicator.dataSubset === indicatorSubset,
+                            mainLast: main.dataSubset.at(-1),
+                            expectedMain: main.data.at(-1),
+                            indicatorLast: indicator.dataSubset.at(-1),
+                            expectedIndicator: indicator.data.at(-1)
+                        }
+                    })
+                    assert.equal(result.mainReused, true)
+                    assert.equal(result.indicatorReused, true)
+                    assert.deepEqual(result.mainLast, result.expectedMain)
+                    assert.deepEqual(result.indicatorLast, result.expectedIndicator)
+                    await checkSma(page)
+                })
+
+                await t.test('refreshes replacement data after a remount during readiness', async () => {
+                    const original = await page.evaluate(() => ({
+                        rows: window.chart.hub.mainOv.data.map(row => [...row]),
+                        colors: window.chart.colors
+                    }))
+                    try {
+                        const result = await page.evaluate(async () => {
+                            const chart = window.chart
+                            const oldController = chart.comp.getChart()
+                            const oldReady = oldController.whenReady
+                            let release
+                            let entered
+                            const gate = new Promise(resolve => { release = resolve })
+                            const waiting = new Promise(resolve => { entered = resolve })
+                            oldController.whenReady = async () => {
+                                entered()
+                                await gate
+                                await oldReady()
+                            }
+                            const rows = window.sampleRows(20, 1704153600000)
+                            const pending = chart.setSeries(rows)
+                            try {
+                                await waiting
+                                chart.colors = { ...chart.colors, grid: '#334455' }
+                                await new Promise(resolve => setTimeout(resolve, 0))
+                                await chart.comp.getChart().whenReady()
+                                release()
+                                await pending
+                                return {
+                                    data: chart.hub.mainOv.data,
+                                    visible: chart.hub.mainOv.dataSubset,
+                                    indicatorLength: window.indicator().data.length,
+                                    actual: window.indicator().data.at(-1)[1],
+                                    expected: rows.slice(-5).reduce((sum, row) => sum + row[4], 0) / 5,
+                                    expectedRows: rows
+                                }
+                            } finally {
+                                release()
+                                await pending
+                            }
+                        })
+                        assert.deepEqual(result.data, result.expectedRows)
+                        assert.deepEqual(result.visible, result.expectedRows)
+                        assert.equal(result.indicatorLength, 20)
+                        assert.ok(Math.abs(result.actual - result.expected) < 1e-8)
+                        await page.waitForFunction(() => window.hasCandlePixels())
+                    } finally {
+                        await page.evaluate(async original => {
+                            window.chart.colors = original.colors
+                            await window.chart.setSeries(original.rows)
+                        }, original)
+                    }
+                })
+
+                await t.test('refreshes pane and overlay presentation without worker recalculation', async () => {
+                    const result = await page.evaluate(async () => {
+                        const chart = window.chart
+                        const paneId = await chart.addPane({
+                            settings: { height: 0.4 },
+                            overlays: [{
+                                type: 'Splines', name: 'Original presentation',
+                                data: chart.hub.mainOv.data.map(row => [row[0], row[4]]),
+                                props: { colors: ['#ff00ff'] }
+                            }]
+                        })
+                        const pane = chart.hub.panes().find(pane => pane.uuid === paneId)
+                        const overlay = pane.overlays[0]
+                        const indicator = window.indicator()
+                        const indicatorRows = indicator.data
+                        const beforeHeight = chart.layout.grids[pane.id].height
+                        const range = [...chart.range]
+                        const calls = []
+                        const originalExec = chart.ww.exec
+                        chart.ww.exec = function (type, data) {
+                            calls.push(type)
+                            return originalExec.call(this, type, data)
+                        }
+                        try {
+                            await chart.updateOverlay(paneId, overlay.uuid, {
+                                name: 'Updated presentation', props: { colors: ['#1122ff'], lineWidth: 3 },
+                                settings: { scale: 'B', precision: 3 }
+                            })
+                            await chart.updatePane(paneId, { settings: { height: 0.8 } })
+                            chart.cursor = {
+                                x: chart.layout.main.width / 2, y: 30, gridId: 0, visible: true
+                            }
+                            await new Promise(resolve => requestAnimationFrame(() =>
+                                requestAnimationFrame(resolve)
+                            ))
+                            const line = [...document.querySelectorAll('.nvjs-legend-line')]
+                                .find(node => node.querySelector('.nvjs-ll-name')?.textContent.trim() === 'Updated presentation')
+                            const snapshot = {
+                                calls: [...calls], range, afterRange: [...chart.range],
+                                indicatorReused: indicator.data === indicatorRows,
+                                beforeHeight, afterHeight: chart.layout.grids[pane.id].height,
+                                legendColor: line?.querySelector('.nvjs-ll-value')?.style.color,
+                                scale: chart.layout.grids[pane.id].scales.B?.scaleSpecs.ovIdxs
+                            }
+                            await chart.updateOverlay(paneId, overlay.uuid, { settings: { display: false } })
+                            await new Promise(resolve => requestAnimationFrame(() =>
+                                requestAnimationFrame(resolve)
+                            ))
+                            const hiddenLine = [...document.querySelectorAll('.nvjs-legend-line')]
+                                .find(node => node.querySelector('.nvjs-ll-name')?.textContent.trim() === 'Updated presentation')
+                            snapshot.hidden = !!hiddenLine?.querySelector('.nvjs-eye')
+                            snapshot.hiddenCalls = [...calls]
+                            return snapshot
+                        } finally {
+                            chart.ww.exec = originalExec
+                            await chart.removePane(paneId)
+                        }
+                    })
+                    assert.deepEqual(result.calls, [])
+                    assert.deepEqual(result.hiddenCalls, [])
+                    assert.equal(result.indicatorReused, true)
+                    assert.deepEqual(result.afterRange, result.range)
+                    assert.ok(result.afterHeight > result.beforeHeight)
+                    assert.equal(result.legendColor, 'rgb(17, 34, 255)')
+                    assert.deepEqual(result.scale, [0])
+                    assert.equal(result.hidden, true)
+                    await checkSma(page)
+                })
+
                 await t.test('rejects invalid and stale rows without changing data', async () => {
                     const result = await page.evaluate(async () => {
                         const chart = window.chart

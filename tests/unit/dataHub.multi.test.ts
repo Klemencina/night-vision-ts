@@ -141,3 +141,95 @@ describe('DataScanner default ranges', () => {
     })
 
 })
+
+describe('streaming visible data', () => {
+    it.each([false, true])('refreshes overlays sharing a changed source, indexBased=%s', indexBased => {
+        const id = `streaming-shared-source-${indexBased}`
+        const hub = DataHub.instance(id)
+        const data = [[10, 1], [20, 2], [30, 3]]
+        const main: Overlay = { main: true, data }
+        const volume: Overlay = { data }
+        const range: [number, number] = indexBased ? [0, 2] : [10, 30]
+        hub.init({ indexBased, panes: [{ overlays: [main, volume] }] })
+        hub.calcSubset(range)
+        try {
+            data[2] = [30, 99]
+            hub.updateRange(range, new Map([[main, 2]]))
+            expect(main.dataSubset).toEqual([[10, 1], [20, 2], [30, 99]])
+            expect(volume.dataSubset).toEqual([[10, 1], [20, 2], [30, 99]])
+            expect(volume.dataSubset!.at(-1)).toBe(data[2])
+
+            data[1] = [20, 88]
+            data.push([40, 44])
+            hub.updateRange(range, new Map([[volume, 1], [main, 3]]))
+            expect(main.dataSubset).toEqual([[10, 1], [20, 88], [30, 99], [40, 44]])
+            expect(volume.dataSubset).toEqual(main.dataSubset)
+        } finally {
+            DataHub.release(id)
+        }
+    })
+
+    it.each([false, true])('updates changed tails without copying visible history, indexBased=%s', indexBased => {
+        const id = `streaming-subsets-${indexBased}`
+        const hub = DataHub.instance(id)
+        const live: Overlay = { main: true, data: [[10, 1], [20, 2], [30, 3], [40, 4]] }
+        const untouched: Overlay = { data: [[10, 10], [20, 20], [30, 30], [40, 40]] }
+        const range: [number, number] = indexBased ? [1, 3] : [20, 40]
+        hub.init({ indexBased, panes: [{ overlays: [live, untouched] }] })
+        hub.calcSubset(range)
+        const visible = live.dataSubset
+        const otherVisible = untouched.dataSubset
+        try {
+            live.data![3] = [40, 99]
+            hub.updateRange(range, new Map([[live, 3]]))
+            expect(live.dataSubset).toEqual([[10, 1], [20, 2], [30, 3], [40, 99]])
+            expect(live.dataSubset).toBe(visible)
+            expect(untouched.dataSubset).toBe(otherVisible)
+
+            live.data!.push([50, 5])
+            hub.updateRange(range, new Map([[live, 4]]))
+            // Include the neighboring point outside the visible range for line drawing.
+            expect(live.dataSubset).toEqual([[10, 1], [20, 2], [30, 3], [40, 99], [50, 5]])
+            expect(live.dataSubset).toBe(visible)
+
+            live.data!.splice(2, 3, [30, 77])
+            hub.updateRange(range, new Map([[live, 2]]))
+            expect(live.dataSubset).toEqual([[10, 1], [20, 2], [30, 77]])
+            expect(live.dataSubset).toBe(visible)
+
+            hub.updateRange(indexBased ? [2, 2] : [30, 30], new Map())
+            expect(live.dataSubset).toEqual([[20, 2], [30, 77]])
+            expect(untouched.dataSubset).toEqual([[20, 20], [30, 30], [40, 40]])
+
+            // Full refreshes still observe edits made directly by the caller.
+            untouched.data![1] = [20, 222]
+            hub.updateRange(indexBased ? [2, 2] : [30, 30])
+            expect(untouched.dataSubset).toEqual([[20, 222], [30, 30], [40, 40]])
+        } finally {
+            DataHub.release(id)
+        }
+    })
+
+    it('rebuilds subsets when source arrays, index offsets, or chart mode change', () => {
+        const id = 'streaming-subset-invalidation'
+        const hub = DataHub.instance(id)
+        const overlay: Overlay = { data: [[10, 1], [20, 2], [30, 3], [40, 4]], indexOffset: 0 }
+        hub.init({ indexBased: true, panes: [{ overlays: [overlay] }] })
+        hub.calcSubset([2, 2])
+        try {
+            overlay.indexOffset = 2
+            hub.updateRange([2, 2], new Map())
+            expect(overlay.dataSubset).toEqual([[10, 1], [20, 2]])
+
+            overlay.data = [[10, 11], [20, 22]]
+            hub.updateRange([2, 2], new Map([[overlay, 1]]))
+            expect(overlay.dataSubset).toEqual([[10, 11], [20, 22]])
+
+            hub.indexBased = false
+            hub.updateRange([2, 2], new Map())
+            expect(overlay.dataSubset).toEqual([[10, 11]])
+        } finally {
+            DataHub.release(id)
+        }
+    })
+})

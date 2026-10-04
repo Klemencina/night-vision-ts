@@ -55,10 +55,19 @@ function protectLiterals(src: string): { code: string; restore: (code: string) =
 
     const code = (expression = false): string => {
         let result = ''
-        let depth = 0
         let canStartRegex = true
         let lastToken = ''
-        const controlParens: boolean[] = []
+        let lastTokenEnd = cursor
+        let asyncExpression = false
+        // A closing statement block permits a regex; an object or function
+        // expression permits division. Keep that distinction through nesting.
+        type Context = {
+            kind: 'block' | 'object' | 'paren' | 'function'
+            expression: boolean
+            ternaries?: number
+        }
+        const contexts: Context[] = [{ kind: expression ? 'object' : 'block', expression }]
+        const context = (): Context => contexts[contexts.length - 1]
         while (cursor < src.length) {
             const char = src[cursor]
             if (char === '"' || char === "'") {
@@ -97,24 +106,79 @@ function protectLiterals(src: string): { code: string; restore: (code: string) =
                 while (cursor < src.length && /[$\w]/.test(src[cursor])) cursor++
                 const token = src.slice(start, cursor)
                 result += token
-                canStartRegex = /^(?:return|throw|case|delete|typeof|void|new|in|instanceof|yield|await)$/.test(token)
-                lastToken = token
+                const property = lastToken === '.'
+                const statement = (!lastToken && !expression) ||
+                    /^(?:;|else|do|try|finally|})$/.test(lastToken) ||
+                    ((lastToken === '{' || lastToken === ':') && context().kind === 'block') ||
+                    (lastToken === 'return' && /[\r\n]/.test(src.slice(lastTokenEnd, start)))
+                if (!property && (token === 'function' || token === 'class')) {
+                    const functionExpression = lastToken === 'async' && !/[\r\n]/.test(src.slice(lastTokenEnd, start))
+                        ? asyncExpression : canStartRegex && !statement
+                    contexts.push({ kind: 'function', expression: functionExpression })
+                }
+                if (token === 'async') asyncExpression = canStartRegex && !statement
+                canStartRegex = !property && /^(?:return|throw|case|delete|typeof|void|new|in|instanceof|yield|await|else|do)$/.test(token)
+                lastToken = property ? 'property' : token
+                lastTokenEnd = cursor
             }
             else {
                 cursor++
                 result += char
-                if (char === '{') depth++
-                if (char === '}' && expression && depth-- === 0) break
                 if (!/\s/.test(char)) {
+                    if (char === '}' && expression && contexts.length === 1) break
+                    let token = char
                     if ((char === '+' || char === '-') && src[cursor] === char) {
                         result += src[cursor++]
-                    } else if (char === ')') {
-                        canStartRegex = controlParens.pop() || false
+                        token += char
+                    } else if (char === '=' && src[cursor] === '>') {
+                        result += src[cursor++]
+                        token = '=>'
+                        canStartRegex = true
+                    } else if (char === '?') {
+                        if (src[cursor] === '?') {
+                            result += src[cursor++]
+                            token = '??'
+                            canStartRegex = true
+                        } else if (src[cursor] === '.' && !/\d/.test(src[cursor + 1] || '')) {
+                            result += src[cursor++]
+                            token = '.'
+                            canStartRegex = false
+                        } else {
+                            context().ternaries = (context().ternaries ?? 0) + 1
+                            canStartRegex = true
+                        }
+                    } else if (char === ':') {
+                        if (context().ternaries) {
+                            context().ternaries!--
+                            // A conditional alternate starts an expression, even
+                            // when its enclosing context is a statement block.
+                            token = '?:'
+                        } else if (context().kind === 'function') {
+                            contexts.pop()
+                        }
+                        canStartRegex = true
+                    } else if (char === '{') {
+                        const parent = context()
+                        let block = parent.kind === 'function' ||
+                            /^(?:else|do|try|catch|finally|;|\)|}|=>)$/.test(lastToken) ||
+                            (!lastToken && !expression)
+                        if (lastToken === ':' || lastToken === '{') block = parent.kind === 'block'
+                        else if (lastToken === 'return') block = /[\r\n]/.test(src.slice(lastTokenEnd, cursor - 1))
+                        contexts.push({ kind: block ? 'block' : 'object', expression: !block })
+                        canStartRegex = true
+                    } else if (char === '(') {
+                        const control = /^(?:if|while|for|with|switch|catch)$/.test(lastToken)
+                        contexts.push({ kind: 'paren', expression: !control })
+                        canStartRegex = true
+                    } else if (char === ')' || char === '}') {
+                        let closed = contexts.length > 1 ? contexts.pop()! : context()
+                        if (closed.kind === 'block' && context().kind === 'function') closed = contexts.pop()!
+                        canStartRegex = !closed.expression
                     } else {
-                        if (char === '(') controlParens.push(/^(?:if|while|for|with|switch|catch)$/.test(lastToken))
                         canStartRegex = !/[\]}]/.test(char) && char !== '.'
                     }
-                    lastToken = ''
+                    lastToken = token
+                    lastTokenEnd = cursor
                 }
             }
         }

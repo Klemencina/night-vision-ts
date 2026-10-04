@@ -1,6 +1,6 @@
 // Client-side api for Script Engine. Emits/listens to se events
 
-import DataHub from '../dataHub'
+import type { Overlay } from '../dataHub'
 import type { OverlayUpdate } from './script_engine'
 
 interface Chart {
@@ -82,15 +82,17 @@ class SeClient {
         if (!this.hub?.mainOv?.data) return
         let ohlcv = this.hub.mainOv.data
         if (!this.ww) return
+        const changes = new Map<Overlay, number>([[this.hub.mainOv, Math.max(0, ohlcv.length - 2)]])
         const data: Record<string, OverlayUpdate> = await this.ww.exec('update-data', { ohlcv: ohlcv.slice(-2) })
         for (var ov of this.hub.allOverlays()) {
             const update = data[ov.uuid]
             if (!update) continue
             ov.data.length = update.start
             for (const row of update.data) ov.data.push(row)
+            changes.set(ov, update.start)
         }
         // Visible subsets keep row references, including the previous live row.
-        this.chart.update('data')
+        this.chart.update('data', { changes })
     }
 
     async execScripts(): Promise<void> {

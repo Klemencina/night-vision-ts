@@ -47,7 +47,9 @@ it('delivers the finalized candle revision and new row through the worker client
                 [overlay.uuid]: { start: 0, data: [[300000, 99], [360000, 2]] }
             }
         })
-        expect(chart.update).toHaveBeenCalledWith('data')
+        expect(chart.update).toHaveBeenCalledWith('data', {
+            changes: new Map([[client.hub.mainOv, 0], [overlay, 0]])
+        })
     } finally {
         post.mockRestore()
     }

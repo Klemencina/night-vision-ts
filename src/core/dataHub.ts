@@ -64,6 +64,12 @@ interface DisplayOvEvent {
     flag: boolean
 }
 
+interface SubsetState {
+    range: [number, number]
+    indexBased: boolean
+    offset: number
+}
+
 class DataHub {
     events: ReturnType<typeof Events.instance>
     se: SeClientType
@@ -74,6 +80,7 @@ class DataHub {
     mainOv: Overlay | null = null
     mainPaneId: number | null = null
     legendCollapsed: boolean
+    private subsetStates = new WeakMap<Overlay, SubsetState>()
 
     constructor(nvId: string) {
         let events = Events.instance(nvId)
@@ -95,6 +102,7 @@ class DataHub {
         this.data = data
         // Index based mode
         this.indexBased = data.indexBased ?? false
+        this.subsetStates = new WeakMap()
 
         this.chart = null // Pane with the main overlay (main pane)
         this.offchart = null // All other panes
@@ -113,14 +121,44 @@ class DataHub {
 
     // Update data on 'range-changed'. Should apply
     // filters only (not updating the full structure)
-    updateRange(range: [number, number]): void {
+    updateRange(range: [number, number], changes?: ReadonlyMap<Overlay, number>): void {
+        // Candles and volume can share one source array. A replacement row must
+        // reach every visible view of that array, including unlisted overlays.
+        const sources = changes && new Map<any[], number>()
+        for (const [overlay, start] of changes || []) {
+            if (overlay.data) sources!.set(overlay.data,
+                Math.min(start, sources!.get(overlay.data) ?? start))
+        }
         for (var pane of this.data.panes || []) {
             for (var ov of pane.overlays || []) {
-                let off = ov.indexOffset
-                ov.dataView = this.filter(ov.data!, range, off)
-                ov.dataSubset = ov.dataView.makeSubset()
+                this.updateSubset(ov, range, sources)
             }
         }
+    }
+
+    private updateSubset(ov: Overlay, range: [number, number], changes?: ReadonlyMap<any[], number>): void {
+        const state = this.subsetStates.get(ov)
+        const offset = ov.indexOffset ?? 0
+        const previous = ov.dataView as DataView$ | undefined
+        const subset = ov.dataSubset
+        const reusable = changes && state && previous && subset && previous.src === ov.data &&
+            state.range[0] === range[0] && state.range[1] === range[1] &&
+            state.indexBased === this.indexBased && state.offset === offset
+        const start = changes?.get(ov.data!)
+        if (reusable && start === undefined) return
+
+        const view = this.filter(ov.data!, range, offset) as DataView$
+        if (reusable && start !== undefined && previous.i1 === view.i1) {
+            // Streaming updates replace a known tail. Keep its visible prefix and
+            // refresh row references before the data operation resolves.
+            const first = Math.max(view.i1, Math.min(start, view.i1 + subset.length))
+            subset.length = Math.max(0, view.length)
+            for (let i = first; i <= view.i2; i++) subset[i - view.i1] = ov.data![i]
+        } else {
+            ov.dataSubset = view.makeSubset()
+        }
+        ov.dataView = view
+        this.subsetStates.set(ov, { range: [range[0], range[1]], indexBased: this.indexBased, offset })
     }
 
     // Calculate visible data section
@@ -138,8 +176,7 @@ class DataHub {
                 ov.id = ovId++
                 ov.main = !!ov.main
                 ov.data = ov.data || []
-                ov.dataView = this.filter(ov.data, range, ov.indexOffset)
-                ov.dataSubset = ov.dataView.makeSubset()
+                this.updateSubset(ov, range)
                 ov.dataExt = ov.dataExt || {}
                 ov.settings = ov.settings || {}
                 ov.props = ov.props || {}

@@ -409,6 +409,47 @@ describe('main candle API queue', () => {
         await expect(chart.setSeries(null as never)).rejects.toMatchObject({ name: 'AbortError' })
         await expect(chart.updateCandle(null as never)).rejects.toMatchObject({ name: 'AbortError' })
     })
+
+    it('refreshes the current controller when a remount replaces a pending controller', async () => {
+        const { chart, controller } = createChart()
+        let release!: () => void
+        controller.whenReady.mockReturnValue(new Promise<void>(resolve => { release = resolve }))
+        const current = {
+            whenReady: vi.fn(async () => {}),
+            fullUpdate: vi.fn(async (_options: unknown) => {}),
+            getRange: () => [0, 120000]
+        }
+        try {
+            const pending = chart.setSeries([[120000, 1, 2, 0, 1]])
+            await vi.waitFor(() => expect(controller.whenReady).toHaveBeenCalled())
+            chart.comp = { getChart: () => current } as never
+            release()
+            await pending
+            expect(controller.fullUpdate).not.toHaveBeenCalled()
+            expect(current.fullUpdate).toHaveBeenCalledWith({ resetRange: true })
+            expect(chart.hub.mainOv!.data).toEqual([[120000, 1, 2, 0, 1]])
+        } finally { release(); chart.destroy() }
+    })
+
+    it('waits for a replacement script upload before changing data', async () => {
+        const { chart, controller } = createChart()
+        let releasePrevious!: () => void
+        let releaseScripts!: () => void
+        ;(chart as any)._scriptsReady = new Promise<void>(resolve => { releasePrevious = resolve })
+        const scripts = new Promise<void>(resolve => { releaseScripts = resolve })
+        const pending = chart.setSeries([[120000, 1, 2, 0, 1]])
+        try {
+            await vi.waitFor(() => expect(controller.whenReady).toHaveBeenCalled())
+            ;(chart as any)._scriptsReady = scripts
+            releasePrevious()
+            await new Promise(resolve => setTimeout(resolve, 0))
+            expect(controller.fullUpdate).not.toHaveBeenCalled()
+            expect(chart.hub.mainOv!.data).toHaveLength(2)
+            releaseScripts()
+            await pending
+            expect(controller.fullUpdate).toHaveBeenCalledOnce()
+        } finally { releasePrevious(); releaseScripts(); await pending; chart.destroy() }
+    })
 })
 
 describe('pane and overlay API queue', () => {
@@ -421,6 +462,7 @@ describe('pane and overlay API queue', () => {
         })
         const controller = {
             whenReady: vi.fn(async () => {}),
+            refreshPresentation: vi.fn((_options: unknown) => {}),
             fullUpdate: vi.fn(async (_options: unknown) => {
                 chart.hub.calcSubset([0, 120000])
                 chart.hub.init(chart.data)
@@ -484,6 +526,28 @@ describe('pane and overlay API queue', () => {
             expect(controller.fullUpdate).toHaveBeenLastCalledWith({ resetRange: true })
             await chart.removeOverlay(0, id)
             expect(chart.hub.mainOv!.type).toBe('Candles')
+        } finally { chart.destroy() }
+    })
+
+    it('refreshes presentation edits without recalculating indicators', async () => {
+        const { chart, controller } = createChart()
+        try {
+            await chart.updatePane(0, { settings: { height: 2, logScale: true } })
+            await chart.updateOverlay(0, 0, {
+                name: 'Renamed candles', props: { color: 'blue' },
+                settings: { display: false, precision: 3 }
+            }, { resetRange: true })
+            expect(controller.fullUpdate).not.toHaveBeenCalled()
+            expect(controller.refreshPresentation.mock.calls).toEqual([
+                [{ resetRange: false }], [{ resetRange: true }]
+            ])
+            expect(chart.data.panes![0].settings).toMatchObject({ height: 2, logScale: true })
+            expect(chart.hub.mainOv).toMatchObject({
+                name: 'Renamed candles', props: { color: 'blue' },
+                settings: { display: false, precision: 3 }
+            })
+            await chart.updateOverlay(0, 0, { settings: { timeFrame: '5m' } })
+            expect(controller.fullUpdate).toHaveBeenCalledOnce()
         } finally { chart.destroy() }
     })
 

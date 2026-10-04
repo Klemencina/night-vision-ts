@@ -9,8 +9,9 @@ describe('indicator update responses', () => {
         const hub = DataHub.instance(id)
         const range: [number, number] = [300000, 420000]
         const indicator: Overlay = { uuid: 'indicator', data: [[300000, 1], [360000, 2], [420000, 3]] }
+        const authored: Overlay = { uuid: 'authored', data: [[300000, 10], [420000, 20]] }
         hub.init({ panes: [{ overlays: [
-            { main: true, data: [[300000, 1], [360000, 2], [420000, 3]] }, indicator
+            { main: true, data: [[300000, 1], [360000, 2], [420000, 3]] }, indicator, authored
         ] }] })
         hub.calcSubset(range)
         hub.detectMain()
@@ -18,19 +19,25 @@ describe('indicator update responses', () => {
             ww: { onevent: vi.fn(), exec: vi.fn().mockResolvedValue({
                 indicator: { start: 2, data: [[420000, 99]] }
             }) },
-            update: vi.fn((type?: string) => {
-                if (type === 'data') hub.updateRange(range)
+            update: vi.fn((type?: string, options?: { changes?: Map<Overlay, number> }) => {
+                if (type === 'data') hub.updateRange(range, options?.changes)
             })
         }
         const client = new SeClient(id, chart)
         client.setRefs(hub, {})
 
         try {
+            const authoredView = authored.dataView
+            const visible = indicator.dataSubset
+            hub.mainOv!.data![2] = [420000, 50]
             expect(indicator.dataSubset).toEqual([[300000, 1], [360000, 2], [420000, 3]])
             await client.updateData()
 
             expect(indicator.dataSubset).toEqual([[300000, 1], [360000, 2], [420000, 99]])
             expect(indicator.dataSubset!.at(-1)).toBe(indicator.data!.at(-1))
+            expect(hub.mainOv!.dataSubset!.at(-1)).toEqual([420000, 50])
+            expect(indicator.dataSubset).toBe(visible)
+            expect(authored.dataView).toBe(authoredView)
         } finally {
             DataHub.release(id)
             SeClients.release(id)
