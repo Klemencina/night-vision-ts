@@ -16,11 +16,13 @@ import { copyOverlay, copyOverlayPoint, copyIndicator, copyPane, findTarget, res
 import { copyCandle, copySeries, type Candle, type SetSeriesOptions } from './core/candleData'
 import HistoryLoading, { type HistoryLoader, type HistoryLoadingOptions, type HistorySource } from './core/historyLoader'
 import DataBatch, { type ChartBatch } from './core/dataBatch'
+import { captureChartState, copyChartState, restoreChartData, type ChartState, type ChartStateOptions } from './core/chartState'
 
 // Re-export types for users
 export type { Data, Pane, Overlay }
 export type { Candle, SetSeriesOptions }
 export type { ChartBatch } from './core/dataBatch'
+export type { ChartState, ChartStateOptions, SavedPane, SavedOverlay, SavedIndicator, SavedScale } from './core/chartState'
 export type { HistoryLoader, HistoryLoadingOptions, HistoryPage, HistoryRequest } from './core/historyLoader'
 export type { IndicatorInput, IndicatorPatch, DataTarget, DataUpdateOptions, OverlayInput, OverlayPatch, OverlayRow, PaneInput, PanePatch } from './core/paneData'
 
@@ -321,7 +323,7 @@ class NightVision {
         }
         this.comp = mount(NightVisionComp, {
             target: this.root,
-            props: this._props
+            props: { ...this._props, initialRange: range || undefined }
         })
         this._defer(() => {
             if (range) this._setRange(range, true)
@@ -457,6 +459,53 @@ class NightVision {
     }
 
     // *** METHODS ***
+
+    /** Capture a JSON-compatible layout after preceding queued edits finish. */
+    async exportState(options: ChartStateOptions = {}): Promise<ChartState> {
+        this._assertActive()
+        const includeData = options.includeData ?? false
+        if (typeof includeData !== 'boolean') throw new TypeError('includeData must be a boolean')
+        return this._queueData(async () => captureChartState(this._data, {
+            colors: this._props.colors || {},
+            config: { ...this._props.config, LEGEND_COLLAPSED: this.hub.legendCollapsed },
+            timezone: this._props.timezone ?? 0,
+            showLogo: this._props.showLogo ?? false
+        }, this._copyRange(), this.meta.yTransforms, includeData))
+    }
+
+    /** Restore a validated layout, keeping omitted series data and recalculating indicator outputs. */
+    async importState(input: unknown): Promise<void> {
+        this._assertActive()
+        const state = copyChartState(input)
+        return this._queueData(async () => {
+            for (const pane of state.panes) {
+                for (const script of pane.scripts) this._assertIndicatorType(script.type)
+                for (const overlay of pane.overlays) {
+                    if (!Object.prototype.hasOwnProperty.call(this.scriptHub.prefabs, overlay.type)) {
+                        throw new RangeError(`Unknown overlay type: ${overlay.type}`)
+                    }
+                }
+            }
+            const data = restoreChartData(state, this._data)
+            this._invalidateHistory()
+            this._data = data
+            this._props = { ...this._props, data, indexBased: state.indexBased,
+                colors: state.appearance.colors, config: state.appearance.config,
+                timezone: state.appearance.timezone, showLogo: state.appearance.showLogo }
+            this.hub.init(data)
+            this.hub.legendCollapsed = !!state.appearance.config.LEGEND_COLLAPSED
+            this.meta.storage = Object.fromEntries(state.panes.flatMap((pane, gridId) =>
+                Object.entries(pane.scales).map(([scaleId, transform]) =>
+                    [`yts:${pane.uuid}:${scaleId}`, { ...transform, gridId, scaleId }])))
+            // Discard range-restoration timers belonging to the previous component.
+            for (const timer of this._timers) clearTimeout(timer)
+            this._timers.clear()
+            this._pendingRemountRange = null
+            this._remount(state.range)
+            await this._readyChart()
+            this._history?.check()
+        })
+    }
 
     /** Stage related edits and apply them with one refresh after the callback succeeds. */
     async batch<T>(callback: (batch: ChartBatch) => T | Promise<T>, options: DataUpdateOptions = {}): Promise<T> {

@@ -1,5 +1,11 @@
 ## Unreleased
 
+* Added versioned `exportState()` and `importState()` for panes, indicators,
+  persistent drawings, manual price scales, colors, configuration, and visible ranges.
+  Market data is optional; omitted series retain current data by UUID or main-series role.
+* Validated saved versions, identities, data, ranges, and registered script types
+  before restoration, and restored manual scale transforms during component initialization.
+
 * Added `chart.batch()` with a scoped editor, copied drafts, and one refresh for
   related candle, pane, overlay, and indicator edits. Callback and validation
   failures discard pending edits; auxiliary-only changes skip indicator calculation.

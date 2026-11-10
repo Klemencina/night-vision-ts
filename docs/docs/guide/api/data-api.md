@@ -120,6 +120,68 @@ methods do not accept per-edit range options. Market-data replacement through
 
 `ChartBatch` is exported as a TypeScript type.
 
+## Saved chart state
+
+`exportState()` returns a detached JSON-compatible object after preceding queued
+edits finish. `importState()` validates and copies a state when called, then restores
+it through the data queue.
+
+```ts
+const state = await chart.exportState()
+localStorage.setItem('chart-layout', JSON.stringify(state))
+
+const saved = localStorage.getItem('chart-layout')
+if (saved) await chart.importState(JSON.parse(saved))
+```
+
+Version `1` includes pane order and settings, authored overlay definitions,
+indicator definitions and properties, persistent drawing data in `overlay.dataExt`,
+manual price-scale ranges, the visible range, and time-based or index-based mode.
+It also includes color overrides, chart configuration, timezone, logo visibility,
+and the collapsed-legend setting. Pane, overlay, and indicator UUIDs remain stable.
+Indicator-generated overlays are recalculated when the state is restored.
+Shared source arrays, such as candles and volume, retain their relationship through
+UUID references in the saved format.
+
+Market data is omitted by default. On import, overlays retain current data with the
+same UUID. A saved main overlay without a matching UUID can reuse the destination
+chart's main series. Other unmatched overlays start empty. This lets a layout be
+restored without replacing candles that arrived after it was saved.
+
+To restore into an empty chart with its data, include authored overlay rows:
+
+```ts
+const snapshot = await chart.exportState({ includeData: true })
+await otherChart.importState(JSON.parse(JSON.stringify(snapshot)))
+```
+
+Explicitly included rows replace the corresponding series, including an empty
+array. Retained data must fit the saved overlay type. Without included rows or a
+matching destination series, supply candles with `setSeries()` after import.
+Stored ranges use timestamps in time-based mode and bar indices in index-based
+mode. Apply a data-free layout to data with matching timestamps or bar positions
+when you want drawings and ranges to retain their meaning.
+
+Register custom overlay and indicator scripts on the destination chart before
+importing their state. State files contain definitions and properties, while script
+code and callbacks stay with the application. Container IDs, dimensions, resize
+observers, event subscriptions, and history loader callbacks stay with the destination
+chart. Transient tool state is saved only if its overlay writes it to `dataExt`.
+
+Unknown versions, duplicate UUIDs, invalid rows or ranges, and unavailable overlay
+or indicator types reject before the current chart changes. UUIDs and scale IDs
+cannot contain colons. State properties must contain JSON values; functions,
+cycles, non-finite numbers, and non-plain objects reject instead of being silently
+lost. Undefined object fields are omitted and undefined array entries become null,
+matching JSON serialization.
+
+Both methods wait for chart readiness and reject after destruction. Import aborts
+pending history requests and recreates the view using the saved settings. Existing
+history loaders remain registered; update their callback when changing symbols.
+
+The package exports `ChartState`, `ChartStateOptions`, `SavedPane`, `SavedOverlay`,
+`SavedIndicator`, and `SavedScale` types.
+
 ## History loading
 
 ### chart.prependSeries(rows)

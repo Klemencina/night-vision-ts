@@ -129,6 +129,17 @@ await chart.removeOverlay(paneId, overlayId)
 await chart.removePane(paneId)
 ```
 
+Save a layout and restore it after a reload:
+
+```js
+const state = await chart.exportState()
+localStorage.setItem('chart-layout', JSON.stringify(state))
+await chart.importState(JSON.parse(localStorage.getItem('chart-layout')))
+```
+
+State includes panes, indicators, persistent drawings, scale settings, and the
+visible range. Pass `{ includeData: true }` to `exportState()` to include market data.
+
 The returned UUIDs remain stable when positions change. These methods share the
 candle update queue and preserve the visible range by default.
 

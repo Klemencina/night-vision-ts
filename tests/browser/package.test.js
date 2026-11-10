@@ -274,6 +274,97 @@ for (const format of ['esm', 'umd']) {
                     await checkSma(page)
                 })
 
+                await t.test('restores JSON chart state, drawings, scales, and indicators while retaining live data', async () => {
+                    const result = await page.evaluate(async indexBased => {
+                        const chart = window.chart
+                        const original = await chart.exportState({ includeData: true })
+                        window.savedStateForFreshChart = original
+                        try {
+                            const indicatorId = chart.data.panes[0].scripts[0].uuid
+                            const ids = await chart.batch(batch => {
+                                batch.updateIndicator(0, indicatorId, { props: { length: 3 } })
+                                const line = batch.addOverlay(0, { type: 'LineTool', data: [] })
+                                const pane = batch.addPane({ settings: { height: 2 } })
+                                batch.addIndicator(pane, { type: 'SMA', props: { length: 7 } })
+                                return { line, pane }
+                            })
+                            const rows = chart.hub.mainOv.data
+                            const drawing = { uuid: 'saved-line', type: 'segment', p1: [rows[10][0], 110], p2: [rows[20][0], 120] }
+                            chart.data.panes[0].overlays.find(overlay => overlay.uuid === ids.line).dataExt = { lines: [drawing] }
+                            chart.range = indexBased ? [10, 30] : [rows[10][0], rows[30][0]]
+                            chart.events.emit('sidebar-transform', { gridId: 0, scaleId: 'A', auto: false, range: [300, 50] })
+                            chart.hub.legendCollapsed = true
+                            const saved = JSON.parse(JSON.stringify(await chart.exportState()))
+                            saved.appearance.colors.back = '#101827'
+                            saved.appearance.timezone = 1
+                            saved.appearance.showLogo = true
+                            const range = [...saved.range]
+                            const uuidList = saved.panes.map(pane => pane.uuid)
+                            const hasData = saved.panes.some(pane => pane.overlays.some(overlay => 'data' in overlay))
+                            await chart.removePane(ids.pane)
+                            await chart.removeOverlay(0, ids.line)
+                            await chart.updateIndicator(0, indicatorId, { props: { length: 19 } })
+                            const last = rows.at(-1)
+                            await chart.updateCandle([last[0] + 60000, 200, 210, 190, 205, 500])
+                            const source = chart.hub.mainOv.data
+                            const restored = chart.importState(saved)
+                            saved.panes[0].scripts[0].props.length = 777
+                            saved.panes[0].overlays.find(overlay => overlay.uuid === ids.line).dataExt.lines.length = 0
+                            await restored
+                            const state = await chart.exportState()
+                            const firstIndicator = chart.data.panes[0].overlays.find(overlay => overlay.prod === indicatorId)
+                            return { hasData, range, actualRange: state.range, uuidList,
+                                actualUuids: state.panes.map(pane => pane.uuid),
+                                retainedData: chart.hub.mainOv.data === source, sourceLength: source.length,
+                                actualLength: chart.hub.mainOv.data.length,
+                                drawing: state.panes[0].overlays.find(overlay => overlay.uuid === ids.line).dataExt.lines,
+                                expectedDrawing: drawing,
+                                transform: chart.meta.getYtransform(0, 'A'),
+                                color: chart.colors.back, timezone: chart.timezone, showLogo: chart.showLogo,
+                                collapsed: chart.hub.legendCollapsed,
+                                length: state.panes[0].scripts[0].props.length,
+                                sma: firstIndicator.data.at(-1)[1],
+                                expectedSma: source.slice(-3).reduce((sum, row) => sum + row[4], 0) / 3 }
+                        } finally { await chart.importState(original) }
+                    }, indexBased)
+                    assert.equal(result.hasData, false)
+                    assert.deepEqual(result.actualRange, result.range)
+                    assert.deepEqual(result.actualUuids, result.uuidList)
+                    assert.equal(result.retainedData, true)
+                    assert.equal(result.actualLength, result.sourceLength)
+                    assert.deepEqual(result.drawing, [result.expectedDrawing])
+                    assert.equal(result.transform.auto, false)
+                    assert.deepEqual(result.transform.range, [300, 50])
+                    assert.equal(result.color, '#101827')
+                    assert.equal(result.timezone, 1)
+                    assert.equal(result.showLogo, true)
+                    assert.equal(result.collapsed, true)
+                    assert.equal(result.length, 3)
+                    assert.ok(Math.abs(result.sma - result.expectedSma) < 1e-8)
+                    await checkSma(page)
+                })
+
+                await t.test('rejects invalid or unavailable saved types without changing the chart', async () => {
+                    const result = await page.evaluate(async () => {
+                        const chart = window.chart
+                        const before = chart.data
+                        const state = await chart.exportState()
+                        const unknownIndicator = structuredClone(state)
+                        unknownIndicator.panes[0].scripts[0].type = 'MissingIndicator'
+                        const unknownOverlay = structuredClone(state)
+                        unknownOverlay.panes[0].overlays[0].type = 'MissingOverlay'
+                        const outcomes = await Promise.allSettled([
+                            chart.importState({ ...state, version: 2 }),
+                            chart.importState(unknownIndicator), chart.importState(unknownOverlay)
+                        ])
+                        return { errors: outcomes.map(outcome => outcome.reason?.message), unchanged: chart.data === before }
+                    })
+                    assert.equal(result.unchanged, true)
+                    assert.match(result.errors[0], /version/)
+                    assert.match(result.errors[1], /Unknown indicator/)
+                    assert.match(result.errors[2], /Unknown overlay/)
+                })
+
                 await t.test('prepends history without moving visible candles and recalculates indicator warmup', async () => {
                     const result = await page.evaluate(async indexBased => {
                         const chart = window.chart
@@ -1192,6 +1283,28 @@ for (const format of ['esm', 'umd']) {
                         await Promise.all(closed)
                     }
                     assert.equal(workers.size, 0)
+                })
+
+                await t.test('imports a state with market data into an empty chart', async () => {
+                    await page.evaluate(indexBased => window.createChart(!indexBased, { empty: true, noMain: true }), indexBased)
+                    await page.evaluate(() => window.chart.importState(window.savedStateForFreshChart))
+                    await waitForChart(page)
+                    await checkSma(page)
+                    const result = await page.evaluate(() => ({
+                        rows: window.chart.hub.mainOv.data.length,
+                        expectedRows: window.savedStateForFreshChart.panes[0].overlays[0].data.length,
+                        pane: window.chart.data.panes[0].uuid,
+                        expectedPane: window.savedStateForFreshChart.panes[0].uuid,
+                        mode: window.chart.layout.indexBased, expectedMode: window.savedStateForFreshChart.indexBased
+                    }))
+                    assert.equal(result.rows, result.expectedRows)
+                    assert.equal(result.pane, result.expectedPane)
+                    assert.equal(result.mode, result.expectedMode)
+                    const closed = [...workers].map(worker =>
+                        once(worker, 'close', { signal: AbortSignal.timeout(15000) })
+                    )
+                    await page.evaluate(() => window.chart.destroy())
+                    await Promise.all(closed)
                 })
 
                 await t.test('bootstraps an empty chart through the history loader', async () => {

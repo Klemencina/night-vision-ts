@@ -21,6 +21,7 @@ export type { Data, Pane, Overlay, NightVisionProps, ChartConfig, Colors } from 
 export type { NormalizedPane } from './core/dataHub'
 export type { Candle, SetSeriesOptions } from './core/candleData'
 export type { ChartBatch } from './core/dataBatch'
+export type { ChartState, ChartStateOptions, SavedPane, SavedOverlay, SavedIndicator, SavedScale } from './core/chartState'
 export type { HistoryLoader, HistoryLoadingOptions, HistoryPage, HistoryRequest } from './core/historyLoader'
 
 export type { IndicatorInput, IndicatorPatch, DataTarget, DataUpdateOptions, OverlayInput, OverlayPatch, OverlayRow, PaneInput, PanePatch } from './core/paneData'

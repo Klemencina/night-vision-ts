@@ -20,7 +20,7 @@ const fixture = vi.hoisted(() => {
             detectMain: () => {},
             loadScripts: async () => {}
         },
-        meta: { init: () => {} },
+        meta: { init: () => {}, restore: () => {} },
         scan: {
             init: () => {},
             detectInterval: () => 60000,

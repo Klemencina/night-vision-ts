@@ -26,7 +26,8 @@
         // indexBased = false, // Currently unused
         timezone = 0,
         data = {},
-        scriptsReady = undefined
+        scriptsReady = undefined,
+        initialRange = undefined
         // autoResize = false // Currently unused
     } = $props()
 
@@ -49,7 +50,8 @@
         //xSettings,
         //skin,
         timezone,
-        scriptsReady
+        scriptsReady,
+        initialRange
     })
     let style = $derived(`
     width: ${props.width}px;

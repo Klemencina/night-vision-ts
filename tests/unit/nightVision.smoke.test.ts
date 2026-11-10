@@ -777,6 +777,24 @@ describe('pane and overlay API queue', () => {
         } finally { release(); chart.destroy() }
     })
 
+    it('exports after earlier queued edits, copies included data, and rejects state methods after destruction', async () => {
+        const { chart } = createChart()
+        try {
+            const pane = chart.addPane({ settings: { height: 2 } })
+            const snapshot = chart.exportState()
+            const id = await pane
+            const state = await snapshot
+            expect(state.panes.map(pane => pane.uuid)).toContain(id)
+            expect(state.panes[0].overlays[0]).not.toHaveProperty('data')
+            const full = await chart.exportState({ includeData: true })
+            expect(full.panes[0].overlays[0].data).toEqual(chart.hub.mainOv!.data)
+            expect(full.panes[0].overlays[0].data).not.toBe(chart.hub.mainOv!.data)
+            chart.destroy()
+            await expect(chart.exportState()).rejects.toMatchObject({ name: 'AbortError' })
+            await expect(chart.importState(state)).rejects.toMatchObject({ name: 'AbortError' })
+        } finally { chart.destroy() }
+    })
+
     it('snapshots input before readiness and preserves identities through renumbering', async () => {
         const { chart, controller } = createChart()
         let ready!: () => void

@@ -58,7 +58,7 @@
 
     let interval = $state(scan.detectInterval())
     let timeFrame = $state(scan.getTimeframe())
-    let range = $state(scan.defaultRange())
+    let range = $state(initialProps.initialRange || scan.defaultRange())
     const cursor = new Cursor(meta)
     // Svelte does not track field mutations on class instances.
     let cursorRevision = $state(0)
@@ -129,6 +129,7 @@
 
         // MetaHub must be inited before Layout (Layout reads meta.preSamplers etc.)
         meta.init(props)
+        meta.restore()
 
         // Set layout immediately so chart shows even if loadScripts hangs/fails
         scan.updatePanesHash()
