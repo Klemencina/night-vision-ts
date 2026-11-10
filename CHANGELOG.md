@@ -1,5 +1,9 @@
 ## Unreleased
 
+* Added `chart.batch()` with a scoped editor, copied drafts, and one refresh for
+  related candle, pane, overlay, and indicator edits. Callback and validation
+  failures discard pending edits; auxiliary-only changes skip indicator calculation.
+
 * Added `prependSeries()` to load older candles while preserving the visible bars
   in time-based and index-based charts, retaining shared arrays, and recalculating indicators.
 * Added managed scroll-triggered history loading with overlapping-page handling,

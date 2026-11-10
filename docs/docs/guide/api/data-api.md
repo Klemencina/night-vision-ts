@@ -81,6 +81,45 @@ a single time-based candle immediately, configure the main overlay's
 Updates preserve the current view. Call `chart.scroll()` after an update if you want
 the existing follow-latest behavior.
 
+## Batched updates
+
+Use `chart.batch()` to apply related edits with one refresh. Its callback receives a
+scoped editor with synchronous versions of the candle, pane, overlay, and indicator
+methods. Newly added objects return their UUID immediately, so later edits in the
+same batch can refer to them.
+
+```ts
+const paneId = await chart.batch(batch => {
+    batch.updateCandle(firstCandle)
+    batch.updateCandle(secondCandle)
+    const paneId = batch.addPane({ settings: { height: 1 } })
+    batch.addIndicator(paneId, { type: 'RSI', props: { length: 14 } })
+    return paneId
+})
+```
+
+The callback's return value becomes the result of `batch()`. You can also return a
+Promise, but use the scoped editor for edits inside the callback. Awaiting an edit
+on the enclosing `chart` would wait behind the batch itself. Fetch external data
+before opening a batch when possible.
+
+Edits stay in a private draft until the callback succeeds. Invalid input or a thrown
+callback discards the draft. Arrays are copied only when an edit changes their rows;
+unchanged series retain their arrays. Once the draft is applied, worker failures
+reject the batch and leave the edited data available for inspection or retry.
+
+Candle or structural edits cause one full indicator recalculation. Presentation and
+auxiliary-point edits refresh once without running indicators. Empty batches do not
+refresh. Batches share the normal data queue, so other API edits run before or after
+the entire batch. The scoped editor cannot be used after its callback finishes.
+
+The visible range is preserved by default, including index shifts for prepended
+history. Pass `{ resetRange: true }` as the second argument to reset it. Scoped
+methods do not accept per-edit range options. Market-data replacement through
+`chart.data` during an asynchronous callback cancels the batch.
+
+`ChartBatch` is exported as a TypeScript type.
+
 ## History loading
 
 ### chart.prependSeries(rows)

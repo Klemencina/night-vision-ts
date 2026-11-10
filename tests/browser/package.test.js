@@ -236,6 +236,44 @@ for (const format of ['esm', 'umd']) {
                     await page.waitForFunction(() => window.hasCandlePixels())
                 })
 
+                await t.test('batches candles and indicator edits into one worker recalculation', async () => {
+                    const result = await page.evaluate(async () => {
+                        const chart = window.chart
+                        const original = chart.hub.mainOv.data.slice()
+                        const originalPaneCount = chart.data.panes.length
+                        const exec = chart.ww.exec.bind(chart.ww)
+                        let runs = 0
+                        chart.ww.exec = (type, ...args) => {
+                            if (type === 'exec-all-scripts') runs++
+                            return exec(type, ...args)
+                        }
+                        try {
+                            const last = original.at(-1)
+                            const pane = await chart.batch(batch => {
+                                batch.updateCandle([last[0] + 60000, 200, 205, 195, 202, 1000])
+                                batch.updateCandle([last[0] + 120000, 202, 210, 200, 208, 1200])
+                                const pane = batch.addPane({ settings: { height: 1 } })
+                                batch.addIndicator(pane, { type: 'SMA', props: { length: 3 } })
+                                return pane
+                            })
+                            const output = chart.data.panes.find(item => item.uuid === pane).overlays.find(overlay => overlay.prod)
+                            const rows = chart.hub.mainOv.data
+                            const expected = rows.slice(-3).reduce((sum, row) => sum + row[4], 0) / 3
+                            const result = { runs, rows: rows.length, expectedRows: original.length + 2,
+                                panes: chart.data.panes.length, expectedPanes: originalPaneCount + 1,
+                                actual: output.data.at(-1)[1], expected }
+                            await chart.removePane(pane)
+                            await chart.setSeries(original)
+                            return result
+                        } finally { chart.ww.exec = exec }
+                    })
+                    assert.equal(result.runs, 1)
+                    assert.equal(result.rows, result.expectedRows)
+                    assert.equal(result.panes, result.expectedPanes)
+                    assert.ok(Math.abs(result.actual - result.expected) < 1e-8)
+                    await checkSma(page)
+                })
+
                 await t.test('prepends history without moving visible candles and recalculates indicator warmup', async () => {
                     const result = await page.evaluate(async indexBased => {
                         const chart = window.chart

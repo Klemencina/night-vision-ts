@@ -15,10 +15,12 @@ import Utils from './stuff/utils'
 import { copyOverlay, copyOverlayPoint, copyIndicator, copyPane, findTarget, resetRangeOption, validateOverlayData, type IndicatorInput, type IndicatorPatch, type OverlayRow, type DataTarget, type DataUpdateOptions, type OverlayInput, type OverlayPatch, type PaneInput, type PanePatch } from './core/paneData'
 import { copyCandle, copySeries, type Candle, type SetSeriesOptions } from './core/candleData'
 import HistoryLoading, { type HistoryLoader, type HistoryLoadingOptions, type HistorySource } from './core/historyLoader'
+import DataBatch, { type ChartBatch } from './core/dataBatch'
 
 // Re-export types for users
 export type { Data, Pane, Overlay }
 export type { Candle, SetSeriesOptions }
+export type { ChartBatch } from './core/dataBatch'
 export type { HistoryLoader, HistoryLoadingOptions, HistoryPage, HistoryRequest } from './core/historyLoader'
 export type { IndicatorInput, IndicatorPatch, DataTarget, DataUpdateOptions, OverlayInput, OverlayPatch, OverlayRow, PaneInput, PanePatch } from './core/paneData'
 
@@ -456,6 +458,48 @@ class NightVision {
 
     // *** METHODS ***
 
+    /** Stage related edits and apply them with one refresh after the callback succeeds. */
+    async batch<T>(callback: (batch: ChartBatch) => T | Promise<T>, options: DataUpdateOptions = {}): Promise<T> {
+        this._assertActive()
+        if (typeof callback !== 'function') throw new TypeError('Batch callback must be a function')
+        const resetRange = resetRangeOption(options)
+        return this._queueData(async () => {
+            const original = this._data
+            const draft = new DataBatch(original, type => this._assertIndicatorType(type))
+            let result: T
+            try {
+                result = await callback(draft)
+            } finally {
+                draft.close()
+            }
+            this._assertActive()
+            if (this._data !== original) throw new DOMException('Chart data changed during the batch', 'AbortError')
+            if (!draft.changed) return result
+            draft.normalizeMain()
+            const chart = await this._readyChart()
+            this._assertActive()
+            if (this._data !== original) throw new DOMException('Chart data changed during the batch', 'AbortError')
+            const range = this._copyRange()
+            const updateOptions: SetSeriesOptions & { range?: [number, number] } = { resetRange }
+            if (!resetRange && range && original.indexBased && draft.prepended) {
+                updateOptions.range = [range[0] + draft.prepended, range[1] + draft.prepended]
+            }
+            if (draft.sourceChanged) this._invalidateHistory()
+            this._data = draft.data
+            this.hub.init(this._data)
+            if (draft.full) {
+                await chart.fullUpdate(updateOptions)
+            } else {
+                this.scan.calcIndexOffsets()
+                this.hub.calcSubset(range || [NaN, NaN])
+                this.hub.detectMain()
+                chart.refreshPresentation({ resetRange })
+            }
+            this._history?.check()
+            return result
+        })
+    }
+
     /** Replace the main candle series and recalculate indicators. */
     async setSeries(rows: readonly Candle[], options: SetSeriesOptions = {}): Promise<void> {
         this._assertActive()
@@ -788,30 +832,35 @@ class NightVision {
         }
     }
 
-    private _queueData<T>(operation: (chart: DataChart) => Promise<T>): Promise<T> {
-        const pending = this._dataQueue.then(async () => {
-            while (true) {
-                this._assertActive()
-                await tick()
-                this._assertActive()
-                const comp = this.comp as unknown as { getChart(): DataChart }
-                const chart = comp.getChart()
-                const scriptsReady = this._scriptsReady
-                try {
-                    await chart.whenReady()
-                    await scriptsReady
-                } catch (error) {
-                    this._assertActive()
-                    if (this.comp !== comp || this._scriptsReady !== scriptsReady) continue
-                    throw error
-                }
+    private async _readyChart(): Promise<DataChart> {
+        while (true) {
+            this._assertActive()
+            await tick()
+            this._assertActive()
+            const comp = this.comp as unknown as { getChart(): DataChart }
+            const chart = comp.getChart()
+            const scriptsReady = this._scriptsReady
+            try {
+                await chart.whenReady()
+                await scriptsReady
+            } catch (error) {
                 this._assertActive()
                 if (this.comp !== comp || this._scriptsReady !== scriptsReady) continue
-                const result = await operation(chart)
-                this._assertActive()
-                await tick()
-                return result
+                throw error
             }
+            this._assertActive()
+            if (this.comp !== comp || this._scriptsReady !== scriptsReady) continue
+            return chart
+        }
+    }
+
+    private _queueData<T>(operation: (chart: DataChart) => Promise<T>): Promise<T> {
+        const pending = this._dataQueue.then(async () => {
+            const chart = await this._readyChart()
+            const result = await operation(chart)
+            this._assertActive()
+            await tick()
+            return result
         })
         // A rejected request must not prevent later valid updates.
         this._dataQueue = pending.then(() => {}, () => {})

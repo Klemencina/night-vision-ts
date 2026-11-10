@@ -102,6 +102,17 @@ const disconnect = chart.setHistoryLoader(async ({ before, signal }) => {
 })
 ```
 
+Group related changes into one recalculation:
+
+```js
+await chart.batch(batch => {
+    batch.updateCandle(firstCandle)
+    batch.updateCandle(secondCandle)
+    const pane = batch.addPane()
+    batch.addIndicator(pane, { type: 'RSI', props: { length: 14 } })
+})
+```
+
 History requests share pending work, stop at the end of the dataset, and abort when
 disconnected or when the chart is destroyed. Overlapping pages retain loaded candles.
 

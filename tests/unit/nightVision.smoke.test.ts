@@ -654,6 +654,129 @@ describe('pane and overlay API queue', () => {
         return { chart, controller }
     }
 
+    it('applies a batch with one recalculation and makes new UUIDs available inside the callback', async () => {
+        const { chart, controller } = createChart()
+        const original = chart.data
+        const originalRows = chart.hub.mainOv!.data!
+        try {
+            const ids = await chart.batch(batch => {
+                batch.updateCandle([120000, 1, 2, 0, 1])
+                batch.updateCandle([180000, 1, 2, 0, 1])
+                const pane = batch.addPane({ settings: { height: 2 } })
+                const indicator = batch.addIndicator(pane, { type: 'RSI', props: { length: 7 } })
+                const overlay = batch.addOverlay(pane, { type: 'Spline', data: [[0, 1]] })
+                batch.updateOverlayPoint(pane, overlay, [60000, 3])
+                expect(chart.data).toBe(original)
+                expect(originalRows).toHaveLength(2)
+                return { pane, indicator, overlay }
+            })
+            expect(controller.fullUpdate).toHaveBeenCalledExactlyOnceWith({ resetRange: false })
+            expect(chart.hub.mainOv!.data!.map(row => row[0])).toEqual([0, 60000, 120000, 180000])
+            expect(chart.data.panes![1]).toMatchObject({ uuid: ids.pane, scripts: [{ uuid: ids.indicator }] })
+            expect(chart.data.panes![1].overlays![0]).toMatchObject({ uuid: ids.overlay, data: [[0, 1], [60000, 3]] })
+            expect(originalRows).toHaveLength(2)
+        } finally { chart.destroy() }
+    })
+
+    it('discards failed batches and keeps subsequent queued updates working', async () => {
+        const { chart, controller } = createChart()
+        const original = chart.data
+        try {
+            await expect(chart.batch(batch => {
+                batch.updateCandle([120000, 1, 2, 0, 1])
+                batch.addPane()
+                batch.addIndicator(0, { type: 'Missing' })
+            })).rejects.toThrow('Unknown indicator')
+            expect(chart.data).toBe(original)
+            expect(chart.data.panes).toHaveLength(1)
+            expect(chart.hub.mainOv!.data).toHaveLength(2)
+            expect(controller.fullUpdate).not.toHaveBeenCalled()
+            await chart.batch(batch => batch.updatePane(0, { settings: { height: 3 } }))
+            expect(controller.refreshPresentation).toHaveBeenCalledOnce()
+        } finally { chart.destroy() }
+    })
+
+    it('serializes outside updates behind an async batch and closes the scoped editor', async () => {
+        const { chart, controller } = createChart()
+        let release!: () => void
+        const gate = new Promise<void>(resolve => { release = resolve })
+        let editor!: import('../../src/core/dataBatch').ChartBatch
+        const pending = chart.batch(async batch => {
+            editor = batch
+            batch.addPane()
+            await gate
+            batch.updatePane(1, { settings: { height: 2 } })
+        })
+        try {
+            await vi.waitFor(() => expect(editor).toBeDefined())
+            const outside = chart.addPane({ settings: { height: 4 } })
+            expect(chart.data.panes).toHaveLength(1)
+            release()
+            await pending
+            expect(() => editor.addPane()).toThrow('no longer active')
+            await outside
+            expect(chart.data.panes!.map(pane => pane.settings!.height)).toEqual([undefined, 2, 4])
+            expect(controller.fullUpdate).toHaveBeenCalledTimes(2)
+        } finally { release(); chart.destroy() }
+    })
+
+    it('keeps auxiliary-only batches out of the worker and skips empty batches', async () => {
+        const { chart, controller } = createChart()
+        try {
+            const id = await chart.addOverlay(0, { type: 'Spline', data: [[0, 2]] })
+            controller.fullUpdate.mockClear()
+            const update = vi.spyOn(chart.se, 'updateData')
+            await chart.batch(batch => {
+                batch.updateOverlayPoint(0, id, [60000, 4])
+                batch.updateOverlay(0, id, { props: { color: 'red' } })
+            })
+            expect(chart.hub.overlay(0, 1)!.data).toEqual([[0, 2], [60000, 4]])
+            expect(update).not.toHaveBeenCalled()
+            expect(controller.fullUpdate).not.toHaveBeenCalled()
+            expect(controller.refreshPresentation).toHaveBeenCalledOnce()
+            await chart.batch(() => {})
+            expect(controller.refreshPresentation).toHaveBeenCalledOnce()
+        } finally { chart.destroy() }
+    })
+
+    it('accumulates prepended index shifts and drops them when the main series is removed', async () => {
+        const { chart, controller } = createChart()
+        chart.data.indexBased = true
+        try {
+            await chart.batch(batch => {
+                batch.prependSeries([[-60000, 1, 2, 0, 1]])
+                batch.prependSeries([[-120000, 1, 2, 0, 1]])
+            })
+            expect(controller.fullUpdate).toHaveBeenLastCalledWith({ resetRange: false, range: [2, 120002] })
+            await chart.batch(batch => {
+                batch.prependSeries([[-180000, 1, 2, 0, 1]])
+                batch.removePane(0)
+                batch.addPane({ overlays: [{ type: 'Candles', data: [[0, 1, 2, 0, 1]] }] })
+            })
+            expect(controller.fullUpdate).toHaveBeenLastCalledWith({ resetRange: false })
+        } finally { chart.destroy() }
+    })
+
+    it('aborts a suspended batch if chart data is replaced before the callback finishes', async () => {
+        const { chart } = createChart()
+        let release!: () => void
+        const gate = new Promise<void>(resolve => { release = resolve })
+        let entered = false
+        const pending = chart.batch(async batch => {
+            batch.addPane()
+            entered = true
+            await gate
+        })
+        try {
+            await vi.waitFor(() => expect(entered).toBe(true))
+            const replacement = { panes: [] }
+            chart.data = replacement
+            release()
+            await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+            expect(chart.data).toBe(replacement)
+        } finally { release(); chart.destroy() }
+    })
+
     it('snapshots input before readiness and preserves identities through renumbering', async () => {
         const { chart, controller } = createChart()
         let ready!: () => void
