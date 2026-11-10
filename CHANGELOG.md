@@ -1,5 +1,10 @@
 ## Unreleased
 
+* Added `prependSeries()` to load older candles while preserving the visible bars
+  in time-based and index-based charts, retaining shared arrays, and recalculating indicators.
+* Added managed scroll-triggered history loading with overlapping-page handling,
+  request deduplication, cancellation, end-of-history detection, and error events.
+
 * Removed empty documentation placeholders and the unused sidebar entry.
 * Added typed `addIndicator()`, `updateIndicator()`, and `removeIndicator()` methods
   with stable script UUIDs, registered-type validation, and automatic recalculation.

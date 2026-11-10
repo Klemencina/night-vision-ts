@@ -14,15 +14,17 @@ import resizeTracker from './stuff/resizeTracker'
 import Utils from './stuff/utils'
 import { copyOverlay, copyOverlayPoint, copyIndicator, copyPane, findTarget, resetRangeOption, validateOverlayData, type IndicatorInput, type IndicatorPatch, type OverlayRow, type DataTarget, type DataUpdateOptions, type OverlayInput, type OverlayPatch, type PaneInput, type PanePatch } from './core/paneData'
 import { copyCandle, copySeries, type Candle, type SetSeriesOptions } from './core/candleData'
+import HistoryLoading, { type HistoryLoader, type HistoryLoadingOptions, type HistorySource } from './core/historyLoader'
 
 // Re-export types for users
 export type { Data, Pane, Overlay }
 export type { Candle, SetSeriesOptions }
+export type { HistoryLoader, HistoryLoadingOptions, HistoryPage, HistoryRequest } from './core/historyLoader'
 export type { IndicatorInput, IndicatorPatch, DataTarget, DataUpdateOptions, OverlayInput, OverlayPatch, OverlayRow, PaneInput, PanePatch } from './core/paneData'
 
 interface DataChart {
     whenReady(): Promise<void>
-    fullUpdate(options: SetSeriesOptions): Promise<void>
+    fullUpdate(options: SetSeriesOptions & { range?: [number, number] }): Promise<void>
     refreshPresentation(options: SetSeriesOptions): void
 }
 
@@ -93,6 +95,8 @@ class NightVision {
     private _resizeCleanup: (() => void) | null = null
     private _timers = new Set<ReturnType<typeof setTimeout>>()
     private _dataQueue: Promise<void> = Promise.resolve()
+    private _history: HistoryLoading | null = null
+    private _historyRevision = 0
     public ww!: WebWorkType
     public se!: SeClientType
     public hub!: ReturnType<typeof DataHub.instance>
@@ -266,11 +270,13 @@ class NightVision {
         return this._data
     }
     set data(val: Data) {
+        this._invalidateHistory()
         this._data = val
         if (this._props.indexBased !== undefined) {
             this._data.indexBased = this._props.indexBased
         }
         this.update('full')
+        this._defer(() => this._history?.check())
     }
 
     // Overwrites the default config values
@@ -429,6 +435,7 @@ class NightVision {
         let chart = (this.comp as any)?.getChart?.()
         if (!chart || typeof chart.setRange !== 'function') return
         chart.setRange(val)
+        this._history?.check(val)
     }
 
     get cursor(): unknown {
@@ -457,11 +464,98 @@ class NightVision {
         if (typeof resetRange !== 'boolean') {
             throw new TypeError('resetRange must be a boolean')
         }
+        this._history?.reset()
         return this._queueData(async chart => {
+            this._invalidateHistory()
             const overlay = this._candleOverlay()
             overlay.data = data
             await chart.fullUpdate({ resetRange })
+            this._history?.check()
         })
+    }
+
+    /** Add older candles, keeping existing rows on overlap and preserving the visible candles. */
+    async prependSeries(rows: readonly Candle[]): Promise<number> {
+        this._assertActive()
+        return this._prependSeries(copySeries(rows))
+    }
+
+    private _prependSeries(rows: number[][], isCurrent: () => boolean = () => true): Promise<number> {
+        return this._queueData(async chart => {
+            if (!isCurrent() || !rows.length) return 0
+            const overlay = this._candleOverlay()
+            const data = overlay.data || (overlay.data = [])
+            const first = data[0]?.[0] ?? Infinity
+            let added = 0
+            while (added < rows.length && rows[added][0] < first) added++
+            if (!added) return 0
+
+            const range = this._copyRange()
+            // Keep shared candle/volume arrays intact and avoid spread argument limits.
+            const length = data.length
+            data.length = length + added
+            for (let i = length - 1; i >= 0; i--) data[i + added] = data[i]
+            for (let i = 0; i < added; i++) data[i] = rows[i]
+            const options: SetSeriesOptions & { range?: [number, number] } = { resetRange: false }
+            if (range && this._data.indexBased && length) {
+                options.range = [range[0] + added, range[1] + added]
+            }
+            await chart.fullUpdate(options)
+            return added
+        })
+    }
+
+    /** Load older pages near the left edge. Call the returned function to disconnect. */
+    setHistoryLoader(loader: HistoryLoader, options: HistoryLoadingOptions = {}): () => void {
+        this._assertActive()
+        if (typeof loader !== 'function') throw new TypeError('History loader must be a function')
+        const threshold = options.threshold ?? 20
+        if (!Number.isFinite(threshold) || threshold < 0) {
+            throw new RangeError('History threshold must be a finite nonnegative number')
+        }
+        this._history?.stop()
+        const history = new HistoryLoading({
+            source: () => this._historySource(),
+            prepend: (rows, isCurrent) => this._prependSeries(copySeries(rows), isCurrent),
+            emit: (type, data) => this.events.emit(type, data)
+        }, loader, threshold)
+        this._history = history
+        this.events.on('history:$range-update', range => history.check(range as number[]))
+        // Initialization can establish the first range without emitting $range-update.
+        void this._queueData(async () => { if (this._history === history) history.check() }).catch(() => {})
+        return () => {
+            history.stop()
+            if (this._history === history) {
+                this._history = null
+                this.events.off('history')
+            }
+        }
+    }
+
+    /** Fetch one page, sharing any pending request. Returns the number of candles added. */
+    async loadHistory(): Promise<number> {
+        this._assertActive()
+        return this._history?.load() ?? 0
+    }
+
+    private _historySource(): HistorySource | null {
+        if (!this._registered) return null
+        const overlays = (this._data.panes || []).flatMap(pane => pane.overlays || [])
+        const main = overlays.find(overlay => overlay.main) || overlays[0]
+        if (main && main.type !== 'Candles' && main.type !== 'CandlesPlus') return null
+        return {
+            key: main?.data || main || this._data,
+            revision: this._historyRevision,
+            before: main?.data?.[0]?.[0] ?? null,
+            range: this._copyRange(),
+            indexBased: !!this._data.indexBased,
+            interval: this.scan.interval
+        }
+    }
+
+    private _invalidateHistory(): void {
+        this._historyRevision++
+        this._history?.reset()
     }
 
     /** Replace the latest candle at the same timestamp, or append a newer candle. */
@@ -670,6 +764,7 @@ class NightVision {
             for (const pane of panes) pane.overlays = []
         }
         await chart.fullUpdate({ resetRange })
+        this._history?.check()
     }
 
     private _editableOverlay(paneTarget: DataTarget, target: DataTarget): Overlay {
@@ -830,6 +925,8 @@ class NightVision {
     destroy(): void {
         if (!this._registered) return
         this._registered = false
+        this._history?.stop()
+        this._history = null
         for (const timer of this._timers) clearTimeout(timer)
         this._timers.clear()
         const resizeCleanup = this._resizeCleanup

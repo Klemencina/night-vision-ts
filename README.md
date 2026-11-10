@@ -89,6 +89,22 @@ An equal timestamp replaces the latest candle; a newer timestamp appends one.
 Both methods update indicators and redraw automatically. See the
 [Data API guide](docs/docs/guide/api/data-api.md) for validation and range behavior.
 
+Load older candles without moving the current view:
+
+```js
+await chart.prependSeries(olderCandles)
+
+const disconnect = chart.setHistoryLoader(async ({ before, signal }) => {
+    const query = before === null ? '' : `?before=${before}`
+    const response = await fetch(`/api/candles${query}`, { signal })
+    if (!response.ok) throw new Error(`History request failed: ${response.status}`)
+    return response.json() // { rows: Candle[], hasMore?: boolean }
+})
+```
+
+History requests share pending work, stop at the end of the dataset, and abort when
+disconnected or when the chart is destroyed. Overlapping pages retain loaded candles.
+
 Manage panes and overlays without editing `chart.data`:
 
 ```js

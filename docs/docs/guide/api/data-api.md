@@ -81,6 +81,88 @@ a single time-based candle immediately, configure the main overlay's
 Updates preserve the current view. Call `chart.scroll()` after an update if you want
 the existing follow-latest behavior.
 
+## History loading
+
+### chart.prependSeries(rows)
+
+```ts
+prependSeries(rows: readonly Candle[]): Promise<number>
+```
+
+Adds candles older than the first loaded candle and returns the number added.
+Input validation and copying follow `setSeries()`. Input timestamps must be strictly
+increasing. Rows at or after the first loaded timestamp are ignored, so overlapping
+pages keep the existing candles. Use `setSeries()` to correct history and
+`updateCandle()` to append newer candles.
+
+```ts
+const added = await chart.prependSeries(olderCandles)
+```
+
+The method preserves the visible candles. Time-based ranges stay unchanged;
+index-based ranges shift by the number of added rows. It keeps the source array
+identity, including arrays shared with volume overlays, and recalculates indicators
+over the extended history. Empty or overlap-only input returns `0` without a redraw.
+On an empty chart, the method creates a main Candles overlay and selects an initial
+range. It uses the same queue as live candles, panes, and indicators.
+
+### chart.setHistoryLoader(loader, options?)
+
+Registers a callback for loading older pages and returns a disconnect function.
+The chart checks the initial visible range and loads when its left edge is within
+`threshold` bars of the oldest candle. `threshold` defaults to `20` and must be a
+finite nonnegative number. Programmatic range changes also trigger checks.
+
+```ts
+const disconnect = chart.setHistoryLoader(async ({ before, signal }) => {
+    const query = new URLSearchParams({ limit: '500' })
+    if (before !== null) query.set('before', String(before))
+    const response = await fetch(`/api/candles?${query}`, { signal })
+    if (!response.ok) throw new Error(`History request failed: ${response.status}`)
+    // The endpoint returns { rows: Candle[], hasMore?: boolean }.
+    return await response.json()
+}, { threshold: 30 })
+
+// Fetch a page explicitly, including retry after a failed request.
+const added = await chart.loadHistory()
+
+// Abort pending work and remove the automatic range subscription.
+disconnect()
+```
+
+`before` is an exclusive Unix timestamp in milliseconds in both chart modes. It is
+`null` for an empty chart, so the callback can supply the initial page. Fetches run
+outside the mutation queue, allowing live candle updates while a page is pending.
+Results pass through `prependSeries()` validation and the mutation queue.
+
+Only one request runs per loader. Repeated range changes and `loadHistory()` calls
+share it. After a successful page, the chart checks whether it needs another page
+to fill the history margin. Loading stops when `hasMore` is `false` or a page adds
+no older candles. Calling `loadHistory()` then returns `0`.
+
+Disconnecting, replacing the loader, replacing the series, or destroying the chart
+aborts pending requests. Late results cannot overwrite the replacement data, even
+if the callback ignores its abort signal. Cancelled requests resolve to `0`.
+`setSeries()` and assignment to `chart.data` reset history exhaustion. When changing
+symbols, register the loader for the new symbol as well. Disconnect functions only
+affect the loader that returned them.
+
+Failures emit `$history-error`. An explicit `loadHistory()` call also rejects with
+the error. The chart does not automatically retry a failed request until another
+range change; call `loadHistory()` to retry immediately.
+
+| Event | Payload |
+| --- | --- |
+| `$history-loading` | `{ before }` |
+| `$history-loaded` | `{ before, added, hasMore }` |
+| `$history-error` | `{ before, error }` |
+
+Subscribe through `chart.events.on('app:$history-error', handler)` and remove the
+subscription with `chart.events.off('app', '$history-error')`. Without a registered
+loader, `loadHistory()` returns `0`. Both history methods reject after destruction.
+The package exports `HistoryLoader`, `HistoryRequest`, `HistoryPage`, and
+`HistoryLoadingOptions` types.
+
 ## Panes and overlays
 
 These methods add, update, and remove panes and user-supplied overlays. Each method

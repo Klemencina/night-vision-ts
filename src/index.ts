@@ -20,5 +20,6 @@ export {
 export type { Data, Pane, Overlay, NightVisionProps, ChartConfig, Colors } from './interface'
 export type { NormalizedPane } from './core/dataHub'
 export type { Candle, SetSeriesOptions } from './core/candleData'
+export type { HistoryLoader, HistoryLoadingOptions, HistoryPage, HistoryRequest } from './core/historyLoader'
 
 export type { IndicatorInput, IndicatorPatch, DataTarget, DataUpdateOptions, OverlayInput, OverlayPatch, OverlayRow, PaneInput, PanePatch } from './core/paneData'

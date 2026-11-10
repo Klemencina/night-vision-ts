@@ -1,4 +1,5 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest'
+import type { HistoryLoader, HistoryPage } from '../../src/core/historyLoader'
 
 type MockWorker = {
     id: number
@@ -337,6 +338,183 @@ describe('main candle API queue', () => {
         chart.hub.detectMain()
         return { chart, controller }
     }
+
+    it.each([false, true])('prepends copied history and preserves the viewport with indexBased=%s', async indexBased => {
+        const { chart, controller } = createChart()
+        chart.data.indexBased = indexBased
+        const source = chart.hub.mainOv!.data!
+        const history: [number, number, number, number, number][] = [
+            [-120000, 2, 4, 0, 3], [-60000, 2, 4, 0, 3], [0, 9, 10, 8, 9]
+        ]
+        try {
+            const pending = chart.prependSeries(history)
+            history[0][4] = -1
+            expect(await pending).toBe(2)
+            expect(chart.hub.mainOv!.data).toBe(source)
+            expect(source.map(row => row[0])).toEqual([-120000, -60000, 0, 60000])
+            expect(source[0][4]).toBe(3)
+            expect(source[2][4]).toBe(1)
+            expect(controller.fullUpdate).toHaveBeenCalledWith(indexBased
+                ? { resetRange: false, range: [2, 120002] }
+                : { resetRange: false })
+            controller.fullUpdate.mockClear()
+            expect(await chart.prependSeries(history.slice(1))).toBe(0)
+            expect(await chart.prependSeries([])).toBe(0)
+            expect(controller.fullUpdate).not.toHaveBeenCalled()
+        } finally { chart.destroy() }
+    })
+
+    it('serializes history against live updates and rejects invalid pages without changing data', async () => {
+        const { chart } = createChart()
+        vi.spyOn(chart.se, 'updateData').mockResolvedValue()
+        try {
+            const results = await Promise.allSettled([
+                chart.prependSeries([[0, 1, 2, 0, 1], [-60000, 1, 2, 0, 1]]),
+                chart.updateCandle([120000, 1, 2, 0, 1]),
+                chart.prependSeries([[-60000, 1, 2, 0, 1], [60000, 8, 9, 7, 8]])
+            ])
+            expect(results.map(result => result.status)).toEqual(['rejected', 'fulfilled', 'fulfilled'])
+            expect(chart.hub.mainOv!.data).toEqual([
+                [-60000, 1, 2, 0, 1], [0, 1, 2, 0, 1],
+                [60000, 1, 2, 0, 1], [120000, 1, 2, 0, 1]
+            ])
+        } finally { chart.destroy() }
+        await expect(chart.prependSeries([])).rejects.toMatchObject({ name: 'AbortError' })
+    })
+
+    it('deduplicates scroll-triggered requests while live candles continue to update', async () => {
+        const { chart, controller } = createChart()
+        controller.getRange = () => [120000, 180000]
+        chart.scan.interval = 60000
+        vi.spyOn(chart.se, 'updateData').mockResolvedValue()
+        let complete!: (page: HistoryPage) => void
+        const loader = vi.fn<HistoryLoader>(() => new Promise<HistoryPage>(resolve => { complete = resolve }))
+        const loaded = vi.fn()
+        chart.events.on('test:$history-loaded', loaded)
+        const disconnect = chart.setHistoryLoader(loader, { threshold: 0 })
+        try {
+            chart.events.emit('$range-update', [0, 60000])
+            chart.events.emit('$range-update', [-60000, 60000])
+            const pending = chart.loadHistory()
+            await vi.waitFor(() => expect(loader).toHaveBeenCalledOnce())
+            expect(loader.mock.calls[0]).toEqual([{ before: 0, signal: expect.any(AbortSignal) }])
+            await chart.updateCandle([120000, 1, 2, 0, 1])
+            complete({ rows: [[-60000, 1, 2, 0, 1], [0, 8, 9, 7, 8]] })
+            expect(await pending).toBe(1)
+            expect(chart.hub.mainOv!.data!.map(row => row[0])).toEqual([-60000, 0, 60000, 120000])
+            expect(chart.hub.mainOv!.data![1][4]).toBe(1)
+            expect(loaded).toHaveBeenCalledWith({ before: 0, added: 1, hasMore: true })
+        } finally { disconnect(); chart.destroy() }
+    })
+
+    it.each(['disconnect', 'destroy', 'replace'] as const)('cancels history on %s and ignores a late page', async action => {
+        const { chart, controller } = createChart()
+        controller.getRange = () => [120000, 180000]
+        let complete!: (page: HistoryPage) => void
+        const loader = vi.fn<HistoryLoader>(() => new Promise<HistoryPage>(resolve => { complete = resolve }))
+        const disconnect = chart.setHistoryLoader(loader, { threshold: 0 })
+        const original = chart.hub.mainOv!.data!
+        try {
+            const pending = chart.loadHistory()
+            await vi.waitFor(() => expect(loader).toHaveBeenCalledOnce())
+            const latePage = complete
+            if (action === 'disconnect') disconnect()
+            else if (action === 'destroy') chart.destroy()
+            else await chart.setSeries([[600000, 1, 2, 0, 1]])
+            expect(loader.mock.calls[0][0].signal.aborted).toBe(true)
+            expect(await pending).toBe(0)
+            latePage({ rows: [[-60000, 1, 2, 0, 1]] })
+            await new Promise(resolve => setTimeout(resolve, 0))
+            expect(original).toHaveLength(2)
+        } finally { disconnect(); chart.destroy() }
+    })
+
+    it('reports a failed page, supports retry, and stops at the end of history', async () => {
+        const { chart, controller } = createChart()
+        controller.getRange = () => [120000, 180000]
+        const failure = new Error('offline')
+        const loader = vi.fn()
+            .mockRejectedValueOnce(failure)
+            .mockResolvedValueOnce({ rows: [[-60000, 1, 2, 0, 1]], hasMore: false })
+        const errors = vi.fn()
+        chart.events.on('test:$history-error', errors)
+        const disconnect = chart.setHistoryLoader(loader, { threshold: 0 })
+        try {
+            await expect(chart.loadHistory()).rejects.toBe(failure)
+            expect(errors).toHaveBeenCalledWith({ before: 0, error: failure })
+            expect(await chart.loadHistory()).toBe(1)
+            chart.events.emit('$range-update', [-120000, 0])
+            expect(await chart.loadHistory()).toBe(0)
+            expect(loader).toHaveBeenCalledTimes(2)
+        } finally { disconnect(); chart.destroy() }
+    })
+
+    it('loads further pages while the visible range is near the boundary and stops on overlap-only pages', async () => {
+        const { chart } = createChart()
+        chart.scan.interval = 60000
+        const loader = vi.fn<HistoryLoader>()
+            .mockResolvedValueOnce({ rows: [[-60000, 1, 2, 0, 1]] })
+            .mockResolvedValueOnce({ rows: [[-60000, 8, 9, 7, 8]] })
+        const loaded = vi.fn()
+        chart.events.on('test:$history-loaded', loaded)
+        const disconnect = chart.setHistoryLoader(loader)
+        try {
+            await vi.waitFor(() => expect(loaded).toHaveBeenCalledTimes(2))
+            expect(loader.mock.calls.map(([request]) => request.before)).toEqual([0, -60000])
+            expect(await chart.loadHistory()).toBe(0)
+            expect(loaded).toHaveBeenLastCalledWith({ before: -60000, added: 0, hasMore: false })
+            expect(chart.hub.mainOv!.data![0][4]).toBe(1)
+        } finally { disconnect(); chart.destroy() }
+    })
+
+    it('ignores a fetched page disconnected while waiting for the mutation queue', async () => {
+        const { chart, controller } = createChart()
+        let ready!: () => void
+        controller.whenReady.mockReturnValue(new Promise<void>(resolve => { ready = resolve }))
+        const loader = vi.fn<HistoryLoader>().mockResolvedValue({ rows: [[-60000, 1, 2, 0, 1]] })
+        const disconnect = chart.setHistoryLoader(loader, { threshold: 0 })
+        try {
+            const pending = chart.loadHistory()
+            await vi.waitFor(() => expect(loader).toHaveBeenCalledOnce())
+            disconnect()
+            expect(await pending).toBe(0)
+            ready()
+            // A subsequent operation waits behind the discarded page.
+            expect(await chart.prependSeries([])).toBe(0)
+            expect(chart.hub.mainOv!.data).toHaveLength(2)
+            expect(controller.fullUpdate).not.toHaveBeenCalled()
+        } finally { ready(); disconnect(); chart.destroy() }
+    })
+
+    it('does not let an old disconnect function remove a replacement history loader', async () => {
+        const { chart, controller } = createChart()
+        controller.getRange = () => [120000, 180000]
+        const first = vi.fn<HistoryLoader>().mockResolvedValue({ rows: [] })
+        const second = vi.fn<HistoryLoader>().mockResolvedValue({ rows: [[-60000, 1, 2, 0, 1]], hasMore: false })
+        const oldDisconnect = chart.setHistoryLoader(first, { threshold: 0 })
+        const disconnect = chart.setHistoryLoader(second, { threshold: 0 })
+        try {
+            oldDisconnect()
+            expect(await chart.loadHistory()).toBe(1)
+            expect(first).not.toHaveBeenCalled()
+            expect(second).toHaveBeenCalledOnce()
+        } finally { disconnect(); chart.destroy() }
+    })
+
+    it('propagates worker failures while creating the initial history overlay', async () => {
+        const { chart, controller } = createChart()
+        chart.data.panes![0].overlays = []
+        chart.hub.init(chart.data)
+        const failure = new Error('worker failed')
+        controller.fullUpdate.mockRejectedValue(failure)
+        const errors = vi.fn()
+        chart.events.on('test:$history-error', errors)
+        const disconnect = chart.setHistoryLoader(async () => ({ rows: [[-60000, 1, 2, 0, 1]] }))
+        try {
+            await expect(chart.loadHistory()).rejects.toBe(failure)
+            expect(errors).toHaveBeenCalledWith({ before: null, error: failure })
+        } finally { disconnect(); chart.destroy() }
+    })
 
     it('waits for initialization and snapshots replacement data and options at call time', async () => {
         const { chart, controller } = createChart()

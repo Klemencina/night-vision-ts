@@ -236,6 +236,72 @@ for (const format of ['esm', 'umd']) {
                     await page.waitForFunction(() => window.hasCandlePixels())
                 })
 
+                await t.test('prepends history without moving visible candles and recalculates indicator warmup', async () => {
+                    const result = await page.evaluate(async indexBased => {
+                        const chart = window.chart
+                        const original = chart.hub.mainOv.data.slice()
+                        const rows = window.sampleRows(80)
+                        await chart.setSeries(rows.slice(5))
+                        chart.range = indexBased ? [3, 23] : [rows[8][0], rows[28][0]]
+                        await new Promise(requestAnimationFrame)
+                        const before = [...chart.range]
+                        const x = chart.layout.main.ti2x(rows[15][0], 10)
+                        const source = chart.hub.mainOv.data
+                        const added = await chart.prependSeries(rows.slice(0, 8))
+                        const actualRange = [...chart.range]
+                        const actualX = chart.layout.main.ti2x(rows[15][0], 15)
+                        const earlySma = window.indicator().data.find(row => row[0] === rows[5][0])?.[1]
+                        const expectedSma = rows.slice(1, 6).reduce((sum, row) => sum + row[4], 0) / 5
+                        const sharedSource = chart.hub.mainOv.data === source
+                        const length = source.length
+                        const duplicateAdded = await chart.prependSeries(rows.slice(0, 8))
+                        await chart.setSeries(original)
+                        return { added, actualRange, expectedRange: indexBased ? before.map(x => x + 5) : before,
+                            x, actualX, earlySma, expectedSma, sharedSource, length, duplicateAdded }
+                    }, indexBased)
+                    assert.equal(result.added, 5)
+                    assert.deepEqual(result.actualRange, result.expectedRange)
+                    assert.equal(result.actualX, result.x)
+                    assert.equal(result.sharedSource, true)
+                    assert.equal(result.length, 80)
+                    assert.equal(result.duplicateAdded, 0)
+                    assert.ok(Math.abs(result.earlySma - result.expectedSma) < 1e-8, JSON.stringify(result))
+                    await checkSma(page)
+                })
+
+                await t.test('loads history at the left edge and stops when the loader is exhausted', async () => {
+                    const result = await page.evaluate(async indexBased => {
+                        const chart = window.chart
+                        const original = chart.hub.mainOv.data.slice()
+                        chart.range = indexBased ? [10, 30] : [original[10][0], original[30][0]]
+                        let calls = 0
+                        let before
+                        const loaded = new Promise(resolve => chart.events.on('test:$history-loaded', resolve))
+                        const disconnect = chart.setHistoryLoader(async request => {
+                            calls++
+                            before = request.before
+                            return { rows: window.sampleRows(5, request.before - 5 * 60000), hasMore: false }
+                        }, { threshold: 0 })
+                        try {
+                            chart.range = indexBased ? [0, 20] : [original[0][0], original[20][0]]
+                            const event = await loaded
+                            const extra = await chart.loadHistory()
+                            return { calls, before, expectedBefore: original[0][0], event, extra,
+                                length: chart.hub.mainOv.data.length }
+                        } finally {
+                            disconnect()
+                            chart.events.off('test')
+                            await chart.setSeries(original)
+                        }
+                    }, indexBased)
+                    assert.equal(result.calls, 1)
+                    assert.equal(result.before, result.expectedBefore)
+                    assert.deepEqual(result.event, { before: result.expectedBefore, added: 5, hasMore: false })
+                    assert.equal(result.extra, 0)
+                    assert.equal(result.length, 85)
+                    await checkSma(page)
+                })
+
                 await t.test('switches index mode and filters the visible candles in both directions', async () => {
                     const result = await page.evaluate(async initialMode => {
                         const chart = window.chart
@@ -1087,6 +1153,27 @@ for (const format of ['esm', 'umd']) {
                         await page.evaluate(() => window.chart.destroy())
                         await Promise.all(closed)
                     }
+                    assert.equal(workers.size, 0)
+                })
+
+                await t.test('bootstraps an empty chart through the history loader', async () => {
+                    await page.evaluate(indexBased => {
+                        window.createChart(indexBased, { empty: true, noMain: true })
+                        window.historyLoaded = new Promise(resolve => window.chart.events.on('test:$history-loaded', resolve))
+                        window.chart.setHistoryLoader(async ({ before }) => {
+                            if (before !== null) throw new Error('An empty chart must request the initial page')
+                            return { rows: window.sampleRows(), hasMore: false }
+                        })
+                    }, indexBased)
+                    const event = await page.evaluate(() => window.historyLoaded)
+                    assert.deepEqual(event, { before: null, added: 80, hasMore: false })
+                    await waitForChart(page)
+                    await checkSma(page)
+                    const closed = [...workers].map(worker =>
+                        once(worker, 'close', { signal: AbortSignal.timeout(15000) })
+                    )
+                    await page.evaluate(() => window.chart.destroy())
+                    await Promise.all(closed)
                     assert.equal(workers.size, 0)
                 })
 

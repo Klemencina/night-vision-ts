@@ -329,6 +329,8 @@
         if (!range.length || opt.resetRange || ibc) {
             rangeUpdate(scan.defaultRange())
         }
+        // History prepends shift bar indices while keeping the same candles visible.
+        if (opt.range) rangeUpdate(opt.range)
         scan.calcIndexOffsets()
         hub.calcSubset(range)
         hub.init(hub.data)
