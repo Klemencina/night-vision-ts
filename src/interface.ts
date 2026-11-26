@@ -21,6 +21,7 @@ import { captureChartState, copyChartState, restoreChartData, type ChartState, t
 // Re-export types for users
 export type { Data, Pane, Overlay }
 export type { Candle, SetSeriesOptions }
+export type { CursorUpdateEvent } from './core/events'
 export type { ChartBatch } from './core/dataBatch'
 export type { ChartState, ChartStateOptions, SavedPane, SavedOverlay, SavedIndicator, SavedScale } from './core/chartState'
 export type { HistoryLoader, HistoryLoadingOptions, HistoryPage, HistoryRequest } from './core/historyLoader'
@@ -101,6 +102,7 @@ class NightVision {
     private _dataQueue: Promise<void> = Promise.resolve()
     private _history: HistoryLoading | null = null
     private _historyRevision = 0
+    private readonly _peerCrosshair: { timestampMs: number | null } = { timestampMs: null }
     public ww!: WebWorkType
     public se!: SeClientType
     public hub!: ReturnType<typeof DataHub.instance>
@@ -172,7 +174,7 @@ class NightVision {
             }
             this.comp = mount(NightVisionComp, {
                 target: this.root,
-                props: this._props
+                props: { ...this._props, peerCrosshair: this._peerCrosshair }
             })
 
             if (props.autoResize && this.root) {
@@ -323,7 +325,7 @@ class NightVision {
         }
         this.comp = mount(NightVisionComp, {
             target: this.root,
-            props: { ...this._props, initialRange: range || undefined }
+            props: { ...this._props, initialRange: range || undefined, peerCrosshair: this._peerCrosshair }
         })
         this._defer(() => {
             if (range) this._setRange(range, true)
@@ -459,6 +461,15 @@ class NightVision {
     }
 
     // *** METHODS ***
+
+    /** Draw a peer chart's timestamp as a vertical guide. Pass null to clear it. */
+    setCrosshairAtTime(timestampMs: number | null): void {
+        if (!this._registered) return
+        const time = Number.isFinite(timestampMs) ? timestampMs : null
+        if (this._peerCrosshair.timestampMs === time) return
+        this._peerCrosshair.timestampMs = time
+        this.events.emitSpec('chart', 'update-crosshair')
+    }
 
     /** Capture a JSON-compatible layout after preceding queued edits finish. */
     async exportState(options: ChartStateOptions = {}): Promise<ChartState> {

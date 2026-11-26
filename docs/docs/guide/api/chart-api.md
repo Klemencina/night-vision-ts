@@ -90,6 +90,14 @@ Allows you to overwrite the [chart config](/guide/api/chart-config). For example
 
 Shift from UTC, hours.
 
+## chart.setCrosshairAtTime(timestampMs)
+
+```ts
+setCrosshairAtTime(timestampMs: number | null): void
+```
+
+Draws a vertical guide across the chart's panes for a Unix timestamp in milliseconds. Pass `null` to clear it. See the [two-chart example and timestamp matching rules](/guide/main-comp/cursor.html#sync-crosshairs-by-timestamp).
+
 <div class="tip custom-block section-split next">Internal Variables</div>
 
 Here you can access some internal stuff, e.g.:

@@ -26,23 +26,31 @@ console.log(chart.cursor)
     scales: {
         A: 5.067736096938775
     },
-    t: 1663434000000
+    time: 1663434000000
 }
 ```
 
-## Syncing multiple cursors
+## Sync crosshairs by timestamp
 
-You can set the cursor by assigning a new value, therefore can track a cursor of a different chart:
+The `$cursor-update` event includes `timestampMs`, the selected main series row's timestamp in milliseconds. The event supplies `null` when the cursor is hidden or its position is outside the source series. On a time-based source, a position between candles uses the nearest visible row. TypeScript infers the `CursorUpdateEvent` type for this subscription.
 
-```js
-chart2.events.on("app:$cursor-update", (range) => {
-    chart1.cursor = cursor;
-});
+Call `setCrosshairAtTime(timestampMs)` on the receiving chart to draw a vertical guide through its panes. This preserves the receiving chart's local cursor, price readout, lock, and viewport. The method does not emit `$cursor-update`, so the same wiring works in both directions.
+
+```ts
+// exchangeA and exchangeB are existing NightVision instances.
+exchangeA.events.on('sync:$cursor-update', ({ timestampMs }) => {
+    exchangeB.setCrosshairAtTime(timestampMs)
+})
+exchangeB.events.on('sync:$cursor-update', ({ timestampMs }) => {
+    exchangeA.setCrosshairAtTime(timestampMs)
+})
 ```
 
-See [Basic Example #8](/guide/intro/10-basic-examples.html#_8-multiple-chart-instances) for the full implementation.
+Index-based charts snap to the nearest timestamp in their own main series. An exact match uses that candle's local index. Midpoint ties go to the earlier timestamp, and duplicate timestamps use the first row. Time-based charts position the guide at the supplied timestamp on the time axis.
 
-The following are useful methods of the cursor.
+The guide is hidden when the receiving series is empty, the timestamp is outside its first and last timestamps, or the resolved position is outside the viewport. The chart keeps the requested time and resolves it again as the viewport or data changes. Pass `null` to clear the request and its guide. Forwarding the event's `null` clears the peer on pointer leave.
+
+To disconnect the charts, call `events.off('sync', '$cursor-update')` and `setCrosshairAtTime(null)` on each chart.
 
 ## cursor.getValue(paneId, ovId)
 

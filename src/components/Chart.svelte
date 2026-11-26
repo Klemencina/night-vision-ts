@@ -92,6 +92,7 @@
         events.on('chart:cursor-locked', onCursorLocked)
         events.on('chart:range-changed', onRangeChanged)
         events.on('chart:update-layout', update)
+        events.on('chart:update-crosshair', () => update({ layout: false, cursorOnly: true }, false))
         events.on('chart:full-update', fullUpdate)
         return () => {
             // Clean-up event listeners on 'chart' component
@@ -176,7 +177,7 @@
         if (disposed) return
         // Emit a global event (hook)
         if ($cursor.mode) cursor.mode = $cursor.mode
-        if (cursor.mode !== 'explore') {
+        if (cursor.mode !== 'explore' && layout?.main) {
             cursor.xSync(hub, layout, chartProps, $cursor)
             if ($cursor.visible === false) {
                 // One more update to hide the cursor
@@ -187,9 +188,26 @@
                 })
             }
         }
-        if (emit) events.emit('$cursor-update', Utils.makeCursorEvent($cursor, cursor, layout))
+        if (emit) {
+            events.emit('$cursor-update', Utils.makeCursorEvent($cursor, cursor, layout, getCursorTimestamp()))
+        }
         //if (cursor.locked) return // filter double updates (*)
         update({ layout: false, cursorOnly: true }, emit)
+    }
+
+    function getCursorTimestamp() {
+        if (!layout?.main || cursor.visible === false || cursor.mode === 'explore' || !Number.isFinite(cursor.x)) {
+            return null
+        }
+        if (layout.indexBased) return Number.isFinite(cursor.time) ? cursor.time : null
+
+        const main = hub.mainOv
+        const data = main?.data
+        const time = cursor.ti
+        if (!data?.length || !Number.isFinite(time) || time < data[0][0] || time > data.at(-1)[0]) {
+            return null
+        }
+        return Utils.nearestTs(time, main.dataSubset || data)[1]?.[0] ?? null
     }
 
     function onCursorLocked(state) {
