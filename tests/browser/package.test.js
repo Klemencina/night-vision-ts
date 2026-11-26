@@ -29,7 +29,8 @@ before(
                 { cwd: root, encoding: 'utf8' }
             )
         )
-        execFileSync('tar', ['-xzf', join(temporary, packed[0].filename), '-C', temporary])
+        const [tarball] = Object.values(packed)
+        execFileSync('tar', ['-xzf', join(temporary, tarball.filename), '-C', temporary])
         const packageRoot = join(temporary, 'package')
         const pkg = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
         const entry = pkg.exports['.'].import.default.replace(/^\.\//, '/')
@@ -110,6 +111,197 @@ async function checkSma(page) {
     }))
     assert.ok(Math.abs(result.actual - result.expected) < 1e-8, JSON.stringify(result))
 }
+
+test('syncs the hovered timestamp across irregular charts', { timeout: 60000 }, async t => {
+    const page = await browser.newPage({ viewport: { width: 1100, height: 800 }, deviceScaleFactor: 1 })
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    t.after(async () => {
+        await page.close()
+        assert.deepEqual(errors, [])
+    })
+    await page.goto(origin)
+    await page.evaluate(async () => {
+        const { NightVision } = await import('night-vision-ts')
+        const epoch = 1704067200000
+        const rows = offsets => offsets.map((seconds, i) => [epoch + seconds * 1000, 100 + i, 110 + i, 90 + i, 103 + i])
+        const sourceRows = rows([0, 30, 50, 90, 147, 500])
+        const peerRows = rows([10, 20, 40, 60, 90, 120, 155])
+        const candle = data => ({ type: 'Candles', data })
+        const create = (id, panes) => {
+            const target = document.createElement('div')
+            document.getElementById('chart').append(target)
+            return new NightVision(target, {
+                id, width: 680, height: 250, indexBased: true, colors: { cross: '#ff00ff' },
+                data: { panes: panes.map(overlays => ({ overlays })) }
+            })
+        }
+        const source = create('source', [[candle(sourceRows)]])
+        const peer = create('peer', [[candle(peerRows)], [candle(peerRows), { ...candle(peerRows), indexOffset: 2 }]])
+        await Promise.all([source.setSeries(sourceRows), peer.setSeries(peerRows)])
+
+        const sourceTimes = []
+        const peerTimes = []
+        source.events.on('sync:$cursor-update', ({ timestampMs }) => {
+            sourceTimes.push(timestampMs)
+            peer.setCrosshairAtTime(timestampMs)
+        })
+        peer.events.on('sync:$cursor-update', ({ timestampMs }) => {
+            peerTimes.push(timestampMs)
+            source.setCrosshairAtTime(timestampMs)
+        })
+        const guides = () => [...document.querySelectorAll('#peer .nvjs-grid canvas')].map(canvas => {
+            const { width, height } = canvas
+            if (!width || !height) return []
+            const pixels = canvas.getContext('2d').getImageData(0, 0, width, height).data
+            const counts = new Uint32Array(width)
+            for (let i = 0; i < pixels.length; i += 4) {
+                if (pixels[i] === 255 && pixels[i + 1] === 0 && pixels[i + 2] === 255) {
+                    counts[(i / 4) % width]++
+                }
+            }
+            return [...counts.keys()].filter(x => counts[x] > height / 4)
+        })
+        window.syncPair = { epoch, rows, source, peer, sourceTimes, peerTimes, guides }
+    })
+
+    const hover = async index => {
+        const [x, y] = await page.evaluate(index => {
+            const { source } = window.syncPair
+            const bounds = document.querySelector('#source .nvjs-grid canvas').getBoundingClientRect()
+            return [bounds.x + Math.ceil(source.layout.main.time2x(index)) + 1, bounds.y + 40]
+        }, index)
+        await page.mouse.move(x, y)
+    }
+    const expectGuide = async ti => {
+        try {
+            await page.waitForFunction(ti => {
+                const { guides, peer } = window.syncPair
+                const x = ti === null ? null : Math.floor(peer.layout.main.time2x(ti))
+                const panes = guides()
+                return panes.length === 2 && panes.every(xs => x === null ? !xs.length : xs.length === 1 && xs[0] === x)
+            }, ti, { timeout: 5000 })
+        } catch (error) {
+            const state = await page.evaluate(ti => {
+                const { guides, peer, sourceTimes, peerTimes } = window.syncPair
+                return { expectedX: ti === null ? null : peer.layout.main.time2x(ti), guides: guides(), sourceTimes, peerTimes }
+            }, ti)
+            throw new Error(`Unexpected crosshair position: ${JSON.stringify(state)}`, { cause: error })
+        }
+    }
+
+    const { range, epoch } = await page.evaluate(() => ({ range: [...window.syncPair.peer.range], epoch: window.syncPair.epoch }))
+    await hover(3)
+    await expectGuide(4)
+    assert.deepEqual(await page.evaluate(() => [...window.syncPair.peer.range]), range)
+    await hover(4)
+    await expectGuide(6)
+    await hover(2)
+    await expectGuide(2) // 50 seconds is midway between 40 and 60.
+
+    await page.evaluate(() => { window.syncPair.peer.range = [3, 11] })
+    await expectGuide(null)
+    await page.evaluate(() => { window.syncPair.peer.range = [-2, 6] })
+    await expectGuide(2)
+    const offsets = await page.evaluate(async () => {
+        const { peer, rows } = window.syncPair
+        const added = await peer.batch(batch => batch.prependSeries(rows([5])))
+        return { added, offsets: peer.hub.panes()[1].overlays.map(overlay => overlay.indexOffset) }
+    })
+    assert.deepEqual(offsets, { added: 1, offsets: [1, 2] })
+    assert.deepEqual(await page.evaluate(() => [...window.syncPair.peer.range]), [-1, 7])
+    await expectGuide(3)
+
+    await hover(0)
+    await expectGuide(null)
+    await hover(3)
+    await expectGuide(5)
+    await hover(5)
+    await expectGuide(null)
+    await hover(2)
+    await expectGuide(3)
+    await page.evaluate(() => { window.syncPair.peer.indexBased = false })
+    await expectGuide(epoch + 50000)
+    await page.mouse.move(1000, 650)
+    await expectGuide(null)
+
+    const result = await page.evaluate(async () => {
+        const { epoch, peer, peerTimes, sourceTimes, guides } = window.syncPair
+        peer.cursor = { visible: true, gridId: 0, x: peer.layout.main.time2x(epoch + 90000) + 1, y: 45 }
+        peer.events.emit('cursor-locked', true)
+        const local = () => {
+            const { x, y, locked, time, visible } = peer.cursor
+            return { x, y, locked, time, visible }
+        }
+        const before = local()
+        const frame = () => new Promise(requestAnimationFrame)
+        peer.setCrosshairAtTime(epoch + 50000)
+        await frame()
+        const marked = local()
+        const markedGuides = guides()
+        peer.setCrosshairAtTime(null)
+        await frame()
+        const clearedGuides = guides()
+        const cleared = local()
+        const peerX = Math.floor(peer.layout.main.time2x(epoch + 50000))
+        peer.events.emit('cursor-locked', false)
+        peer.cursor = { visible: false }
+        return { before, marked, cleared, markedGuides, clearedGuides, peerX, sourceTimes, peerTimes }
+    })
+    assert.deepEqual(result.sourceTimes, [90, 147, 50, 0, 90, 500, 50].map(seconds => epoch + seconds * 1000).concat(null))
+    assert.deepEqual(result.peerTimes, [])
+    assert.equal(result.before.locked, true)
+    assert.equal(result.before.visible, true)
+    assert.deepEqual(result.marked, result.before)
+    assert.deepEqual(result.cleared, result.before)
+    const localX = Math.floor(result.before.x)
+    const both = [result.peerX, localX].sort((a, b) => a - b)
+    assert.deepEqual(result.markedGuides, [both, both])
+    assert.deepEqual(result.clearedGuides, [[localX], [localX]])
+
+    const lockedTimes = await page.evaluate(async () => {
+        const { source, sourceTimes } = window.syncPair
+        const start = sourceTimes.length
+        const x = source.layout.main.time2x(3) + 1
+        const move = props => source.events.emit('cursor-changed', { x, y: 40, gridId: 0, ...props })
+        move({ visible: true })
+        source.events.emit('cursor-locked', true)
+        source.events.emit('range-changed', source.range.map(index => index + 1))
+        await new Promise(requestAnimationFrame)
+        move({ visible: true })
+        source.events.emit('cursor-changed', { visible: false })
+        move({})
+        source.events.emit('cursor-locked', false)
+        return sourceTimes.slice(start)
+    })
+
+    await page.evaluate(() => { window.syncPair.source.indexBased = false })
+    await page.waitForFunction(() => window.syncPair.source.layout?.indexBased === false)
+    const moveTimeCursor = time => page.evaluate(time => {
+        const { source } = window.syncPair
+        const x = source.layout.main.time2x(time) + 1
+        source.events.emit('cursor-changed', { x, y: 40, gridId: 0, visible: true })
+    }, time)
+    await moveTimeCursor(epoch + 90000)
+    await expectGuide(epoch + 90000)
+    await moveTimeCursor(epoch + 550000)
+    const timeModeTimes = await page.evaluate(() => window.syncPair.sourceTimes.slice(-2))
+
+    assert.deepEqual({ lockedTimes, timeModeTimes }, {
+        lockedTimes: [epoch + 90000, epoch + 147000, epoch + 147000, null, null],
+        timeModeTimes: [epoch + 90000, null]
+    })
+    await expectGuide(null)
+
+    await page.evaluate(async () => {
+        const { rows, source } = window.syncPair
+        source.hub.mainOv.settings.timeFrame = 60000
+        await source.setSeries(rows([10, 37, 100, 130]))
+    })
+    await moveTimeCursor(epoch + 70000)
+    assert.equal(await page.evaluate(() => window.syncPair.sourceTimes.at(-1)), epoch + 100000)
+    await expectGuide(epoch + 100000)
+})
 
 for (const format of ['esm', 'umd']) {
     for (const indexBased of [false, true]) {

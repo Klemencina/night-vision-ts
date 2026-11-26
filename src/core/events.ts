@@ -3,6 +3,21 @@
 
 type EventHandler = (data: unknown) => void
 
+export interface CursorUpdateEvent {
+    /** Selected main series timestamp in milliseconds, or null when the cursor leaves. */
+    timestampMs: number | null
+    visible?: boolean
+    gridId?: number
+    x?: number
+    y?: number
+    mode?: string
+    ti?: number
+    time?: number
+    values?: unknown[]
+    ohlcCoord(): { x: number; ys: number[] } | null
+    [key: string]: unknown
+}
+
 type EventHandlers = {
     [type: string]: {
         [component: string]: EventHandler
@@ -49,12 +64,14 @@ class Events {
 
     // Add event listener to a specific component:
     // '<component>:<event-type>'
-    on(compAndType: string, f: EventHandler): void {
+    on(compAndType: `${string}:$cursor-update`, f: (data: CursorUpdateEvent) => void): void
+    on(compAndType: string, f: EventHandler): void
+    on(compAndType: string, f: EventHandler | ((data: CursorUpdateEvent) => void)): void {
         const [comp, type] = compAndType.split(':')
         if (!this.handlers[type]) {
             this.handlers[type] = {}
         }
-        this.handlers[type][comp] = f
+        this.handlers[type][comp] = f as EventHandler
     }
 
     clear(): void {

@@ -27,7 +27,8 @@
         timezone = 0,
         data = {},
         scriptsReady = undefined,
-        initialRange = undefined
+        initialRange = undefined,
+        peerCrosshair = undefined
         // autoResize = false // Currently unused
     } = $props()
 
@@ -51,7 +52,8 @@
         //skin,
         timezone,
         scriptsReady,
-        initialRange
+        initialRange,
+        peerCrosshair
     })
     let style = $derived(`
     width: ${props.width}px;

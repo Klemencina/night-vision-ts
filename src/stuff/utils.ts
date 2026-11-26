@@ -1,4 +1,5 @@
 import Const from './constants'
+import type { CursorUpdateEvent } from '../core/events'
 
 const { MINUTE, MINUTE5, MINUTE15, HOUR, HOUR4, DAY, WEEK, MONTH, YEAR } = Const
 
@@ -535,21 +536,25 @@ export default {
                 time2x: (ti: number) => number
                 value2y: (x: number) => number
             }
-        }
-    ): Record<string, unknown> {
-        $cursor.values = cursor.values
-        $cursor.ti = cursor.ti
-        $cursor.time = cursor.time
-        $cursor.ohlcCoord = () => {
-            let ohlc = layout.main?.ohlc(cursor.time!)
-            return ohlc
-                ? {
-                      x: layout.main!.time2x(cursor.ti!),
-                      ys: ohlc.map(x => layout.main!.value2y(x))
-                  }
-                : null
-        }
-        return $cursor
+        } | null,
+        timestampMs: number | null = null
+    ): CursorUpdateEvent {
+        return Object.assign($cursor, {
+            values: cursor.values,
+            ti: cursor.ti,
+            time: cursor.time,
+            timestampMs,
+            ohlcCoord: () => {
+                const main = layout?.main
+                const ohlc = main?.ohlc(cursor.time!)
+                return main && ohlc
+                    ? {
+                          x: main.time2x(cursor.ti!),
+                          ys: ohlc.map(x => main.value2y(x))
+                      }
+                    : null
+            }
+        })
     },
 
     // Adjust mouse coords to fix the shift caused by

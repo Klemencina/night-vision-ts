@@ -392,7 +392,7 @@ chart2.events.on("app:$range-update", (range) => {
 });
 ```
 
-The same goes for the cursor (see `main.js` in the sandbox).
+To sync crosshairs across charts with different candle timestamps, use the [timestamp sync example](/guide/main-comp/cursor.html#sync-crosshairs-by-timestamp).
 
 
 ## 9. Using the lib with Python

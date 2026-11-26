@@ -21,6 +21,7 @@ import { captureChartState, copyChartState, restoreChartData, type ChartState, t
 // Re-export types for users
 export type { Data, Pane, Overlay }
 export type { Candle, SetSeriesOptions }
+export type { CursorUpdateEvent } from './core/events'
 export type { ChartBatch } from './core/dataBatch'
 export type { ChartState, ChartStateOptions, SavedPane, SavedOverlay, SavedIndicator, SavedScale } from './core/chartState'
 export type { HistoryLoader, HistoryLoadingOptions, HistoryPage, HistoryRequest } from './core/historyLoader'
@@ -87,6 +88,7 @@ export interface NightVisionProps {
 }
 
 const activeChartIds = new Set<string>()
+const historyRangeListener = '__nv-history-loader'
 let nextChartId = 0
 
 class NightVision {
@@ -101,6 +103,7 @@ class NightVision {
     private _dataQueue: Promise<void> = Promise.resolve()
     private _history: HistoryLoading | null = null
     private _historyRevision = 0
+    private readonly _peerCrosshair: { timestampMs: number | null } = { timestampMs: null }
     public ww!: WebWorkType
     public se!: SeClientType
     public hub!: ReturnType<typeof DataHub.instance>
@@ -172,7 +175,7 @@ class NightVision {
             }
             this.comp = mount(NightVisionComp, {
                 target: this.root,
-                props: this._props
+                props: { ...this._props, peerCrosshair: this._peerCrosshair }
             })
 
             if (props.autoResize && this.root) {
@@ -323,7 +326,7 @@ class NightVision {
         }
         this.comp = mount(NightVisionComp, {
             target: this.root,
-            props: { ...this._props, initialRange: range || undefined }
+            props: { ...this._props, initialRange: range || undefined, peerCrosshair: this._peerCrosshair }
         })
         this._defer(() => {
             if (range) this._setRange(range, true)
@@ -460,6 +463,15 @@ class NightVision {
 
     // *** METHODS ***
 
+    /** Draw a peer chart's timestamp as a vertical guide. Pass null to clear it. */
+    setCrosshairAtTime(timestampMs: number | null): void {
+        if (!this._registered) return
+        const time = Number.isFinite(timestampMs) ? timestampMs : null
+        if (this._peerCrosshair.timestampMs === time) return
+        this._peerCrosshair.timestampMs = time
+        this.events.emitSpec('chart', 'update-crosshair')
+    }
+
     /** Capture a JSON-compatible layout after preceding queued edits finish. */
     async exportState(options: ChartStateOptions = {}): Promise<ChartState> {
         this._assertActive()
@@ -514,7 +526,7 @@ class NightVision {
         const resetRange = resetRangeOption(options)
         return this._queueData(async () => {
             const original = this._data
-            const draft = new DataBatch(original, type => this._assertIndicatorType(type))
+            const draft = new DataBatch(original, type => this._assertIndicatorType(type), this.scan)
             let result: T
             try {
                 result = await callback(draft)
@@ -613,14 +625,14 @@ class NightVision {
             emit: (type, data) => this.events.emit(type, data)
         }, loader, threshold)
         this._history = history
-        this.events.on('history:$range-update', range => history.check(range as number[]))
+        this.events.on(`${historyRangeListener}:$range-update`, range => history.check(range as number[]))
         // Initialization can establish the first range without emitting $range-update.
         void this._queueData(async () => { if (this._history === history) history.check() }).catch(() => {})
         return () => {
             history.stop()
             if (this._history === history) {
                 this._history = null
-                this.events.off('history')
+                this.events.off(historyRangeListener, '$range-update')
             }
         }
     }

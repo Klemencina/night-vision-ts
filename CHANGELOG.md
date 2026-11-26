@@ -1,4 +1,7 @@
-## Unreleased
+## 0.7.0 (2026-11-26)
+
+* Added `timestampMs` to `$cursor-update` and `setCrosshairAtTime()` to sync
+  crosshairs across charts with different candle timestamps and bar indices.
 
 * Added versioned `exportState()` and `importState()` for panes, indicators,
   persistent drawings, manual price scales, colors, configuration, and visible ranges.
