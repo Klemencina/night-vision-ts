@@ -18,6 +18,7 @@ function protectLiterals(src: string): { code: string; restore: (code: string) =
     let prefix = '__navy_literal_'
     while (src.includes(prefix)) prefix += '_'
     const literals: string[] = []
+    const word = /[$\u200c\u200d\p{ID_Continue}]+/uy
     let cursor = 0
     const save = (text: string): string => `${prefix}${literals.push(text) - 1}__`
 
@@ -70,6 +71,8 @@ function protectLiterals(src: string): { code: string; restore: (code: string) =
         const context = (): Context => contexts[contexts.length - 1]
         while (cursor < src.length) {
             const char = src[cursor]
+            word.lastIndex = cursor
+            const wordMatch = word.exec(src)
             if (char === '"' || char === "'") {
                 result += quoted()
                 canStartRegex = false
@@ -101,10 +104,10 @@ function protectLiterals(src: string): { code: string; restore: (code: string) =
                 result += save(src.slice(start, cursor))
                 canStartRegex = false
                 lastToken = ''
-            } else if (/[$\w]/.test(char)) {
-                const start = cursor++
-                while (cursor < src.length && /[$\w]/.test(src[cursor])) cursor++
-                const token = src.slice(start, cursor)
+            } else if (wordMatch) {
+                const start = cursor
+                cursor = word.lastIndex
+                const [token] = wordMatch
                 result += token
                 const property = lastToken === '.'
                 const statement = (!lastToken && !expression) ||

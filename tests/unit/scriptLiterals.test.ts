@@ -17,6 +17,7 @@ describe('indicator string literals', () => {
     it.each([
         ['keyword property division', `const obj = {return: 4}; const value = obj.return / 2; Spline(sma(close, 1)[0] / value)`, 2],
         ['optional keyword property division', `const obj = {return: 4}; const value = obj?.return / 2; Spline(sma(close, 1)[0] / value)`, 2],
+        ['Unicode identifier division', `const цена𐐀 = 4; const value = цена𐐀 / 2; Spline(sma(close, 1)[0] / value)`, 2],
         ['regex after a statement block', `if (true) {} /"/.test('"'); Spline(sma(close, 1)[0])`, 4],
         ['regex after else', `if (false) {} else /"/.test('"'); Spline(sma(close, 1)[0])`, 4],
         ['object expression division', `const value = {} / 2; if (!Number.isNaN(value)) throw new Error('Division changed'); Spline(sma(close, 1)[0])`, 4],

@@ -72,11 +72,13 @@
     let initialization = Promise.resolve()
     let disposed = false
     let cursorHideTimer = null
+    let lastCursorTimestamp = null
     let pendingUpdate = {
         layout: false,
         emit: false,
         updateHash: false,
-        content: false
+        content: false,
+        rangeCursor: null
     }
 
     scan.calcIndexOffsets()
@@ -188,26 +190,40 @@
                 })
             }
         }
-        if (emit) {
-            events.emit('$cursor-update', Utils.makeCursorEvent($cursor, cursor, layout, getCursorTimestamp()))
-        }
-        //if (cursor.locked) return // filter double updates (*)
+        if (emit) emitCursorUpdate($cursor)
         update({ layout: false, cursorOnly: true }, emit)
     }
 
+    function emitCursorUpdate($cursor, changedOnly = false) {
+        const timestamp = getCursorTimestamp()
+        if (changedOnly && timestamp === lastCursorTimestamp) return
+        lastCursorTimestamp = timestamp
+        events.emit('$cursor-update', Utils.makeCursorEvent($cursor, cursor, layout, timestamp))
+    }
+
+    function emitCursorAfterRangeChange() {
+        const { x, y, gridId, mode, visible } = cursor
+        emitCursorUpdate({ x, y, gridId, mode, visible }, true)
+    }
+
     function getCursorTimestamp() {
-        if (!layout?.main || cursor.visible === false || cursor.mode === 'explore' || !Number.isFinite(cursor.x)) {
+        const grid = layout?.main
+        if (!grid || cursor.visible === false || cursor.mode === 'explore' || !Number.isFinite(cursor.x)) {
             return null
         }
         if (layout.indexBased) return Number.isFinite(cursor.time) ? cursor.time : null
 
         const main = hub.mainOv
         const data = main?.data
-        const time = cursor.ti
-        if (!data?.length || !Number.isFinite(time) || time < data[0][0] || time > data.at(-1)[0]) {
+        if (!data?.length) return null
+        // The cursor and candle positions can round to adjacent pixel columns.
+        if (cursor.x < grid.time2x(data[0][0]) - 1 || cursor.x > grid.time2x(data.at(-1)[0]) + 1) {
             return null
         }
-        return Utils.nearestTs(time, main.dataSubset || data)[1]?.[0] ?? null
+        const time = cursor.locked && !meta.scrollLock
+            ? Utils.nearestTs(grid.x2ti(cursor.x), main.dataSubset || data)[1]?.[0]
+            : cursor.getValue(hub.chart?.id, main.id)?.[0]
+        return Number.isFinite(time) ? time : null
     }
 
     function onCursorLocked(state) {
@@ -223,9 +239,15 @@
         if (emit) events.emit('$range-update', $range)
         rangeUpdate($range)
         hub.updateRange(range)
-        // TODO: Shoud be enabled (*), but it creates cursor lag
+        update({ rangeChanged: true }, emit)
+        let Q = props.config.QUANTIZE_AFTER
+        if (!cursor.locked && Q) Utils.afterAll(storage, () => quantizeCursor(emit), Q)
+    }
+
+    function updateRangeCursor(emit) {
+        if (!layout?.main) return
         if (cursor.locked) {
-            if (layout?.main && cursor.x !== undefined) {
+            if (cursor.x !== undefined) {
                 cursor.ti = layout.main.x2ti(cursor.x)
                 if (!layout.indexBased) {
                     cursor.time = interval ? Math.round(cursor.ti / interval) * interval : cursor.ti
@@ -237,20 +259,17 @@
                     cursor.time = src?.[idx]?.[0]
                 }
             }
-            update({}, emit)
-            return
+        } else {
+            cursor.xValues(hub, layout, chartProps)
+            cursor.yValues(layout)
         }
-        cursor.xValues(hub, layout, chartProps)
-        cursor.yValues(layout)
-        update({}, emit)
-        // Quantize cursor after events stop coming in
-        let Q = props.config.QUANTIZE_AFTER
-        if (Q) Utils.afterAll(storage, quantizeCursor, Q)
+        if (emit) emitCursorAfterRangeChange()
     }
 
-    function quantizeCursor() {
-        if (disposed) return
+    function quantizeCursor(emit) {
+        if (disposed || !layout?.main) return
         cursor.xSync(hub, layout, chartProps, cursor)
+        if (emit) emitCursorAfterRangeChange()
         update({ layout: false, cursorOnly: true })
     }
 
@@ -262,6 +281,7 @@
         pendingUpdate.emit = pendingUpdate.emit || emit
         pendingUpdate.updateHash = pendingUpdate.updateHash || !!opt.updateHash
         pendingUpdate.content = pendingUpdate.content || opt.cursorOnly !== true
+        if (opt.rangeChanged) pendingUpdate.rangeCursor = emit
 
         if (opt.immediate) {
             if (updateRaf != null) {
@@ -280,8 +300,8 @@
     function flushUpdate() {
         updateRaf = null
         if (disposed) return
-        let { layout: needsLayout, emit, updateHash, content } = pendingUpdate
-        pendingUpdate = { layout: false, emit: false, updateHash: false, content: false }
+        let { layout: needsLayout, emit, updateHash, content, rangeCursor } = pendingUpdate
+        pendingUpdate = { layout: false, emit: false, updateHash: false, content: false, rangeCursor: null }
 
         // Emit a global event (hook)
         if (emit) events.emit('$chart-pre-update')
@@ -300,18 +320,13 @@
             }
             // When only panes/overlays changed (e.g. script-produced overlays),
             // update layout and remake grid without re-running fullUpdate (loadScripts).
-            if (scan.panesChanged()) {
-                scan.updatePanesHash()
-                layout = new Layout(chartProps, hub, meta)
-                events.emit('update-pane', layout)
-                events.emitSpec('botbar', 'update-bb', layout)
-                events.emit('remake-grid')
-                if (emit) events.emit('$chart-update')
-                return
-            }
+            const remake = scan.panesChanged()
+            if (remake) scan.updatePanesHash()
             layout = new Layout(chartProps, hub, meta)
+            if (rangeCursor !== null) updateRangeCursor(rangeCursor)
             events.emit('update-pane', layout) // Update all panes
             events.emitSpec('botbar', 'update-bb', layout)
+            if (remake) events.emit('remake-grid')
             if (emit) events.emit('$chart-update')
             return
         }

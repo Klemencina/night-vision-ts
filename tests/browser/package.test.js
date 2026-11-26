@@ -137,7 +137,7 @@ test('syncs the hovered timestamp across irregular charts', { timeout: 60000 }, 
             })
         }
         const source = create('source', [[candle(sourceRows)]])
-        const peer = create('peer', [[candle(peerRows)], [candle(peerRows)]])
+        const peer = create('peer', [[candle(peerRows)], [candle(peerRows), { ...candle(peerRows), indexOffset: 2 }]])
         await Promise.all([source.setSeries(sourceRows), peer.setSeries(peerRows)])
 
         const sourceTimes = []
@@ -203,7 +203,12 @@ test('syncs the hovered timestamp across irregular charts', { timeout: 60000 }, 
     await expectGuide(null)
     await page.evaluate(() => { window.syncPair.peer.range = [-2, 6] })
     await expectGuide(2)
-    assert.equal(await page.evaluate(() => window.syncPair.peer.prependSeries(window.syncPair.rows([5]))), 1)
+    const offsets = await page.evaluate(async () => {
+        const { peer, rows } = window.syncPair
+        const added = await peer.batch(batch => batch.prependSeries(rows([5])))
+        return { added, offsets: peer.hub.panes()[1].overlays.map(overlay => overlay.indexOffset) }
+    })
+    assert.deepEqual(offsets, { added: 1, offsets: [1, 2] })
     assert.deepEqual(await page.evaluate(() => [...window.syncPair.peer.range]), [-1, 7])
     await expectGuide(3)
 
@@ -261,7 +266,7 @@ test('syncs the hovered timestamp across irregular charts', { timeout: 60000 }, 
         const move = props => source.events.emit('cursor-changed', { x, y: 40, gridId: 0, ...props })
         move({ visible: true })
         source.events.emit('cursor-locked', true)
-        source.range = source.range.map(index => index + 1)
+        source.events.emit('range-changed', source.range.map(index => index + 1))
         await new Promise(requestAnimationFrame)
         move({ visible: true })
         source.events.emit('cursor-changed', { visible: false })
@@ -283,10 +288,19 @@ test('syncs the hovered timestamp across irregular charts', { timeout: 60000 }, 
     const timeModeTimes = await page.evaluate(() => window.syncPair.sourceTimes.slice(-2))
 
     assert.deepEqual({ lockedTimes, timeModeTimes }, {
-        lockedTimes: [epoch + 90000, epoch + 147000, null, null],
+        lockedTimes: [epoch + 90000, epoch + 147000, epoch + 147000, null, null],
         timeModeTimes: [epoch + 90000, null]
     })
     await expectGuide(null)
+
+    await page.evaluate(async () => {
+        const { rows, source } = window.syncPair
+        source.hub.mainOv.settings.timeFrame = 60000
+        await source.setSeries(rows([10, 37, 100, 130]))
+    })
+    await moveTimeCursor(epoch + 70000)
+    assert.equal(await page.evaluate(() => window.syncPair.sourceTimes.at(-1)), epoch + 100000)
+    await expectGuide(epoch + 100000)
 })
 
 for (const format of ['esm', 'umd']) {

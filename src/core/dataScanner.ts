@@ -3,6 +3,7 @@
 
 import Utils from '../stuff/utils'
 import DataHub from './dataHub'
+import type { Overlay } from './dataHub'
 
 class DataScanner {
     props: any
@@ -105,6 +106,13 @@ class DataScanner {
                 : Utils.findIndexOffset(this.main, ov.data || [])
             ov.indexOffset = offset
             this.inferredOffsets.set(ov, offset)
+        }
+    }
+
+    copyInferredIndexOffset(source: Overlay, copy: Overlay): void {
+        const inferred = this.inferredOffsets.get(source)
+        if (inferred !== undefined && source.indexOffset === inferred) {
+            this.inferredOffsets.set(copy, inferred)
         }
     }
 

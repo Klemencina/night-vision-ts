@@ -63,4 +63,19 @@ describe('input lifecycle', () => {
         expect(vi.getTimerCount()).toBe(0)
         expect(callback).not.toHaveBeenCalled()
     })
+
+    it('releases the cursor lock when its input is replaced mid-gesture', () => {
+        const input = new Input()
+        const emit = vi.fn()
+        input.canvas = document.createElement('canvas')
+        input.events = { emit, emitSpec: vi.fn() }
+
+        input.mousedown(new MouseEvent('mousedown'))
+        input.destroy()
+        input.destroy()
+
+        expect(emit.mock.calls.filter(([event]) => event === 'cursor-locked')).toEqual([
+            ['cursor-locked', true], ['cursor-locked', false]
+        ])
+    })
 })

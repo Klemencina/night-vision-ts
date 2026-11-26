@@ -491,6 +491,8 @@ describe('main candle API queue', () => {
         controller.getRange = () => [120000, 180000]
         const first = vi.fn<HistoryLoader>().mockResolvedValue({ rows: [] })
         const second = vi.fn<HistoryLoader>().mockResolvedValue({ rows: [[-60000, 1, 2, 0, 1]], hasMore: false })
+        const appRange = vi.fn()
+        chart.events.on('history:$range-update', appRange)
         const oldDisconnect = chart.setHistoryLoader(first, { threshold: 0 })
         const disconnect = chart.setHistoryLoader(second, { threshold: 0 })
         try {
@@ -498,6 +500,9 @@ describe('main candle API queue', () => {
             expect(await chart.loadHistory()).toBe(1)
             expect(first).not.toHaveBeenCalled()
             expect(second).toHaveBeenCalledOnce()
+            disconnect()
+            chart.events.emit('$range-update', [1, 2])
+            expect(appRange).toHaveBeenCalledWith([1, 2])
         } finally { disconnect(); chart.destroy() }
     })
 

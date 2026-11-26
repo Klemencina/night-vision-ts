@@ -32,7 +32,7 @@ console.log(chart.cursor)
 
 ## Sync crosshairs by timestamp
 
-The `$cursor-update` event includes `timestampMs`, the selected main series row's timestamp in milliseconds. The event supplies `null` when the cursor is hidden or its position is outside the source series. On a time-based source, a position between candles uses the nearest visible row. TypeScript infers the `CursorUpdateEvent` type for this subscription.
+The `$cursor-update` event includes `timestampMs`, the selected main series row's timestamp in milliseconds. The event supplies `null` when the cursor is hidden or its position is outside the source series. On a time-based source, a position between candles uses the nearest visible row. Panning or zooming emits an update when the timestamp under the cursor changes. TypeScript infers the `CursorUpdateEvent` type for this subscription.
 
 Call `setCrosshairAtTime(timestampMs)` on the receiving chart to draw a vertical guide through its panes. This preserves the receiving chart's local cursor, price readout, lock, and viewport. The method does not emit `$cursor-update`, so the same wiring works in both directions.
 

@@ -88,6 +88,7 @@ export interface NightVisionProps {
 }
 
 const activeChartIds = new Set<string>()
+const historyRangeListener = '__nv-history-loader'
 let nextChartId = 0
 
 class NightVision {
@@ -525,7 +526,7 @@ class NightVision {
         const resetRange = resetRangeOption(options)
         return this._queueData(async () => {
             const original = this._data
-            const draft = new DataBatch(original, type => this._assertIndicatorType(type))
+            const draft = new DataBatch(original, type => this._assertIndicatorType(type), this.scan)
             let result: T
             try {
                 result = await callback(draft)
@@ -624,14 +625,14 @@ class NightVision {
             emit: (type, data) => this.events.emit(type, data)
         }, loader, threshold)
         this._history = history
-        this.events.on('history:$range-update', range => history.check(range as number[]))
+        this.events.on(`${historyRangeListener}:$range-update`, range => history.check(range as number[]))
         // Initialization can establish the first range without emitting $range-update.
         void this._queueData(async () => { if (this._history === history) history.check() }).catch(() => {})
         return () => {
             history.stop()
             if (this._history === history) {
                 this._history = null
-                this.events.off('history')
+                this.events.off(historyRangeListener, '$range-update')
             }
         }
     }

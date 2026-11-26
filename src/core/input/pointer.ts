@@ -103,6 +103,7 @@ export default class Input {
     pendingPan?: { x: number; y: number }
     pendingPinchScale?: number
     private disposed = false
+    private cursorLocked = false
     private setupGeneration = 0
     private timers = new Set<ReturnType<typeof setTimeout>>()
 
@@ -213,7 +214,7 @@ export default class Input {
                 t0: Utils.now(),
                 recentMoves: []
             }
-            this.events.emit('cursor-locked', true)
+            this.setCursorLocked(true)
             this.events.emit('cursor-changed', {
                 gridId: this.gridId,
                 x: event.center.x + this.offsetX,
@@ -262,7 +263,7 @@ export default class Input {
                 this.panFade()
             }
             this.drug = null
-            this.events.emit('cursor-locked', false)
+            this.setCursorLocked(false)
         })
 
         mc.on('tap', (event: any) => {
@@ -348,14 +349,14 @@ export default class Input {
     mouseup(event: MouseEvent): void {
         event = Utils.adjustMouse(event, this.canvas)
         this.drug = null
-        this.events.emit('cursor-locked', false)
+        this.setCursorLocked(false)
         this.propagate('mouseup', event)
     }
 
     mousedown(event: MouseEvent): void {
         event = Utils.adjustMouse(event, this.canvas)
         if (Utils.isMobile) return
-        this.events.emit('cursor-locked', true)
+        this.setCursorLocked(true)
         this.propagate('mousedown', event)
         if (event.defaultPrevented) return
         this.events.emit('grid-mousedown', [this.gridId, event])
@@ -639,9 +640,15 @@ export default class Input {
         this.timers.add(timer)
     }
 
+    private setCursorLocked(locked: boolean): void {
+        this.cursorLocked = locked
+        this.events.emit('cursor-locked', locked)
+    }
+
     destroy(): void {
         if (this.disposed) return
         this.disposed = true
+        if (this.cursorLocked) this.setCursorLocked(false)
         this.setupGeneration++
         this.fade?.stop()
         this.fade = undefined

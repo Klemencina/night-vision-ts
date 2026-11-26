@@ -1,4 +1,5 @@
 import type { Data, Overlay, Pane } from './dataHub'
+import type { DataScanner } from './dataScanner'
 import { copyCandle, copySeries, type Candle } from './candleData'
 import { copyIndicator, copyOverlay, copyOverlayPoint, copyPane, findTarget, validateOverlayData,
     type DataTarget, type IndicatorInput, type IndicatorPatch, type OverlayInput,
@@ -21,13 +22,15 @@ export default class DataBatch {
     private copiedRows = new WeakSet<any[]>()
     private initialMain: Overlay | undefined
 
-    constructor(data: Data, private validateIndicator: (type: string | undefined) => void) {
+    constructor(data: Data, private validateIndicator: (type: string | undefined) => void, scan: DataScanner) {
         this.data = { ...data, panes: (data.panes || []).map(pane => ({
             ...pane,
             settings: { ...pane.settings },
-            overlays: (pane.overlays || []).map(overlay => ({
-                ...overlay, settings: { ...overlay.settings }, props: { ...overlay.props }
-            })),
+            overlays: (pane.overlays || []).map(overlay => {
+                const copy = { ...overlay, settings: { ...overlay.settings }, props: { ...overlay.props } }
+                scan.copyInferredIndexOffset(overlay, copy)
+                return copy
+            }),
             scripts: (pane.scripts || []).map(script => ({
                 ...script, settings: { ...script.settings }, props: { ...script.props }
             }))
